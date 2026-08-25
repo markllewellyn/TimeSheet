@@ -8,6 +8,13 @@ namespace TimeSheet.Infrastructure.Repositories;
 
 public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRepository
 {
+    public async Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Include(e => e.User)
+            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to
+                        && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))
+            .ToListAsync(ct);
+
     public async Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct) =>
         await db.TimesheetEntries
             .Where(e => e.ProjectId == projectId && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))

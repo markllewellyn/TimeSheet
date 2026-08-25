@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\TimeSheet.Infrastructure\TimeSheet.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\TimeSheet.Domain\TimeSheet.Domain.csproj" />
   </ItemGroup>
 
 </Project>

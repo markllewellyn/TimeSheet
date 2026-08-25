@@ -30,6 +30,11 @@ public class ExpenseEntryRepository(TimesheetDbContext db) : IExpenseEntryReposi
         return await query.OrderByDescending(e => e.Date).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<ExpenseEntry>> GetBillableForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct) =>
+        await db.ExpenseEntries
+            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to && e.IsBillable)
+            .ToListAsync(ct);
+
     public async Task AddAsync(ExpenseEntry entry, CancellationToken ct) => await db.ExpenseEntries.AddAsync(entry, ct);
 
     public void Update(ExpenseEntry entry) => db.ExpenseEntries.Update(entry);

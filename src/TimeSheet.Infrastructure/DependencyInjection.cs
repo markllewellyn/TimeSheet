@@ -5,6 +5,7 @@ using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 using TimeSheet.Infrastructure.Data;
 using TimeSheet.Infrastructure.ExternalServices;
+using TimeSheet.Infrastructure.Pdf;
 using TimeSheet.Infrastructure.Repositories;
 using TimeSheet.Infrastructure.Services;
 
@@ -32,6 +33,7 @@ public static class DependencyInjection
         services.AddScoped<ICurrencyRateRepository, CurrencyRateRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IEscalationRepository, EscalationRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
@@ -41,6 +43,9 @@ public static class DependencyInjection
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IBudgetMonitoringService, BudgetMonitoringService>();
         services.AddScoped<IEscalationService, EscalationService>();
+        services.AddScoped<IInvoiceGenerationService, InvoiceGenerationService>();
+        services.AddScoped<IInvoicingService, InvoicingService>();
+        services.AddScoped<IPdfInvoiceRenderer, QuestPdfInvoiceRenderer>();
 
         services.AddHttpClient<ICurrencyRateProvider, FrankfurterCurrencyRateProvider>(client =>
         {

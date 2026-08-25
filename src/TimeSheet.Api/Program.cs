@@ -6,9 +6,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Identity.Web;
 using OpenTelemetry;
+using QuestPDF.Infrastructure;
 using TimeSheet.Api.Auth;
 using TimeSheet.Domain.Services;
 using TimeSheet.Infrastructure;
+
+// Community license - free under an annual gross revenue threshold (~USD 1M); confirm current terms against
+// SVG IT's actual revenue before shipping (see the plan's Invoicing section).
+QuestPDF.Settings.License = LicenseType.Community;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 

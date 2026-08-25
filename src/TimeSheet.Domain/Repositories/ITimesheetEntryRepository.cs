@@ -11,6 +11,10 @@ public interface ITimesheetEntryRepository
     /// Time" grid's search box.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetForUserAsync(int userId, string? searchText, DateOnly? from, DateOnly? to, CancellationToken ct);
 
+    /// <summary>All Normal/Approved entries for a project within a date range, across all users - used by
+    /// invoicing (billing is per-project, not per-user) and, later, reporting.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct);
+
     /// <summary>Sum of WorkHours+OutOfHoursHours for a project across entries that count toward its budget
     /// (Normal + Approved - PendingApproval/Declined are excluded until/unless approved). Used by
     /// IBudgetMonitoringService to evaluate a new entry against Project.BudgetHours.</summary>
