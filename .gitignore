@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+
+# EF Core / SQLite local data
+*.db
+*.db-shm
+*.db-wal
+App_Data/
+
+# Azure Functions local secrets
+local.settings.json
+
+# Angular / Node
+node_modules/
+dist/
+.angular/
+
+# Angular environment secrets (kept as .example templates in source control)
+src/TimeSheet.Web/src/environments/environment.ts
+src/TimeSheet.Web/src/environments/environment.development.ts
+
+# OS/editor
+.DS_Store
+Thumbs.db

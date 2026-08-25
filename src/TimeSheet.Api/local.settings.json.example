@@ -1,0 +1,26 @@
+{
+    "IsEncrypted": false,
+    "Values": {
+        "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+        "FUNCTIONS_WORKER_RUNTIME": "dotnet-isolated",
+
+        "AzureAd:Instance": "https://login.microsoftonline.com/",
+        "AzureAd:TenantId": "<your-entra-tenant-id>",
+        "AzureAd:ClientId": "<the-API-app-registration-client-id>",
+        "AzureAd:Audience": "api://<the-API-app-registration-client-id>",
+
+        "ConnectionStrings:TimesheetDb": "Data Source=timesheet.db",
+
+        "GraphAdmin:TenantId": "<your-entra-tenant-id>",
+        "GraphAdmin:ClientId": "<the-Graph-admin-app-registration-client-id>",
+        "GraphAdmin:ClientSecret": "<the-Graph-admin-app-registration-client-secret>",
+        "GraphAdmin:SendMailAsUser": "noreply@svgit.co.uk",
+
+        "Claude:ApiKey": "<your-anthropic-api-key>",
+
+        "AttachmentsRootPath": "C:\\TimeSheetData\\Attachments"
+    },
+    "Host": {
+        "CORS": "http://localhost:4200"
+    }
+}

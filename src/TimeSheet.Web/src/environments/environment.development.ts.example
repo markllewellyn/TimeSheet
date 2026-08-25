@@ -1,0 +1,10 @@
+// Copy this file to environment.development.ts (gitignored) and fill in your Entra app registration details.
+export const environment = {
+  production: false,
+  apiBaseUrl: '/api',
+  entra: {
+    authority: 'https://login.microsoftonline.com/<your-entra-tenant-id>',
+    clientId: '<the-SPA-app-registration-client-id>',
+    apiScope: 'api://<the-API-app-registration-client-id>/access_as_user',
+  },
+};
