@@ -35,4 +35,9 @@ export class UsersAdminService {
   update(id: number, request: UpdateUserRequest): Observable<AppUser> {
     return this.http.put<AppUser>(`${this.baseUrl}/${id}`, request);
   }
+
+  // Admin account maintenance against Entra ID itself (via Graph) - returns a one-time temporary password.
+  resetPassword(id: number): Observable<{ temporaryPassword: string }> {
+    return this.http.post<{ temporaryPassword: string }>(`${environment.apiBaseUrl}/admin/users/${id}/reset-password`, {});
+  }
 }

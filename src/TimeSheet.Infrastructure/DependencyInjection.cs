@@ -41,7 +41,9 @@ public static class DependencyInjection
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
+        services.AddSingleton<GraphClientFactory>();
         services.AddScoped<IEmailSender, GraphEmailSender>();
+        services.AddScoped<IAdminUserService, GraphAdminUserService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IBudgetMonitoringService, BudgetMonitoringService>();
         services.AddScoped<IEscalationService, EscalationService>();

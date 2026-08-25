@@ -64,4 +64,12 @@ export class UsersListPage {
       .update(user.id, { displayName: user.displayName, role: newRole, jobTitle: user.jobTitle, isActive: user.isActive })
       .subscribe(() => this.refresh());
   }
+
+  protected resetPassword(user: AppUser): void {
+    if (!confirm(`Force a password reset for ${user.displayName} in Entra ID?`)) return;
+    this.usersAdmin.resetPassword(user.id).subscribe({
+      next: (result) => alert(`Temporary password for ${user.displayName}:\n\n${result.temporaryPassword}\n\nThey'll be required to change it at next sign-in.`),
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not reset the password.'),
+    });
+  }
 }

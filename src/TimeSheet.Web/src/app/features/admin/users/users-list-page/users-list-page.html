@@ -59,7 +59,8 @@
           <td class="py-2">{{ u.isActive ? 'Active' : 'Inactive' }}</td>
           <td class="py-2 text-right">
             <button class="mr-3 hover:underline" (click)="toggleRole(u)">Make {{ u.role === 'Admin' ? 'User' : 'Admin' }}</button>
-            <button class="hover:underline" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+            <button class="mr-3 hover:underline" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+            <button class="hover:underline" (click)="resetPassword(u)">Reset Password</button>
           </td>
         </tr>
       }
