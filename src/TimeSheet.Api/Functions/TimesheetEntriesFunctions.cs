@@ -17,6 +17,9 @@ public class TimesheetEntriesFunctions(
     ITimesheetEntryRepository entries,
     IProjectAssignmentRepository assignments,
     IProjectRepository projects,
+    IBudgetMonitoringService budgetMonitoring,
+    IEscalationService escalationService,
+    INotificationService notificationService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -71,8 +74,26 @@ public class TimesheetEntriesFunctions(
             Status = TimesheetEntryStatus.Normal,
             CreatedUtc = DateTimeOffset.UtcNow,
         };
+
+        // Budget check is synchronous, gating the save itself - going over budget is an explicit admin
+        // decision, never a silent event (see IBudgetMonitoringService/IEscalationService).
+        var budgetCheck = await budgetMonitoring.EvaluateAsync(entry, ct);
+        if (budgetCheck.RequiresEscalation) entry.Status = TimesheetEntryStatus.PendingApproval;
+
         await entries.AddAsync(entry, ct);
         await uow.SaveChangesAsync(ct);
+
+        if (budgetCheck.RequiresEscalation)
+        {
+            await escalationService.RaiseAsync(entry, EscalationReason.ProjectBudgetExceeded, budgetCheck.Limit!.Value, budgetCheck.CumulativeValue, ct);
+        }
+        else if (budgetCheck.IsWarningOnly)
+        {
+            await notificationService.RaiseToAdminsAsync(
+                NotificationType.BudgetWarning,
+                $"Project {body.ProjectId} is approaching its budget ({budgetCheck.CumulativeValue}/{budgetCheck.Limit} hours).",
+                NotificationChannel.InAppOnly, body.ProjectId, entry.Id, ct);
+        }
 
         var saved = await entries.GetByIdAsync(entry.Id, ct);
         return new CreatedResult($"/api/timesheet-entries/{entry.Id}", ToDto(saved!));

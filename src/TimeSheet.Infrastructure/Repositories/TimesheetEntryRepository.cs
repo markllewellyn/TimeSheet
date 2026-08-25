@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Infrastructure.Data;
@@ -7,6 +8,11 @@ namespace TimeSheet.Infrastructure.Repositories;
 
 public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRepository
 {
+    public async Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Where(e => e.ProjectId == projectId && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))
+            .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
+
     public Task<TimesheetEntry?> GetByIdAsync(int id, CancellationToken ct) =>
         db.TimesheetEntries.Include(e => e.Attachments).Include(e => e.Project).ThenInclude(p => p!.Client)
             .FirstOrDefaultAsync(e => e.Id == id, ct);
