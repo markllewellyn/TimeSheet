@@ -9,7 +9,7 @@ namespace TimeSheet.Infrastructure.Repositories;
 public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
 {
     public Task<Project?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.Projects.Include(p => p.Rates).FirstOrDefaultAsync(p => p.Id == id, ct);
+        db.Projects.Include(p => p.Rates).Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<IReadOnlyList<Project>> GetByClientIdAsync(int clientId, bool includeInactive, CancellationToken ct)
     {

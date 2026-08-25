@@ -35,6 +35,7 @@ public static class DependencyInjection
         services.AddScoped<IEscalationRepository, EscalationRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IReportingRepository, ReportingRepository>();
+        services.AddScoped<IProjectHealthAssessmentRepository, ProjectHealthAssessmentRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
@@ -49,11 +50,15 @@ public static class DependencyInjection
         services.AddScoped<IPdfInvoiceRenderer, QuestPdfInvoiceRenderer>();
         services.AddScoped<IRevenueRecognitionService, RevenueRecognitionService>();
         services.AddScoped<IReportingService, ReportingService>();
+        services.AddScoped<IProjectHealthAssessor, ProjectHealthAssessor>();
+        services.AddScoped<IProjectHealthService, ProjectHealthService>();
 
         services.AddHttpClient<ICurrencyRateProvider, FrankfurterCurrencyRateProvider>(client =>
         {
             client.BaseAddress = new Uri("https://api.frankfurter.dev/");
         });
+
+        services.AddHttpClient<IHealthAnalysisClient, ClaudeHealthAnalysisClient>();
 
         return services;
     }
