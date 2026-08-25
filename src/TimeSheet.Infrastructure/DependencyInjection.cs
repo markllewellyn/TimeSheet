@@ -25,9 +25,13 @@ public static class DependencyInjection
         services.AddScoped<IProjectRateRepository, ProjectRateRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<IProjectAssignmentRepository, ProjectAssignmentRepository>();
+        services.AddScoped<ITimesheetEntryRepository, TimesheetEntryRepository>();
+        services.AddScoped<IExpenseEntryRepository, ExpenseEntryRepository>();
+        services.AddScoped<IAttachmentRepository, AttachmentRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
+        services.AddScoped<IFileStorageService, LocalFileStorageService>();
 
         return services;
     }

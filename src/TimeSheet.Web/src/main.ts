@@ -1,8 +1,11 @@
 import { bootstrapApplication } from '@angular/platform-browser';
 import { MSAL_INSTANCE } from '@azure/msal-angular';
+import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community';
 import { appConfig } from './app/app.config';
 import { App } from './app/app';
 import { MSALInstanceFactory } from './app/core/auth/msal.factories';
+
+ModuleRegistry.registerModules([AllCommunityModule]);
 
 // MSAL v3+ requires instance.initialize() to complete, and the redirect response to be processed via
 // handleRedirectPromise(), before the app renders - otherwise login works once then breaks on refresh.

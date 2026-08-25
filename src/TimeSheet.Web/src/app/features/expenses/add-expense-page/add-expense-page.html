@@ -1,0 +1,56 @@
+<div class="mx-auto max-w-2xl">
+  <h1 class="mb-6 text-xl font-semibold">Add an Expense Entry</h1>
+
+  @if (error(); as e) {
+    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  }
+
+  <div class="grid grid-cols-2 gap-4">
+    <label class="flex flex-col gap-1 text-sm">
+      Customer
+      <select
+        class="rounded border border-border bg-card px-3 py-2"
+        [ngModel]="selectedClientId()"
+        (ngModelChange)="onClientChange($event)"
+      >
+        <option [ngValue]="null" disabled>Select a customer</option>
+        @for (c of clients(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Project
+      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
+        <option [ngValue]="null" disabled>Select a project</option>
+        @for (p of projectsForClient(); track p.id) {
+          <option [ngValue]="p.id">{{ p.name }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Date
+      <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Value of Expense
+      <div class="flex gap-2">
+        <input type="number" min="0" step="0.01" class="w-full rounded border border-border bg-card px-3 py-2" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
+        <input type="text" maxlength="3" class="w-20 rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="currency()" (ngModelChange)="currency.set($event)" />
+      </div>
+    </label>
+
+    <label class="col-span-2 flex flex-col gap-1 text-sm">
+      Description
+      <input type="text" placeholder="Task description" class="rounded border border-border bg-card px-3 py-2" [ngModel]="description()" (ngModelChange)="description.set($event)" />
+    </label>
+  </div>
+
+  <div class="mt-6 flex gap-3">
+    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="save()">Log</button>
+    <button class="rounded border border-border px-4 py-2 text-sm" (click)="cancel()">Cancel</button>
+  </div>
+</div>

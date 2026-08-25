@@ -1,0 +1,118 @@
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Azure.Functions.Worker;
+using TimeSheet.Api.Auth;
+using TimeSheet.Contracts;
+using TimeSheet.Domain.Entities;
+using TimeSheet.Domain.Repositories;
+using TimeSheet.Domain.Services;
+
+namespace TimeSheet.Api.Functions;
+
+public class ExpenseEntriesFunctions(
+    IExpenseEntryRepository expenses,
+    IProjectAssignmentRepository assignments,
+    IProjectRepository projects,
+    IUnitOfWork uow,
+    ICurrentUserAccessor currentUser)
+{
+    [Function("ExpenseEntries_List")]
+    public async Task<IActionResult> List(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "expense-entries")] HttpRequest req, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var search = req.Query["search"].ToString();
+        var from = req.Query.TryGetValue("from", out var f) && DateOnly.TryParse(f, out var fd) ? fd : (DateOnly?)null;
+        var to = req.Query.TryGetValue("to", out var t) && DateOnly.TryParse(t, out var td) ? td : (DateOnly?)null;
+
+        var result = await expenses.GetForUserAsync(user.UserId, search, from, to, ct);
+        return new OkObjectResult(result.Select(ToDto));
+    }
+
+    [Function("ExpenseEntries_Create")]
+    public async Task<IActionResult> Create(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "expense-entries")] HttpRequest req, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var body = await req.ReadFromJsonAsync<CreateExpenseEntryRequest>(ct)
+            ?? throw new BadHttpRequestException("Missing request body.");
+
+        var validation = await ValidateAssignmentAsync(user.UserId, body.ProjectId, body.Date, ct);
+        if (validation is not null) return validation;
+
+        var entry = new ExpenseEntry
+        {
+            UserId = user.UserId,
+            ProjectId = body.ProjectId,
+            Date = body.Date,
+            Amount = body.Amount,
+            Currency = body.Currency,
+            Description = body.Description,
+            IsBillable = body.IsBillable,
+            CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        await expenses.AddAsync(entry, ct);
+        await uow.SaveChangesAsync(ct);
+
+        var saved = await expenses.GetByIdAsync(entry.Id, ct);
+        return new CreatedResult($"/api/expense-entries/{entry.Id}", ToDto(saved!));
+    }
+
+    [Function("ExpenseEntries_Update")]
+    public async Task<IActionResult> Update(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "expense-entries/{id:int}")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var entry = await expenses.GetByIdAsync(id, ct);
+        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+
+        var body = await req.ReadFromJsonAsync<UpdateExpenseEntryRequest>(ct)
+            ?? throw new BadHttpRequestException("Missing request body.");
+
+        var validation = await ValidateAssignmentAsync(user.UserId, entry.ProjectId, body.Date, ct);
+        if (validation is not null) return validation;
+
+        entry.Date = body.Date;
+        entry.Amount = body.Amount;
+        entry.Currency = body.Currency;
+        entry.Description = body.Description;
+        entry.IsBillable = body.IsBillable;
+        entry.ModifiedUtc = DateTimeOffset.UtcNow;
+
+        expenses.Update(entry);
+        await uow.SaveChangesAsync(ct);
+        return new OkObjectResult(ToDto(entry));
+    }
+
+    [Function("ExpenseEntries_Delete")]
+    public async Task<IActionResult> Delete(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "expense-entries/{id:int}")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var entry = await expenses.GetByIdAsync(id, ct);
+        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+
+        expenses.Remove(entry);
+        await uow.SaveChangesAsync(ct);
+        return new NoContentResult();
+    }
+
+    private async Task<IActionResult?> ValidateAssignmentAsync(int userId, int projectId, DateOnly date, CancellationToken ct)
+    {
+        var project = await projects.GetByIdAsync(projectId, ct);
+        if (project is null) return new NotFoundObjectResult(new { error = "Project not found." });
+
+        if (!await assignments.IsUserAssignedAsync(userId, projectId, date, ct))
+        {
+            return new ObjectResult(new { error = "You are not assigned to this project for the given date." })
+            {
+                StatusCode = StatusCodes.Status403Forbidden,
+            };
+        }
+        return null;
+    }
+
+    private static ExpenseEntryDto ToDto(ExpenseEntry e) => new(
+        e.Id, e.ProjectId, e.Project?.Name ?? "", e.Project?.ClientId ?? 0, e.Project?.Client?.Name ?? "",
+        e.Date, e.Amount, e.Currency, e.Description, e.IsBillable);
+}

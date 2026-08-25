@@ -1,0 +1,39 @@
+<div class="flex flex-col gap-4">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-2">
+      <input
+        class="rounded border border-border bg-card px-3 py-1.5 text-sm"
+        placeholder="Customer Name/Account, Project..."
+        [value]="searchText()"
+        (input)="onSearchChange($any($event.target).value)"
+      />
+      <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="refresh()">
+        Refresh
+      </button>
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button class="rounded border border-border px-3 py-1.5 text-sm" (click)="addExpense()">+ Expense</button>
+      <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="addEntry()">
+        + Log Time
+      </button>
+    </div>
+  </div>
+
+  @if (summary(); as s) {
+    <div class="flex flex-wrap gap-6 text-sm text-muted-foreground">
+      <span>Most Recent Day's Hours: <strong class="text-foreground">{{ s.mostRecentDayHours }}</strong></span>
+      <span>Total Work Hours: <strong class="text-foreground">{{ s.totalWorkHours }}</strong></span>
+      <span>Total Out Of Office Hours: <strong class="text-foreground">{{ s.totalOutOfHoursHours }}</strong></span>
+      <span>Total Hours: <strong class="text-foreground">{{ s.totalHours }}</strong></span>
+    </div>
+  }
+
+  <ag-grid-angular
+    class="h-[600px] w-full"
+    [theme]="theme"
+    [rowData]="rowData()"
+    [columnDefs]="columnDefs"
+    [defaultColDef]="{ sortable: true, resizable: true }"
+  />
+</div>
