@@ -30,4 +30,17 @@
     <ProjectReference Include="..\TimeSheet.Infrastructure\TimeSheet.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- Without this, `func start`/Core Tools' own handling copies these to its custom bin\output\ path, but a
+       plain Visual Studio F5 build (bin\Debug\net9.0\) never gets a copy at all - which is exactly what caused
+       local.settings.json's values to appear "missing" under the VS debugger. -->
+  <ItemGroup>
+    <None Update="host.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Update="local.settings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>Never</CopyToPublishDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
