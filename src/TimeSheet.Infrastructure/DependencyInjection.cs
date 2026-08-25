@@ -34,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IEscalationRepository, EscalationRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IReportingRepository, ReportingRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
@@ -46,6 +47,8 @@ public static class DependencyInjection
         services.AddScoped<IInvoiceGenerationService, InvoiceGenerationService>();
         services.AddScoped<IInvoicingService, InvoicingService>();
         services.AddScoped<IPdfInvoiceRenderer, QuestPdfInvoiceRenderer>();
+        services.AddScoped<IRevenueRecognitionService, RevenueRecognitionService>();
+        services.AddScoped<IReportingService, ReportingService>();
 
         services.AddHttpClient<ICurrencyRateProvider, FrankfurterCurrencyRateProvider>(client =>
         {
