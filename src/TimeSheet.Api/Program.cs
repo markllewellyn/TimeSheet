@@ -33,8 +33,20 @@ if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHT
 // A second scheme, "LocalBearer", validates self-issued tokens for local (username/password) accounts -
 // CurrentUserMiddleware tries the Entra scheme first, then falls back to this one. This is what lets a local
 // account sign in even if Entra SSO is unreachable/misconfigured (see LocalAuthService/AuthFunctions).
-var localAuthSigningKey = builder.Configuration["LocalAuth:JwtSigningKey"]
-    ?? throw new InvalidOperationException("Missing LocalAuth:JwtSigningKey configuration.");
+var localAuthSigningKey = builder.Configuration["LocalAuth:JwtSigningKey"];
+if (string.IsNullOrWhiteSpace(localAuthSigningKey))
+{
+    // Local dev resilience: some launch paths (e.g. Visual Studio's F5 debugger) don't always surface
+    // local.settings.json values the same way `func start` does. Rather than refuse to start, generate an
+    // ephemeral key for this process instead - local-account sign-in still works, tokens just won't survive
+    // a restart until a real value is set in local.settings.json. Written back into Configuration so
+    // LocalAuthService (which reads the same key at token-issuance time) uses this identical value.
+    localAuthSigningKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
+    builder.Configuration["LocalAuth:JwtSigningKey"] = localAuthSigningKey;
+    Console.WriteLine(
+        "WARNING: LocalAuth:JwtSigningKey was not found in configuration - generated a temporary key for " +
+        "this run. Set a real value in local.settings.json so local-account sessions survive a restart.");
+}
 
 var authBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme);
 authBuilder.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
