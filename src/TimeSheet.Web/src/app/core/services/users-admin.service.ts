@@ -37,7 +37,9 @@ export class UsersAdminService {
   }
 
   // Admin account maintenance against Entra ID itself (via Graph) - returns a one-time temporary password.
+  // Route deliberately avoids a leading "admin/" segment - Azure Functions reserves that for its own host API
+  // and silently drops user-defined routes that start with it.
   resetPassword(id: number): Observable<{ temporaryPassword: string }> {
-    return this.http.post<{ temporaryPassword: string }>(`${environment.apiBaseUrl}/admin/users/${id}/reset-password`, {});
+    return this.http.post<{ temporaryPassword: string }>(`${this.baseUrl}/${id}/reset-password`, {});
   }
 }

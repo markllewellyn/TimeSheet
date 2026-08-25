@@ -14,7 +14,7 @@ public class AdminUsersFunctions(IUserRepository users, IAdminUserService adminU
 {
     [Function("AdminUsers_ResetPassword")]
     public async Task<IActionResult> ResetPassword(
-        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "admin/users/{id:int}/reset-password")] HttpRequest req, int id, CancellationToken ct)
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "users/{id:int}/reset-password")] HttpRequest req, int id, CancellationToken ct)
     {
         if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
 
