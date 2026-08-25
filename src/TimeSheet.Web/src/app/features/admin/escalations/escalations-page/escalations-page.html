@@ -1,0 +1,37 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-xl font-semibold">Pending Budget Escalations</h1>
+
+  @if (escalations().length === 0) {
+    <p class="text-sm text-muted-foreground">No pending escalations - nothing needs your approval right now.</p>
+  }
+
+  <table class="w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-border text-left">
+        <th class="py-2">Client</th>
+        <th class="py-2">Project</th>
+        <th class="py-2">Reason</th>
+        <th class="py-2">Limit</th>
+        <th class="py-2">Cumulative</th>
+        <th class="py-2">Raised</th>
+        <th class="py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (e of escalations(); track e.id) {
+        <tr class="border-b border-border">
+          <td class="py-2">{{ e.clientName }}</td>
+          <td class="py-2">{{ e.projectName }}</td>
+          <td class="py-2">{{ e.reason }}</td>
+          <td class="py-2">{{ e.budgetLimitAtTimeOfEntry }}</td>
+          <td class="py-2">{{ e.cumulativeValueAtTimeOfEntry }}</td>
+          <td class="py-2">{{ e.raisedAtUtc | date: 'short' }}</td>
+          <td class="py-2 text-right">
+            <button class="mr-3 text-green-700 hover:underline" (click)="approve(e)">Approve</button>
+            <button class="text-red-600 hover:underline" (click)="decline(e)">Decline</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

@@ -1,0 +1,64 @@
+<div class="mx-auto max-w-2xl">
+  <h1 class="mb-6 text-xl font-semibold">{{ isEditMode ? 'Edit Client' : 'New Client' }}</h1>
+
+  @if (error(); as e) {
+    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  }
+
+  <div class="grid grid-cols-2 gap-4">
+    <label class="flex flex-col gap-1 text-sm">
+      Name
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Account Code
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="accountCode()" (ngModelChange)="accountCode.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Billing Address
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingAddressLine1()" (ngModelChange)="billingAddressLine1.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      City
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingCity()" (ngModelChange)="billingCity.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Postal Code
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingPostalCode()" (ngModelChange)="billingPostalCode.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Country Code
+      <input maxlength="2" class="rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="billingCountryCode()" (ngModelChange)="billingCountryCode.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Primary Contact Name
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="primaryContactName()" (ngModelChange)="primaryContactName.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Primary Contact Email
+      <input type="email" class="rounded border border-border bg-card px-3 py-2" [ngModel]="primaryContactEmail()" (ngModelChange)="primaryContactEmail.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Reporting Currency
+      <input maxlength="3" class="rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="reportingCurrencyCode()" (ngModelChange)="reportingCurrencyCode.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Invoicing Month-End Day
+      <input type="number" min="1" max="31" class="rounded border border-border bg-card px-3 py-2" [ngModel]="invoicingMonthEndDay()" (ngModelChange)="invoicingMonthEndDay.set($event)" />
+    </label>
+
+    <label class="col-span-2 flex flex-col gap-1 text-sm">
+      Notes
+      <textarea class="rounded border border-border bg-card px-3 py-2" rows="3" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
+    </label>
+  </div>
+
+  <div class="mt-6 flex gap-3">
+    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="save()">Save</button>
+    <button class="rounded border border-border px-4 py-2 text-sm" (click)="cancel()">Cancel</button>
+  </div>
+</div>

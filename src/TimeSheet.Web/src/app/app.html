@@ -1,9 +1,51 @@
 <div class="min-h-screen bg-background text-foreground">
   <header class="flex items-center justify-between border-b border-border px-6 py-3">
-    <span class="font-semibold">TimeSheet</span>
+    <nav class="flex items-center gap-4 text-sm">
+      <span class="font-semibold">TimeSheet</span>
+      <a routerLink="/timesheet" class="hover:underline">Log Time</a>
+      @if (currentUser.isAdmin()) {
+        <a routerLink="/admin/clients" class="hover:underline">Clients</a>
+        <a routerLink="/admin/users" class="hover:underline">Users</a>
+        <a routerLink="/admin/escalations" class="hover:underline">Escalations</a>
+        <a routerLink="/admin/reports" class="hover:underline">Reports</a>
+        <a routerLink="/admin/invoicing" class="hover:underline">Invoicing</a>
+        <a routerLink="/admin/health" class="hover:underline">Project Health</a>
+      }
+    </nav>
 
     @if (currentUser.isSignedIn()) {
-      <div class="flex items-center gap-3 text-sm">
+      <div class="flex items-center gap-4 text-sm">
+        <div class="relative">
+          <button class="relative" (click)="showNotifications.set(!showNotifications())" aria-label="Notifications">
+            🔔
+            @if (notifications.unread().length > 0) {
+              <span class="absolute -right-2 -top-2 rounded-full bg-red-600 px-1.5 text-xs text-white">
+                {{ notifications.unread().length }}
+              </span>
+            }
+          </button>
+
+          @if (showNotifications()) {
+            <div class="absolute right-0 z-10 mt-2 w-80 rounded border border-border bg-card p-3 shadow-lg">
+              @if (notifications.unread().length === 0) {
+                <p class="text-sm text-muted-foreground">No new notifications.</p>
+              } @else {
+                <div class="flex flex-col gap-2">
+                  @for (n of notifications.unread(); track n.id) {
+                    <div class="border-b border-border pb-2 text-sm last:border-0">
+                      <p>{{ n.message }}</p>
+                      <button class="text-xs text-muted-foreground hover:underline" (click)="notifications.markRead(n.id)">
+                        Mark read
+                      </button>
+                    </div>
+                  }
+                  <button class="text-left text-xs hover:underline" (click)="notifications.markAllRead()">Mark all read</button>
+                </div>
+              }
+            </div>
+          }
+        </div>
+
         <span>{{ currentUser.me()?.displayName }}</span>
         <button class="underline" (click)="currentUser.logout()">Sign out</button>
       </div>

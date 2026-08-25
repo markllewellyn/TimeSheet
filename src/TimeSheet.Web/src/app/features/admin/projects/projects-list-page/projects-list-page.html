@@ -1,0 +1,36 @@
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Projects - {{ clientName() }}</h1>
+    <a [routerLink]="['/admin/clients', clientId, 'projects', 'new']" class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+      + New Project
+    </a>
+  </div>
+
+  <table class="w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-border text-left">
+        <th class="py-2">Code</th>
+        <th class="py-2">Name</th>
+        <th class="py-2">Payment Model</th>
+        <th class="py-2">Budget Hours</th>
+        <th class="py-2">Status</th>
+        <th class="py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (p of projects(); track p.id) {
+        <tr class="border-b border-border">
+          <td class="py-2">{{ p.code }}</td>
+          <td class="py-2">{{ p.name }}</td>
+          <td class="py-2">{{ p.paymentModel }}</td>
+          <td class="py-2">{{ p.budgetHours ?? '-' }}</td>
+          <td class="py-2">{{ p.isActive ? 'Active' : 'Inactive' }}</td>
+          <td class="py-2 text-right">
+            <a [routerLink]="['/admin/projects', p.id]" class="mr-3 hover:underline">Edit / Rates</a>
+            <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="hover:underline">Assignments</a>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

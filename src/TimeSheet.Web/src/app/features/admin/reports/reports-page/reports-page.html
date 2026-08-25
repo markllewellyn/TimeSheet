@@ -1,0 +1,96 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-xl font-semibold">Reports</h1>
+
+  @if (error(); as e) {
+    <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  }
+
+  <div class="flex flex-wrap items-end gap-3 rounded border border-border p-4">
+    <label class="flex flex-col gap-1 text-sm">
+      Report
+      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="reportType()" (ngModelChange)="reportType.set($event)">
+        <option value="time-on-client">Time on Client</option>
+        <option value="time-on-project">Time on Project</option>
+        <option value="cost-on-client">Cost to Business on Client</option>
+        <option value="cost-on-project">Cost to Business on Project</option>
+        <option value="profit-on-client">Profit to Business on Client</option>
+        <option value="profit-on-project">Profit to Business on Project</option>
+      </select>
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Client
+      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
+        <option [ngValue]="null" disabled>Select a client</option>
+        @for (c of clients(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+    </label>
+
+    @if (isProjectScoped()) {
+      <label class="flex flex-col gap-1 text-sm">
+        Project
+        <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
+          <option [ngValue]="null" disabled>Select a project</option>
+          @for (p of projects(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }}</option>
+          }
+        </select>
+      </label>
+    }
+
+    <label class="flex flex-col gap-1 text-sm">
+      Range
+      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="rangePreset()" (ngModelChange)="rangePreset.set($event)">
+        <option value="Last7Days">Last 7 Days</option>
+        <option value="LastMonth">Last Month</option>
+        <option value="LastYear">Last Year</option>
+        <option value="Custom">Custom</option>
+      </select>
+    </label>
+
+    @if (rangePreset() === 'Custom') {
+      <label class="flex flex-col gap-1 text-sm">
+        Start
+        <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+      </label>
+      <label class="flex flex-col gap-1 text-sm">
+        End
+        <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+      </label>
+    }
+
+    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="run()">Run</button>
+  </div>
+
+  @if (report(); as r) {
+    <div class="rounded border border-border p-4">
+      <h2 class="mb-2 font-semibold">Summary ({{ r.currency }})</h2>
+      <div class="flex flex-wrap gap-6 text-sm">
+        @for (kv of r.summary | keyvalue; track kv.key) {
+          <span>{{ kv.key }}: <strong>{{ kv.value }}</strong></span>
+        }
+      </div>
+    </div>
+
+    <table class="w-full border-collapse text-sm">
+      <thead>
+        <tr class="border-b border-border text-left">
+          @for (col of breakdownColumns(); track col) {
+            <th class="py-2">{{ col }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of r.breakdown; track $index) {
+          <tr class="border-b border-border">
+            @for (col of breakdownColumns(); track col) {
+              <td class="py-2">{{ row[col] }}</td>
+            }
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+</div>

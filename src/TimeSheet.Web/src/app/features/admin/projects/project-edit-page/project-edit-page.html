@@ -1,0 +1,133 @@
+<div class="mx-auto max-w-3xl">
+  <h1 class="mb-6 text-xl font-semibold">{{ isEditMode ? 'Edit Project' : 'New Project' }}</h1>
+
+  @if (error(); as e) {
+    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  }
+
+  <div class="grid grid-cols-2 gap-4">
+    <label class="flex flex-col gap-1 text-sm">
+      Name
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Code
+      <input class="rounded border border-border bg-card px-3 py-2 disabled:opacity-60" [disabled]="isEditMode" [ngModel]="code()" (ngModelChange)="code.set($event)" />
+    </label>
+
+    <label class="col-span-2 flex flex-col gap-1 text-sm">
+      Description
+      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="description()" (ngModelChange)="description.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Payment Model
+      <select class="rounded border border-border bg-card px-3 py-2 disabled:opacity-60" [disabled]="isEditMode" [ngModel]="paymentModel()" (ngModelChange)="paymentModel.set($event)">
+        <option value="TimeAndMaterials">Time and Materials</option>
+        <option value="FixedProjectCost">Fixed Project Cost</option>
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Currency Override
+      <input maxlength="3" placeholder="(inherits client currency)" class="rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="currencyOverride()" (ngModelChange)="currencyOverride.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Start Date
+      <input type="date" class="rounded border border-border bg-card px-3 py-2 disabled:opacity-60" [disabled]="isEditMode" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      End Date
+      <input type="date" placeholder="(open-ended)" class="rounded border border-border bg-card px-3 py-2" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+    </label>
+
+    <label class="flex flex-col gap-1 text-sm">
+      Budget Hours
+      <input type="number" min="0" class="rounded border border-border bg-card px-3 py-2" [ngModel]="budgetHours()" (ngModelChange)="budgetHours.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Budget Alert Threshold (%)
+      <input type="number" min="1" max="100" class="rounded border border-border bg-card px-3 py-2" [ngModel]="budgetAlertThresholdPercent()" (ngModelChange)="budgetAlertThresholdPercent.set($event)" />
+    </label>
+
+    @if (paymentModel() === 'FixedProjectCost') {
+      <label class="flex flex-col gap-1 text-sm">
+        Fixed Fee Amount (per invoicing period)
+        <input type="number" min="0" step="0.01" class="rounded border border-border bg-card px-3 py-2" [ngModel]="fixedFeeAmount()" (ngModelChange)="fixedFeeAmount.set($event)" />
+      </label>
+    }
+
+    @if (!isEditMode) {
+      <label class="flex flex-col gap-1 text-sm">
+        Default Cost Rate / Hour
+        <input type="number" min="0" step="0.01" class="rounded border border-border bg-card px-3 py-2" [ngModel]="defaultCostRatePerHour()" (ngModelChange)="defaultCostRatePerHour.set($event)" />
+      </label>
+      @if (paymentModel() === 'TimeAndMaterials') {
+        <label class="flex flex-col gap-1 text-sm">
+          Default Billing Rate / Hour
+          <input type="number" min="0" step="0.01" class="rounded border border-border bg-card px-3 py-2" [ngModel]="defaultBillingRatePerHour()" (ngModelChange)="defaultBillingRatePerHour.set($event)" />
+        </label>
+      }
+    }
+
+    @if (isEditMode) {
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" [ngModel]="isActive()" (ngModelChange)="isActive.set($event)" />
+        Active
+      </label>
+    }
+  </div>
+
+  <div class="mt-6 flex gap-3">
+    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="save()">Save</button>
+    <button class="rounded border border-border px-4 py-2 text-sm" (click)="cancel()">Cancel</button>
+  </div>
+
+  @if (isEditMode) {
+    <div class="mt-10">
+      <h2 class="mb-3 text-lg font-semibold">Rate Card</h2>
+      <table class="w-full border-collapse text-sm">
+        <thead>
+          <tr class="border-b border-border text-left">
+            <th class="py-2">User</th>
+            <th class="py-2">Billing Rate</th>
+            <th class="py-2">Cost Rate</th>
+            <th class="py-2">Effective From</th>
+            <th class="py-2">Effective To</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rates(); track r.id) {
+            <tr class="border-b border-border">
+              <td class="py-2">{{ r.userName ?? '(project default)' }}</td>
+              <td class="py-2">{{ r.billingRatePerHour ?? '-' }}</td>
+              <td class="py-2">{{ r.costRatePerHour }}</td>
+              <td class="py-2">{{ r.effectiveFrom }}</td>
+              <td class="py-2">{{ r.effectiveTo ?? '(current)' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+
+      <div class="mt-4 grid grid-cols-5 gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          User Id (blank = default)
+          <input type="number" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newRateUserId()" (ngModelChange)="newRateUserId.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Billing Rate
+          <input type="number" min="0" step="0.01" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newRateBillingRate()" (ngModelChange)="newRateBillingRate.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Cost Rate
+          <input type="number" min="0" step="0.01" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newRateCostRate()" (ngModelChange)="newRateCostRate.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Effective From
+          <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newRateEffectiveFrom()" (ngModelChange)="newRateEffectiveFrom.set($event)" />
+        </label>
+        <button class="mt-6 h-fit rounded border border-border px-3 py-2 text-sm" (click)="addRate()">Add Rate</button>
+      </div>
+    </div>
+  }
+</div>

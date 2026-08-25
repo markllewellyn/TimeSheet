@@ -1,0 +1,68 @@
+<div class="flex flex-col gap-4">
+  <div class="flex items-center justify-between">
+    <h1 class="text-xl font-semibold">Users</h1>
+    <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="showInviteForm.set(!showInviteForm())">
+      + Invite User
+    </button>
+  </div>
+
+  @if (showInviteForm()) {
+    <div class="rounded border border-border p-4">
+      @if (error(); as e) {
+        <div class="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+      }
+      <div class="grid grid-cols-2 gap-3">
+        <label class="flex flex-col gap-1 text-sm">
+          Entra Object Id
+          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Email
+          <input type="email" class="rounded border border-border bg-card px-3 py-2" [ngModel]="email()" (ngModelChange)="email.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Display Name
+          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" />
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Role
+          <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="role()" (ngModelChange)="role.set($event)">
+            <option value="User">User</option>
+            <option value="Admin">Admin</option>
+          </select>
+        </label>
+        <label class="flex flex-col gap-1 text-sm">
+          Job Title
+          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="jobTitle()" (ngModelChange)="jobTitle.set($event)" />
+        </label>
+      </div>
+      <button class="mt-4 rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="invite()">Send Invite</button>
+    </div>
+  }
+
+  <table class="w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-border text-left">
+        <th class="py-2">Name</th>
+        <th class="py-2">Email</th>
+        <th class="py-2">Role</th>
+        <th class="py-2">Status</th>
+        <th class="py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (u of users(); track u.id) {
+        <tr class="border-b border-border">
+          <td class="py-2">{{ u.displayName }}</td>
+          <td class="py-2">{{ u.email }}</td>
+          <td class="py-2">{{ u.role }}</td>
+          <td class="py-2">{{ u.isActive ? 'Active' : 'Inactive' }}</td>
+          <td class="py-2 text-right">
+            <button class="mr-3 hover:underline" (click)="toggleRole(u)">Make {{ u.role === 'Admin' ? 'User' : 'Admin' }}</button>
+            <button class="hover:underline" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+</div>

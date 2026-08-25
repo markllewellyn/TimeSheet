@@ -1,0 +1,41 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-xl font-semibold">Project Health</h1>
+
+  @if (assessments().length === 0) {
+    <p class="text-sm text-muted-foreground">
+      No assessments yet - they're generated nightly, or trigger one on demand from a project's page.
+    </p>
+  }
+
+  <div class="flex flex-col gap-4">
+    @for (a of assessments(); track a.id) {
+      <div class="rounded border border-border p-4">
+        <div class="mb-2 flex items-center justify-between">
+          <div>
+            <span class="font-semibold">{{ a.projectName }}</span>
+            <span class="ml-2 text-sm text-muted-foreground">{{ a.clientName }}</span>
+          </div>
+          <span class="rounded px-2 py-0.5 text-xs" [class]="statusClass(a.status)">{{ a.status }}</span>
+        </div>
+        <p class="text-sm">{{ a.summary }}</p>
+        @if (a.contributingFactors.length > 0) {
+          <ul class="mt-2 list-disc pl-5 text-sm text-muted-foreground">
+            @for (f of a.contributingFactors; track f) {
+              <li>{{ f }}</li>
+            }
+          </ul>
+        }
+        @if (a.recommendedAction) {
+          <p class="mt-2 text-sm"><strong>Recommended:</strong> {{ a.recommendedAction }}</p>
+        }
+        <div class="mt-3 flex items-center justify-between text-xs text-muted-foreground">
+          <span>
+            Budget consumed: {{ a.percentBudgetConsumed ?? '-' }}% - Time elapsed: {{ a.percentTimeElapsed ?? '-' }}% -
+            Assessed {{ a.assessedAtUtc | date: 'short' }}
+          </span>
+          <button class="text-foreground hover:underline" (click)="reassess(a)">Reassess now</button>
+        </div>
+      </div>
+    }
+  </div>
+</div>

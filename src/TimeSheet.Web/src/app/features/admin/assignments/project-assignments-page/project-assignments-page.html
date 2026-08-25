@@ -1,0 +1,57 @@
+<div class="flex flex-col gap-4">
+  <h1 class="text-xl font-semibold">Project Assignments</h1>
+
+  @if (error(); as e) {
+    <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  }
+
+  <table class="w-full border-collapse text-sm">
+    <thead>
+      <tr class="border-b border-border text-left">
+        <th class="py-2">User</th>
+        <th class="py-2">Status</th>
+        <th class="py-2">Start</th>
+        <th class="py-2">End</th>
+        <th class="py-2">Allocated Hrs/Wk</th>
+        <th class="py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      @for (a of assignments(); track a.id) {
+        <tr class="border-b border-border">
+          <td class="py-2">{{ a.userDisplayName }}</td>
+          <td class="py-2">{{ a.status }}</td>
+          <td class="py-2">{{ a.startDate }}</td>
+          <td class="py-2">{{ a.endDate ?? '-' }}</td>
+          <td class="py-2">{{ a.allocatedHoursPerWeek ?? '-' }}</td>
+          <td class="py-2 text-right">
+            @if (a.status !== 'Ended') {
+              <button class="text-red-600 hover:underline" (click)="endAssignment(a)">End</button>
+            }
+          </td>
+        </tr>
+      }
+    </tbody>
+  </table>
+
+  <div class="mt-4 grid grid-cols-4 gap-3 rounded border border-border p-4">
+    <label class="flex flex-col gap-1 text-sm">
+      User
+      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="newUserId()" (ngModelChange)="newUserId.set($event)">
+        <option [ngValue]="null" disabled>Select a user</option>
+        @for (u of users(); track u.id) {
+          <option [ngValue]="u.id">{{ u.displayName }}</option>
+        }
+      </select>
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Start Date
+      <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newStartDate()" (ngModelChange)="newStartDate.set($event)" />
+    </label>
+    <label class="flex flex-col gap-1 text-sm">
+      Allocated Hours/Week
+      <input type="number" min="0" step="0.5" class="rounded border border-border bg-card px-3 py-2" [ngModel]="newAllocatedHoursPerWeek()" (ngModelChange)="newAllocatedHoursPerWeek.set($event)" />
+    </label>
+    <button class="mt-6 h-fit rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="addAssignment()">Assign</button>
+  </div>
+</div>
