@@ -18,10 +18,16 @@ namespace TimeSheet.Api.Auth;
 /// stashes it on HttpContext.Items for HttpContextCurrentUserAccessor to expose. An authenticated Entra
 /// principal with no matching User row is rejected (403 "not provisioned") rather than auto-provisioned -
 /// Admins pre-create User rows (invite-style); see the plan's Authentication section for the reasoning.
+///
+/// The one deliberate exception is the bootstrap route (see BootstrapFunctions): on a brand-new database
+/// nobody is an Admin yet, so nobody could ever invite the first one. That route is let through unprovisioned
+/// ONLY while the Users table is completely empty - it self-disables permanently the moment the first User
+/// (the first Admin) is created.
 /// </summary>
 public class CurrentUserMiddleware : IFunctionsWorkerMiddleware
 {
     public const string HttpContextItemKey = "CurrentUser";
+    private const string BootstrapPath = "/api/bootstrap/first-admin";
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
@@ -56,6 +62,14 @@ public class CurrentUserMiddleware : IFunctionsWorkerMiddleware
         var user = await users.GetByEntraObjectIdAsync(oid, httpContext.RequestAborted);
         if (user is null || !user.IsActive)
         {
+            if (httpContext.Request.Path.Equals(BootstrapPath, StringComparison.OrdinalIgnoreCase)
+                && (await users.GetAllAsync(includeInactive: true, httpContext.RequestAborted)).Count == 0)
+            {
+                // No CurrentUserContext is set - the bootstrap function reads the raw Entra claims itself.
+                await next(context);
+                return;
+            }
+
             httpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
             await httpContext.Response.WriteAsJsonAsync(new { error = "not provisioned" });
             return;

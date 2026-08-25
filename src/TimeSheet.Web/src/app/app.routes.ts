@@ -5,6 +5,11 @@ import { adminGuard } from './core/auth/admin.guard';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'timesheet' },
   {
+    path: 'setup',
+    canActivate: [MsalGuard],
+    loadComponent: () => import('./features/setup/setup-page/setup-page').then((m) => m.SetupPage),
+  },
+  {
     path: 'timesheet',
     canActivate: [MsalGuard],
     loadComponent: () => import('./features/timesheet/log-time-page/log-time-page').then((m) => m.LogTimePage),

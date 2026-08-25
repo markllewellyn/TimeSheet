@@ -54,6 +54,13 @@
     }
   </header>
 
+  @if (currentUser.notProvisioned()) {
+    <div class="flex items-center justify-between border-b border-yellow-300 bg-yellow-50 px-6 py-2 text-sm text-yellow-900">
+      <span>Your account isn't set up in this app yet.</span>
+      <a routerLink="/setup" class="underline">Get started</a>
+    </div>
+  }
+
   <main class="p-6">
     <router-outlet />
   </main>

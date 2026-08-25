@@ -22,6 +22,11 @@ export class CurrentUserService {
   readonly isAdmin = computed(() => this.meSignal()?.role === 'Admin');
   readonly isSignedIn = computed(() => this.msal.instance.getAllAccounts().length > 0);
 
+  // True once a signed-in Entra account has no matching app User row yet (a fresh database, or an account an
+  // Admin hasn't invited) - see BootstrapFunctions/CurrentUserMiddleware for the one-time first-admin escape hatch.
+  private readonly notProvisionedSignal = signal(false);
+  readonly notProvisioned = this.notProvisionedSignal.asReadonly();
+
   constructor() {
     // Read login success from the broadcast stream (not synchronously after loginRedirect() resolves) -
     // idTokenClaims/account info can briefly come back undefined immediately after login otherwise.
@@ -42,7 +47,19 @@ export class CurrentUserService {
     this.msal.logoutRedirect();
   }
 
+  refreshMe(): void {
+    this.loadMe();
+  }
+
   private loadMe(): void {
-    this.http.get<Me>(`${environment.apiBaseUrl}/me`).subscribe((me) => this.meSignal.set(me));
+    this.http.get<Me>(`${environment.apiBaseUrl}/me`).subscribe({
+      next: (me) => {
+        this.meSignal.set(me);
+        this.notProvisionedSignal.set(false);
+      },
+      error: (err) => {
+        if (err?.status === 403) this.notProvisionedSignal.set(true);
+      },
+    });
   }
 }
