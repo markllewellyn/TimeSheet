@@ -6,16 +6,37 @@
     </button>
   </div>
 
+  @if (newTemporaryPassword(); as pwd) {
+    <div class="flex items-center justify-between rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900">
+      <span>One-time temporary password: <strong class="font-mono">{{ pwd }}</strong> - hand this to the user, they'll need it to sign in.</span>
+      <button class="underline" (click)="newTemporaryPassword.set(null)">Dismiss</button>
+    </div>
+  }
+
   @if (showInviteForm()) {
     <div class="rounded border border-border p-4">
       @if (error(); as e) {
         <div class="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
       }
-      <div class="grid grid-cols-2 gap-3">
-        <label class="flex flex-col gap-1 text-sm">
-          Entra Object Id
-          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
+
+      <div class="mb-3 flex gap-4 text-sm">
+        <label class="flex items-center gap-1">
+          <input type="radio" name="accountType" value="sso" [ngModel]="accountType()" (ngModelChange)="accountType.set($event)" />
+          SSO (Entra ID)
         </label>
+        <label class="flex items-center gap-1">
+          <input type="radio" name="accountType" value="local" [ngModel]="accountType()" (ngModelChange)="accountType.set($event)" />
+          Local account (username/password)
+        </label>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3">
+        @if (accountType() === 'sso') {
+          <label class="flex flex-col gap-1 text-sm">
+            Entra Object Id
+            <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
+          </label>
+        }
         <label class="flex flex-col gap-1 text-sm">
           Email
           <input type="email" class="rounded border border-border bg-card px-3 py-2" [ngModel]="email()" (ngModelChange)="email.set($event)" />
@@ -36,7 +57,16 @@
           <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="jobTitle()" (ngModelChange)="jobTitle.set($event)" />
         </label>
       </div>
-      <button class="mt-4 rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="invite()">Send Invite</button>
+
+      @if (accountType() === 'local') {
+        <p class="mt-3 text-xs text-muted-foreground">
+          A temporary password will be generated and shown once after creating this account.
+        </p>
+      }
+
+      <button class="mt-4 rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="invite()">
+        {{ accountType() === 'local' ? 'Create Account' : 'Send Invite' }}
+      </button>
     </div>
   }
 
@@ -45,6 +75,7 @@
       <tr class="border-b border-border text-left">
         <th class="py-2">Name</th>
         <th class="py-2">Email</th>
+        <th class="py-2">Account</th>
         <th class="py-2">Role</th>
         <th class="py-2">Status</th>
         <th class="py-2"></th>
@@ -55,6 +86,7 @@
         <tr class="border-b border-border">
           <td class="py-2">{{ u.displayName }}</td>
           <td class="py-2">{{ u.email }}</td>
+          <td class="py-2">{{ u.isLocalAccount ? 'Local' : 'SSO' }}</td>
           <td class="py-2">{{ u.role }}</td>
           <td class="py-2">{{ u.isActive ? 'Active' : 'Inactive' }}</td>
           <td class="py-2 text-right">

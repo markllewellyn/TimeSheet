@@ -1,9 +1,12 @@
+using System.Text;
 using Azure.Monitor.OpenTelemetry.Exporter;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.IdentityModel.Tokens;
 using Microsoft.Identity.Web;
 using OpenTelemetry;
 using QuestPDF.Infrastructure;
@@ -27,9 +30,27 @@ if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("APPLICATIONINSIGHT
 }
 
 // Validates the bearer token's audience against the API app registration (AzureAd config section below).
-builder.Services
-    .AddAuthentication(Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerDefaults.AuthenticationScheme)
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+// A second scheme, "LocalBearer", validates self-issued tokens for local (username/password) accounts -
+// CurrentUserMiddleware tries the Entra scheme first, then falls back to this one. This is what lets a local
+// account sign in even if Entra SSO is unreachable/misconfigured (see LocalAuthService/AuthFunctions).
+var localAuthSigningKey = builder.Configuration["LocalAuth:JwtSigningKey"]
+    ?? throw new InvalidOperationException("Missing LocalAuth:JwtSigningKey configuration.");
+
+var authBuilder = builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme);
+authBuilder.AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+authBuilder.AddJwtBearer(LocalAuthConstants.SchemeName, options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = LocalAuthConstants.Issuer,
+        ValidateAudience = true,
+        ValidAudience = LocalAuthConstants.Audience,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(localAuthSigningKey)),
+    };
+});
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpContextAccessor();

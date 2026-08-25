@@ -10,7 +10,7 @@ using TimeSheet.Domain.Services;
 
 namespace TimeSheet.Api.Functions;
 
-public class UsersFunctions(IUserRepository users, IUnitOfWork uow, ICurrentUserAccessor currentUser)
+public class UsersFunctions(IUserRepository users, ILocalUserPasswordService localUserPasswordService, IUnitOfWork uow, ICurrentUserAccessor currentUser)
 {
     [Function("Users_List")]
     public async Task<IActionResult> List(
@@ -23,8 +23,10 @@ public class UsersFunctions(IUserRepository users, IUnitOfWork uow, ICurrentUser
         return new OkObjectResult(result.Select(ToDto));
     }
 
-    /// <summary>Admins pre-create User rows (invite-style); an authenticated Entra principal with no matching
-    /// User row is rejected 403 "not provisioned" by CurrentUserMiddleware, never auto-provisioned.</summary>
+    /// <summary>Admins pre-create User rows (invite-style); an authenticated principal with no matching User
+    /// row is rejected 403 "not provisioned" by CurrentUserMiddleware, never auto-provisioned. Provide
+    /// EntraObjectId for an SSO account, or omit it for a local (username/password) account - a temporary
+    /// password is generated and returned once.</summary>
     [Function("Users_Invite")]
     public async Task<IActionResult> Invite(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "users")] HttpRequest req, CancellationToken ct)
@@ -44,9 +46,12 @@ public class UsersFunctions(IUserRepository users, IUnitOfWork uow, ICurrentUser
             return new ConflictObjectResult(new { error = $"A user with email '{body.Email}' already exists." });
         }
 
+        var isLocal = string.IsNullOrWhiteSpace(body.EntraObjectId);
+        string? temporaryPassword = null;
+
         var user = new User
         {
-            EntraObjectId = body.EntraObjectId,
+            EntraObjectId = isLocal ? null : body.EntraObjectId,
             Email = body.Email,
             DisplayName = body.DisplayName,
             Role = role,
@@ -54,10 +59,18 @@ public class UsersFunctions(IUserRepository users, IUnitOfWork uow, ICurrentUser
             IsActive = true,
             CreatedUtc = DateTimeOffset.UtcNow,
         };
+
+        if (isLocal)
+        {
+            var (passwordHash, tempPassword) = localUserPasswordService.GenerateInitialCredentials();
+            user.PasswordHash = passwordHash;
+            temporaryPassword = tempPassword;
+        }
+
         await users.AddAsync(user, ct);
         await uow.SaveChangesAsync(ct);
 
-        return new CreatedResult($"/api/users/{user.Id}", ToDto(user));
+        return new CreatedResult($"/api/users/{user.Id}", new InviteUserResponse(ToDto(user), temporaryPassword));
     }
 
     [Function("Users_Update")]
@@ -88,5 +101,5 @@ public class UsersFunctions(IUserRepository users, IUnitOfWork uow, ICurrentUser
         return new OkObjectResult(ToDto(user));
     }
 
-    private static UserDto ToDto(User u) => new(u.Id, u.EntraObjectId, u.Email, u.DisplayName, u.Role.ToString(), u.JobTitle, u.IsActive);
+    private static UserDto ToDto(User u) => new(u.Id, u.EntraObjectId, u.IsLocalAccount, u.Email, u.DisplayName, u.Role.ToString(), u.JobTitle, u.IsActive);
 }

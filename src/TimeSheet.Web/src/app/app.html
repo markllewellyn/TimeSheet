@@ -50,7 +50,7 @@
         <button class="underline" (click)="currentUser.logout()">Sign out</button>
       </div>
     } @else {
-      <button class="underline text-sm" (click)="currentUser.login()">Sign in</button>
+      <a routerLink="/login" class="underline text-sm">Sign in</a>
     }
   </header>
 

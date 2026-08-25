@@ -14,12 +14,14 @@ export class UsersListPage {
   protected readonly users = signal<AppUser[]>([]);
 
   protected readonly showInviteForm = signal(false);
+  protected readonly accountType = signal<'sso' | 'local'>('sso');
   protected readonly entraObjectId = signal('');
   protected readonly email = signal('');
   protected readonly displayName = signal('');
   protected readonly role = signal<'Admin' | 'User'>('User');
   protected readonly jobTitle = signal('');
   protected readonly error = signal<string | null>(null);
+  protected readonly newTemporaryPassword = signal<string | null>(null);
 
   constructor() {
     this.refresh();
@@ -32,20 +34,21 @@ export class UsersListPage {
   protected invite(): void {
     this.usersAdmin
       .invite({
-        entraObjectId: this.entraObjectId(),
+        entraObjectId: this.accountType() === 'sso' ? this.entraObjectId() : null,
         email: this.email(),
         displayName: this.displayName(),
         role: this.role(),
         jobTitle: this.jobTitle() || null,
       })
       .subscribe({
-        next: () => {
+        next: (result) => {
           this.showInviteForm.set(false);
           this.entraObjectId.set('');
           this.email.set('');
           this.displayName.set('');
           this.jobTitle.set('');
           this.error.set(null);
+          this.newTemporaryPassword.set(result.temporaryPassword);
           this.refresh();
         },
         error: (err) => this.error.set(err?.error?.error ?? 'Could not invite the user.'),
@@ -66,9 +69,10 @@ export class UsersListPage {
   }
 
   protected resetPassword(user: AppUser): void {
-    if (!confirm(`Force a password reset for ${user.displayName} in Entra ID?`)) return;
+    const target = user.isLocalAccount ? 'in this app' : 'in Entra ID';
+    if (!confirm(`Force a password reset for ${user.displayName} ${target}?`)) return;
     this.usersAdmin.resetPassword(user.id).subscribe({
-      next: (result) => alert(`Temporary password for ${user.displayName}:\n\n${result.temporaryPassword}\n\nThey'll be required to change it at next sign-in.`),
+      next: (result) => this.newTemporaryPassword.set(result.temporaryPassword),
       error: (err) => this.error.set(err?.error?.error ?? 'Could not reset the password.'),
     });
   }

@@ -9,7 +9,8 @@ export interface Me {
 
 export interface AppUser {
   id: number;
-  entraObjectId: string;
+  entraObjectId: string | null;
+  isLocalAccount: boolean;
   email: string;
   displayName: string;
   role: 'Admin' | 'User';

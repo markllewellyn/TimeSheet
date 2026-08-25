@@ -11,6 +11,8 @@
 
         "ConnectionStrings:TimesheetDb": "Data Source=timesheet.db",
 
+        "LocalAuth:JwtSigningKey": "<a-long-random-string-unique-to-this-environment>",
+
         "GraphAdmin:TenantId": "<your-entra-tenant-id>",
         "GraphAdmin:ClientId": "<the-Graph-admin-app-registration-client-id>",
         "GraphAdmin:ClientSecret": "<the-Graph-admin-app-registration-client-secret>",

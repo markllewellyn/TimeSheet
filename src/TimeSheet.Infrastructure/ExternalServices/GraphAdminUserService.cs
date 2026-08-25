@@ -1,6 +1,6 @@
-using System.Security.Cryptography;
 using Microsoft.Graph.Models;
 using TimeSheet.Domain.Services;
+using TimeSheet.Infrastructure.Services;
 
 namespace TimeSheet.Infrastructure.ExternalServices;
 
@@ -14,7 +14,7 @@ public class GraphAdminUserService(GraphClientFactory graphClientFactory) : IAdm
 {
     public async Task<string> ForcePasswordResetAsync(string entraObjectId, CancellationToken ct)
     {
-        var temporaryPassword = GenerateTemporaryPassword();
+        var temporaryPassword = TemporaryPasswordGenerator.Generate();
         var client = graphClientFactory.CreateClient();
 
         // Both password and forceChangePasswordNextSignIn must be sent together - setting the flag alone
@@ -30,31 +30,4 @@ public class GraphAdminUserService(GraphClientFactory graphClientFactory) : IAdm
 
         return temporaryPassword;
     }
-
-    private static string GenerateTemporaryPassword()
-    {
-        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        const string lower = "abcdefghijkmnopqrstuvwxyz";
-        const string digits = "23456789";
-        const string symbols = "!@#$%^&*";
-        const string all = upper + lower + digits + symbols;
-
-        // Guarantee at least one of each character class, then fill the rest randomly - meets typical Entra
-        // tenant password complexity policies (upper/lower/digit/symbol, 12+ characters). Shuffled (not just
-        // appended) so the guaranteed characters aren't always in the same predictable positions.
-        var chars = new[]
-        {
-            PickRandom(upper), PickRandom(lower), PickRandom(digits), PickRandom(symbols),
-        }.Concat(Enumerable.Range(0, 8).Select(_ => PickRandom(all))).ToArray();
-
-        for (var i = chars.Length - 1; i > 0; i--)
-        {
-            var j = RandomNumberGenerator.GetInt32(i + 1);
-            (chars[i], chars[j]) = (chars[j], chars[i]);
-        }
-
-        return new string(chars);
-    }
-
-    private static char PickRandom(string source) => source[RandomNumberGenerator.GetInt32(source.Length)];
 }

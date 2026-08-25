@@ -5,11 +5,18 @@ import { environment } from '../../../environments/environment';
 import { AppUser } from '../models/user.models';
 
 export interface InviteUserRequest {
-  entraObjectId: string;
+  // Omit/leave blank for a local (username/password) account instead of an SSO account.
+  entraObjectId: string | null;
   email: string;
   displayName: string;
   role: 'Admin' | 'User';
   jobTitle: string | null;
+}
+
+export interface InviteUserResponse {
+  user: AppUser;
+  // Only set for a local account - a one-time temporary password to hand to the person.
+  temporaryPassword: string | null;
 }
 
 export interface UpdateUserRequest {
@@ -28,17 +35,17 @@ export class UsersAdminService {
     return this.http.get<AppUser[]>(this.baseUrl, { params: { includeInactive } });
   }
 
-  invite(request: InviteUserRequest): Observable<AppUser> {
-    return this.http.post<AppUser>(this.baseUrl, request);
+  invite(request: InviteUserRequest): Observable<InviteUserResponse> {
+    return this.http.post<InviteUserResponse>(this.baseUrl, request);
   }
 
   update(id: number, request: UpdateUserRequest): Observable<AppUser> {
     return this.http.put<AppUser>(`${this.baseUrl}/${id}`, request);
   }
 
-  // Admin account maintenance against Entra ID itself (via Graph) - returns a one-time temporary password.
-  // Route deliberately avoids a leading "admin/" segment - Azure Functions reserves that for its own host API
-  // and silently drops user-defined routes that start with it.
+  // Branches server-side: Graph for an SSO account, a direct local reset otherwise. Returns a one-time
+  // temporary password either way. Route deliberately avoids a leading "admin/" segment - Azure Functions
+  // reserves that for its own host API and silently drops user-defined routes that start with it.
   resetPassword(id: number): Observable<{ temporaryPassword: string }> {
     return this.http.post<{ temporaryPassword: string }>(`${this.baseUrl}/${id}/reset-password`, {});
   }

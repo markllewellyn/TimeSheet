@@ -55,6 +55,10 @@ public static class DependencyInjection
         services.AddScoped<IProjectHealthAssessor, ProjectHealthAssessor>();
         services.AddScoped<IProjectHealthService, ProjectHealthService>();
 
+        services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
+        services.AddScoped<ILocalAuthService, LocalAuthService>();
+        services.AddScoped<ILocalUserPasswordService, LocalUserPasswordService>();
+
         services.AddHttpClient<ICurrencyRateProvider, FrankfurterCurrencyRateProvider>(client =>
         {
             client.BaseAddress = new Uri("https://api.frankfurter.dev/");
