@@ -20,14 +20,20 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Where(e => e.ProjectId == projectId && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))
             .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
 
+    public async Task<decimal> GetTotalHoursForUserDateAsync(int userId, DateOnly date, int? excludeEntryId, CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Where(e => e.UserId == userId && e.Date == date && (excludeEntryId == null || e.Id != excludeEntryId.Value))
+            .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
+
     public Task<TimesheetEntry?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.TimesheetEntries.Include(e => e.Attachments).Include(e => e.Project).ThenInclude(p => p!.Client)
+        db.TimesheetEntries.Include(e => e.Attachments).Include(e => e.Client).Include(e => e.Project)
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
     public async Task<IReadOnlyList<TimesheetEntry>> GetForUserAsync(int userId, string? searchText, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         var query = db.TimesheetEntries
-            .Include(e => e.Project).ThenInclude(p => p!.Client)
+            .Include(e => e.Client)
+            .Include(e => e.Project)
             .Include(e => e.Attachments)
             .Where(e => e.UserId == userId);
 
@@ -44,6 +50,53 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
 
         return await query.OrderByDescending(e => e.Date).ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(DateOnly? from, DateOnly? to, CancellationToken ct)
+    {
+        var query = db.TimesheetEntries.Include(e => e.User).Include(e => e.Client).Include(e => e.Project).AsQueryable();
+        if (from is not null) query = query.Where(e => e.Date >= from);
+        if (to is not null) query = query.Where(e => e.Date <= to);
+        return await query.OrderBy(e => e.Date).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, CancellationToken ct)
+    {
+        var query = db.TimesheetEntries
+            .Include(e => e.User)
+            .Include(e => e.Client)
+            .Include(e => e.Project)
+            .Where(e => !e.ApprovedPayroll);
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+        {
+            var term = searchText.Trim();
+            query = query.Where(e =>
+                EF.Functions.Like(e.User!.DisplayName, $"%{term}%") ||
+                EF.Functions.Like(e.Client!.Name, $"%{term}%") ||
+                EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+        }
+
+        return await query.OrderBy(e => e.Date).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Include(e => e.User)
+            .Include(e => e.Client)
+            .Include(e => e.Project)
+            .Where(e => e.ApprovedPayroll && !e.SentToPayroll)
+            .OrderBy(e => e.Date)
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<string>> GetDistinctPostingBatchesAsync(CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Where(e => e.PostingBatch != null && e.PostingBatch != "")
+            .Select(e => e.PostingBatch!)
+            .Distinct()
+            .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<TimesheetEntry>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken ct) =>
+        await db.TimesheetEntries.Where(e => ids.Contains(e.Id)).ToListAsync(ct);
 
     public async Task AddAsync(TimesheetEntry entry, CancellationToken ct) => await db.TimesheetEntries.AddAsync(entry, ct);
 

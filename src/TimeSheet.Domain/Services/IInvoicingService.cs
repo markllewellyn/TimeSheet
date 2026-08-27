@@ -6,12 +6,12 @@ namespace TimeSheet.Domain.Services;
 /// rate/fixed-fee application. No persistence; IInvoicingService owns the Draft/Finalize lifecycle.</summary>
 public interface IInvoiceGenerationService
 {
-    Task<Invoice> BuildDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
+    Task<Invoice> BuildDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct);
 }
 
 public interface IInvoicingService
 {
-    Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
+    Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct);
 
     /// <summary>Requires a non-empty, unique (per client) invoice number. Renders the PDF at this point (so the
     /// invoice number appears on the document) and freezes the record - no further edits possible after.</summary>
@@ -27,6 +27,7 @@ public record InvoiceDocumentModel(
     DateOnly PeriodStart,
     DateOnly PeriodEnd,
     string Currency,
+    decimal? ExchangeRate,
     IReadOnlyList<InvoiceDocumentLine> LineItems,
     decimal TotalAmount);
 

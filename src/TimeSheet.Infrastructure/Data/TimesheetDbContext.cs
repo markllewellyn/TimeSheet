@@ -4,17 +4,25 @@ using TimeSheet.Domain.Repositories;
 
 namespace TimeSheet.Infrastructure.Data;
 
+// The legacy source schema groups its tables under a SQL Server "[Timesheets]" schema. SQLite has no concept
+// of schemas; EF Core's Sqlite provider silently no-ops any schema argument passed to ToTable(), so we
+// deliberately omit it here rather than let the code lie about namespacing that doesn't actually exist.
 public class TimesheetDbContext(DbContextOptions<TimesheetDbContext> options) : DbContext(options), IUnitOfWork
 {
     public DbSet<Client> Clients => Set<Client>();
     public DbSet<ClientAccountManager> ClientAccountManagers => Set<ClientAccountManager>();
     public DbSet<Project> Projects => Set<Project>();
-    public DbSet<ProjectRate> ProjectRates => Set<ProjectRate>();
     public DbSet<User> Users => Set<User>();
-    public DbSet<ProjectAssignment> ProjectAssignments => Set<ProjectAssignment>();
+    public DbSet<StaffCost> StaffCosts => Set<StaffCost>();
+    public DbSet<Role> Roles => Set<Role>();
+    public DbSet<RateCard> RateCards => Set<RateCard>();
+    public DbSet<StaffProject> StaffProjects => Set<StaffProject>();
     public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
+    public DbSet<RecordedTimeArchive> RecordedTimeArchives => Set<RecordedTimeArchive>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<Currency> Currencies => Set<Currency>();
+    public DbSet<CurrencyExchangeHistory> CurrencyExchangeHistories => Set<CurrencyExchangeHistory>();
     public DbSet<CurrencyRate> CurrencyRates => Set<CurrencyRate>();
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();

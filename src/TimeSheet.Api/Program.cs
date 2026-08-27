@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Azure.Functions.Worker.OpenTelemetry;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
@@ -13,6 +14,7 @@ using QuestPDF.Infrastructure;
 using TimeSheet.Api.Auth;
 using TimeSheet.Domain.Services;
 using TimeSheet.Infrastructure;
+using TimeSheet.Infrastructure.Data;
 
 // Community license - free under an annual gross revenue threshold (~USD 1M); confirm current terms against
 // SVG IT's actual revenue before shipping (see the plan's Invoicing section).
@@ -78,4 +80,13 @@ builder.Services.AddInfrastructure(builder.Configuration);
 // resource level.
 builder.UseMiddleware<CurrentUserMiddleware>();
 
-builder.Build().Run();
+var app = builder.Build();
+
+// Applies any pending EF Core migrations at startup, creating the local SQLite file/schema on first run -
+// fine for this app's local-single-dev scale; a real deployment would move this to an explicit release step.
+using (var scope = app.Services.CreateScope())
+{
+    scope.ServiceProvider.GetRequiredService<TimesheetDbContext>().Database.Migrate();
+}
+
+app.Run();

@@ -41,6 +41,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
     public void Configure(EntityTypeBuilder<Invoice> builder)
     {
         builder.Property(i => i.ReportingCurrency).HasMaxLength(3).IsRequired();
+        builder.Property(i => i.ExchangeRate).HasPrecision(18, 8);
         builder.Property(i => i.InvoiceNumber).HasMaxLength(50);
         builder.Property(i => i.TotalAmount).HasPrecision(18, 2);
         builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
@@ -110,6 +111,41 @@ public class ProjectHealthAssessmentConfiguration : IEntityTypeConfiguration<Pro
 
         builder.HasIndex(a => new { a.ProjectId, a.AssessedAtUtc });
         builder.HasOne(a => a.Project).WithMany().HasForeignKey(a => a.ProjectId).OnDelete(DeleteBehavior.Cascade);
+    }
+}
+
+public class RoleConfiguration : IEntityTypeConfiguration<Role>
+{
+    public void Configure(EntityTypeBuilder<Role> builder)
+    {
+        builder.Property(r => r.Name).HasMaxLength(100).IsRequired();
+        builder.HasIndex(r => r.Name).IsUnique();
+    }
+}
+
+public class RateCardConfiguration : IEntityTypeConfiguration<RateCard>
+{
+    public void Configure(EntityTypeBuilder<RateCard> builder)
+    {
+        builder.Property(rc => rc.Rate).HasPrecision(18, 2).IsRequired();
+
+        // A "change" is a new dated row, never a mutation - see RateCard.cs.
+        builder.HasIndex(rc => new { rc.RoleId, rc.StaffId, rc.ClientId, rc.ProjectId, rc.EffectiveFrom }).IsUnique();
+
+        // Enforces RateCard's scope shape at the DB layer, not just in the API - this table is billing-load-
+        // bearing, a malformed row silently breaks invoices/payroll, so it's worth the extra rigor other
+        // nullable-FK-pair tables in this codebase (e.g. User.EntraObjectId/PasswordHash) don't have.
+        builder.ToTable(t =>
+        {
+            t.HasCheckConstraint("CK_RateCard_ScopeXor", "(\"RoleId\" IS NOT NULL AND \"StaffId\" IS NULL) OR (\"RoleId\" IS NULL AND \"StaffId\" IS NOT NULL)");
+            t.HasCheckConstraint("CK_RateCard_NotBothClientProject", "\"ClientId\" IS NULL OR \"ProjectId\" IS NULL");
+            t.HasCheckConstraint("CK_RateCard_StaffRequiresScope", "\"StaffId\" IS NULL OR \"ClientId\" IS NOT NULL OR \"ProjectId\" IS NOT NULL");
+        });
+
+        builder.HasOne(rc => rc.Role).WithMany().HasForeignKey(rc => rc.RoleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(rc => rc.Staff).WithMany().HasForeignKey(rc => rc.StaffId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(rc => rc.Client).WithMany().HasForeignKey(rc => rc.ClientId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(rc => rc.Project).WithMany().HasForeignKey(rc => rc.ProjectId).OnDelete(DeleteBehavior.Restrict);
     }
 }
 

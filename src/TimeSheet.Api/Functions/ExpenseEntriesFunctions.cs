@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
 using TimeSheet.Contracts;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
@@ -11,7 +12,7 @@ namespace TimeSheet.Api.Functions;
 
 public class ExpenseEntriesFunctions(
     IExpenseEntryRepository expenses,
-    IProjectAssignmentRepository assignments,
+    IStaffProjectRepository assignments,
     IProjectRepository projects,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -37,13 +38,37 @@ public class ExpenseEntriesFunctions(
         var body = await req.ReadFromJsonAsync<CreateExpenseEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
-        var validation = await ValidateAssignmentAsync(user.UserId, body.ProjectId, body.Date, ct);
-        if (validation is not null) return validation;
+        if (!Enum.TryParse<ExpenseEntryKind>(body.Kind ?? nameof(ExpenseEntryKind.Expense), out var kind))
+        {
+            return new BadRequestObjectResult(new { error = "Invalid Kind." });
+        }
+
+        // "Contract" (an Admin-only monetary value against a non-invoiceable project) skips the normal
+        // project-assignment check entirely - it isn't tied to the admin's own work on the project, so
+        // requiring them to be personally assigned would be the wrong gate. CanInvoice + Admin role is the
+        // actual control here, mirroring the legacy Power App's separate admin-only value-entry flow.
+        if (kind == ExpenseEntryKind.Contract)
+        {
+            if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+            var contractProject = await projects.GetByIdAsync(body.ProjectId, ct);
+            if (contractProject is null) return new NotFoundObjectResult(new { error = "Project not found." });
+            if (contractProject.CanInvoice == true)
+            {
+                return new BadRequestObjectResult(new { error = "Contract values can only be logged against projects that cannot be invoiced." });
+            }
+        }
+        else
+        {
+            var validation = await ValidateAssignmentAsync(user.UserId, body.ProjectId, body.Date, ct);
+            if (validation is not null) return validation;
+        }
 
         var entry = new ExpenseEntry
         {
             UserId = user.UserId,
             ProjectId = body.ProjectId,
+            Kind = kind,
             Date = body.Date,
             Amount = body.Amount,
             Currency = body.Currency,
@@ -114,5 +139,5 @@ public class ExpenseEntriesFunctions(
 
     private static ExpenseEntryDto ToDto(ExpenseEntry e) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.Project?.ClientId ?? 0, e.Project?.Client?.Name ?? "",
-        e.Date, e.Amount, e.Currency, e.Description, e.IsBillable);
+        e.Date, e.Amount, e.Currency, e.Description, e.IsBillable, e.Kind.ToString());
 }

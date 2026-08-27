@@ -8,7 +8,7 @@ namespace TimeSheet.Infrastructure.Repositories;
 public class UserRepository(TimesheetDbContext db) : IUserRepository
 {
     public Task<User?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.Users.FirstOrDefaultAsync(u => u.Id == id, ct);
+        db.Users.Include(u => u.JobRole).FirstOrDefaultAsync(u => u.Id == id, ct);
 
     public Task<User?> GetByEntraObjectIdAsync(string entraObjectId, CancellationToken ct) =>
         db.Users.FirstOrDefaultAsync(u => u.EntraObjectId == entraObjectId, ct);
@@ -18,7 +18,7 @@ public class UserRepository(TimesheetDbContext db) : IUserRepository
 
     public async Task<IReadOnlyList<User>> GetAllAsync(bool includeInactive, CancellationToken ct)
     {
-        var query = db.Users.AsQueryable();
+        var query = db.Users.Include(u => u.JobRole).AsQueryable();
         if (!includeInactive) query = query.Where(u => u.IsActive);
         return await query.OrderBy(u => u.DisplayName).ToListAsync(ct);
     }

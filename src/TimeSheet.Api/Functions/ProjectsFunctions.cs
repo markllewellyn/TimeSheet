@@ -13,7 +13,6 @@ namespace TimeSheet.Api.Functions;
 public class ProjectsFunctions(
     IProjectRepository projects,
     IClientRepository clients,
-    IProjectRateRepository rates,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -36,8 +35,18 @@ public class ProjectsFunctions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/assigned-to-me")] HttpRequest req, CancellationToken ct)
     {
         var user = currentUser.RequireUser();
+        var targetUserId = user.UserId;
+
+        // Admin-only escape hatch for impersonation ("log time on behalf of X") - lets the Add Entry page show
+        // the target person's assigned projects rather than the admin's own.
+        if (req.Query.TryGetValue("userId", out var userIdRaw) && int.TryParse(userIdRaw, out var requestedUserId) && requestedUserId != user.UserId)
+        {
+            if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+            targetUserId = requestedUserId;
+        }
+
         var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
-        var result = await projects.GetAssignedToUserAsync(user.UserId, today, ct);
+        var result = await projects.GetAssignedToUserAsync(targetUserId, today, ct);
         return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "")));
     }
 
@@ -85,11 +94,6 @@ public class ProjectsFunctions(
             return new BadRequestObjectResult(new { error = "Invalid PaymentModel." });
         }
 
-        if (paymentModel == PaymentModel.TimeAndMaterials && body.DefaultBillingRatePerHour is null)
-        {
-            return new BadRequestObjectResult(new { error = "DefaultBillingRatePerHour is required for Time and Materials projects." });
-        }
-
         var project = new Project
         {
             ClientId = body.ClientId,
@@ -97,6 +101,7 @@ public class ProjectsFunctions(
             Code = body.Code,
             Description = body.Description,
             PaymentModel = paymentModel,
+            CanInvoice = body.CanInvoice,
             CurrencyOverride = body.CurrencyOverride,
             StartDate = body.StartDate,
             EndDate = body.EndDate,
@@ -108,22 +113,6 @@ public class ProjectsFunctions(
             CreatedByUserId = currentUser.RequireUser().UserId,
         };
         await projects.AddAsync(project, ct);
-
-        // Atomically seed the project's first default (project-wide, UserId null) rate - a Project must never
-        // exist without at least a default rate resolvable, or billing/cost calculations have nothing to resolve.
-        var defaultRate = new ProjectRate
-        {
-            Project = project,
-            UserId = null,
-            BillingRatePerHour = body.DefaultBillingRatePerHour,
-            CostRatePerHour = body.DefaultCostRatePerHour,
-            EffectiveFrom = body.StartDate,
-            EffectiveTo = null,
-            CreatedUtc = DateTimeOffset.UtcNow,
-            CreatedByUserId = currentUser.RequireUser().UserId,
-        };
-        await rates.AddAsync(defaultRate, ct);
-
         await uow.SaveChangesAsync(ct);
         return new CreatedResult($"/api/projects/{project.Id}", ToDto(project, client.Name));
     }
@@ -142,6 +131,7 @@ public class ProjectsFunctions(
 
         project.Name = body.Name;
         project.Description = body.Description;
+        project.CanInvoice = body.CanInvoice;
         project.CurrencyOverride = body.CurrencyOverride;
         project.EndDate = body.EndDate;
         project.BudgetHours = body.BudgetHours;
@@ -159,6 +149,6 @@ public class ProjectsFunctions(
 
     private static ProjectDto ToDto(Project p, string clientName) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
-        p.PaymentModel.ToString(), p.CurrencyOverride, p.StartDate, p.EndDate,
+        p.PaymentModel.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
         p.BudgetHours, p.FixedFeeAmount, p.BudgetAlertThresholdPercent, p.IsActive);
 }

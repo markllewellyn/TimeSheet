@@ -17,14 +17,35 @@ public class InvoiceGenerationService(
     IProjectRepository projects,
     ITimesheetEntryRepository timesheetEntries,
     IExpenseEntryRepository expenseEntries,
-    IRateResolver rateResolver,
     ICurrencyConversionService currencyConversion) : IInvoiceGenerationService
 {
-    public async Task<Invoice> BuildDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct)
+    public async Task<Invoice> BuildDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct)
     {
         var client = await clients.GetByIdAsync(clientId, ct)
             ?? throw new InvalidOperationException($"Client {clientId} not found.");
         var targetCurrency = client.ReportingCurrencyCode;
+
+        if (manualExchangeRate is not null)
+        {
+            if (string.Equals(targetCurrency, "GBP", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException("This client's reporting currency is GBP; an exchange rate is not applicable.");
+            }
+            if (manualExchangeRate <= 0)
+            {
+                throw new InvalidOperationException("The exchange rate must be a positive number.");
+            }
+        }
+
+        // When a manual rate is supplied it REPLACES automatic (Frankfurter-based) conversion entirely for
+        // this run - every native amount is treated as GBP and multiplied straight through by the rate. This
+        // deliberately bypasses the per-project CurrencyOverride and ExpenseEntry.Currency distinctions
+        // (pre-existing ambiguities - StaffCost.CustomerRate and ExpenseEntry.Currency have no guarantee of
+        // actually being GBP - out of scope for this feature).
+        async Task<decimal> ConvertAsync(decimal amountNative, string nativeCurrency) =>
+            manualExchangeRate is { } rate
+                ? amountNative * rate
+                : (await currencyConversion.ConvertAsync(new Money(amountNative, nativeCurrency), targetCurrency, periodEnd, ct)).Amount;
 
         var clientProjects = await projects.GetByClientIdAsync(clientId, includeInactive: true, ct);
         var lineItems = new List<InvoiceLineItem>();
@@ -38,24 +59,19 @@ public class InvoiceGenerationService(
                 var entries = await timesheetEntries.GetCountedForProjectAsync(project.Id, periodStart, periodEnd, ct);
                 if (entries.Count > 0)
                 {
-                    decimal totalHours = 0;
-                    decimal amountNative = 0;
+                    // Summed from each entry's stamped ResolvedCustomerRate (see TimesheetEntry), not
+                    // re-resolved via IRateResolver here - so the rate that actually applied when the entry
+                    // was recorded is what gets billed, never "today's" rate.
+                    var totalHours = entries.Sum(e => e.WorkHours + e.OutOfHoursHours);
+                    var amountNative = entries.Sum(e => (e.WorkHours + e.OutOfHoursHours) * (e.ResolvedCustomerRate ?? 0));
 
-                    foreach (var byUser in entries.GroupBy(e => e.UserId))
-                    {
-                        var hours = byUser.Sum(e => e.WorkHours + e.OutOfHoursHours);
-                        var rate = await rateResolver.GetEffectiveRateAsync(project.Id, byUser.Key, periodEnd, ct);
-                        totalHours += hours;
-                        amountNative += hours * (rate.BillingRatePerHour ?? 0);
-                    }
-
-                    var converted = await currencyConversion.ConvertAsync(new Money(amountNative, projectCurrency), targetCurrency, periodEnd, ct);
+                    var amount = await ConvertAsync(amountNative, projectCurrency);
                     lineItems.Add(new InvoiceLineItem
                     {
                         ProjectId = project.Id,
                         Description = project.Name,
                         Hours = totalHours,
-                        Amount = converted.Amount,
+                        Amount = amount,
                         Type = InvoiceLineItemType.TimeAndMaterials,
                     });
                 }
@@ -64,13 +80,13 @@ public class InvoiceGenerationService(
             {
                 if (project.FixedFeeAmount is > 0)
                 {
-                    var converted = await currencyConversion.ConvertAsync(new Money(project.FixedFeeAmount.Value, projectCurrency), targetCurrency, periodEnd, ct);
+                    var amount = await ConvertAsync(project.FixedFeeAmount.Value, projectCurrency);
                     lineItems.Add(new InvoiceLineItem
                     {
                         ProjectId = project.Id,
                         Description = $"{project.Name} (Fixed Fee)",
                         Hours = null,
-                        Amount = converted.Amount,
+                        Amount = amount,
                         Type = InvoiceLineItemType.FixedFee,
                     });
                 }
@@ -82,8 +98,7 @@ public class InvoiceGenerationService(
                 decimal expenseTotal = 0;
                 foreach (var expense in billableExpenses)
                 {
-                    var converted = await currencyConversion.ConvertAsync(new Money(expense.Amount, expense.Currency), targetCurrency, periodEnd, ct);
-                    expenseTotal += converted.Amount;
+                    expenseTotal += await ConvertAsync(expense.Amount, expense.Currency);
                 }
 
                 lineItems.Add(new InvoiceLineItem
@@ -103,6 +118,7 @@ public class InvoiceGenerationService(
             PeriodStart = periodStart,
             PeriodEnd = periodEnd,
             ReportingCurrency = targetCurrency,
+            ExchangeRate = manualExchangeRate,
             Status = InvoiceStatus.Draft,
             TotalAmount = Math.Round(lineItems.Sum(l => l.Amount), 2),
             GeneratedAtUtc = DateTimeOffset.UtcNow,

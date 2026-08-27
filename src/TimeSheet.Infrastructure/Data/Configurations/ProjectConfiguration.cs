@@ -4,11 +4,22 @@ using TimeSheet.Domain.Entities;
 
 namespace TimeSheet.Infrastructure.Data.Configurations;
 
+/// <summary>
+/// Maps onto the legacy [Projects] table (Id/ClientId/Name/IsActive/CanInvoice), extended directly with the
+/// Code/Description/PaymentModel/budget/date columns the legacy table has no room for - see ClientConfiguration
+/// for why this extends the table directly rather than using a separate split table. See Project.cs.
+/// </summary>
 public class ProjectConfiguration : IEntityTypeConfiguration<Project>
 {
     public void Configure(EntityTypeBuilder<Project> builder)
     {
-        builder.Property(p => p.Name).HasMaxLength(200).IsRequired();
+        builder.ToTable("Projects");
+        builder.Property(p => p.Id).HasColumnName("PK_Projects");
+        builder.Property(p => p.ClientId).HasColumnName("PK_Customers");
+        builder.Property(p => p.Name).HasColumnName("ProjectName").HasMaxLength(50).IsRequired();
+        builder.Property(p => p.IsActive).HasColumnName("Active").IsRequired();
+        builder.Property(p => p.CanInvoice).HasColumnName("CanInvoice");
+
         builder.Property(p => p.Code).HasMaxLength(50).IsRequired();
         builder.Property(p => p.CurrencyOverride).HasMaxLength(3);
         builder.Property(p => p.BudgetHours).HasPrecision(18, 2);
@@ -16,11 +27,6 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
 
         // Code is unique per-client, not globally.
         builder.HasIndex(p => new { p.ClientId, p.Code }).IsUnique();
-
-        builder.HasMany(p => p.Rates)
-            .WithOne(r => r.Project)
-            .HasForeignKey(r => r.ProjectId)
-            .OnDelete(DeleteBehavior.Cascade);
 
         builder.HasMany(p => p.Assignments)
             .WithOne(a => a.Project)

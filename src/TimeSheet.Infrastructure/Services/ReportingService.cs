@@ -9,7 +9,6 @@ public class ReportingService(
     IReportingRepository reportingRepository,
     IClientRepository clients,
     IProjectRepository projects,
-    IRateResolver rateResolver,
     ICurrencyConversionService currencyConversion,
     IRevenueRecognitionService revenueRecognition) : IReportingService
 {
@@ -52,9 +51,7 @@ public class ReportingService(
         var byUser = new List<CostByUserLine>();
         foreach (var g in rows.GroupBy(r => (r.UserId, r.UserName)))
         {
-            var hours = g.Sum(x => x.WorkHours + x.OutOfHoursHours);
-            var rate = await rateResolver.GetEffectiveRateAsync(projectId, g.Key.UserId, range.End, ct);
-            var laborCost = await currencyConversion.ConvertAsync(new Money(hours * rate.CostRatePerHour, projectCurrency), currency, range.End, ct);
+            var laborCost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
             byUser.Add(new CostByUserLine(g.Key.UserId, g.Key.UserName, laborCost.Amount, 0, laborCost.Amount));
         }
 
@@ -74,14 +71,7 @@ public class ReportingService(
         foreach (var projectGroup in rows.GroupBy(r => (r.ProjectId, r.ProjectName)))
         {
             var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectGroup.Key.ProjectId, ct);
-            decimal laborCostNative = 0;
-            foreach (var userGroup in projectGroup.GroupBy(r => r.UserId))
-            {
-                var hours = userGroup.Sum(x => x.WorkHours + x.OutOfHoursHours);
-                var rate = await rateResolver.GetEffectiveRateAsync(projectGroup.Key.ProjectId, userGroup.Key, range.End, ct);
-                laborCostNative += hours * rate.CostRatePerHour;
-            }
-            var laborCost = await currencyConversion.ConvertAsync(new Money(laborCostNative, projectCurrency), currency, range.End, ct);
+            var laborCost = await currencyConversion.ConvertAsync(new Money(projectGroup.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
             var expenseCost = await SumConvertedAsync(
                 expenseRows.Where(e => e.ProjectId == projectGroup.Key.ProjectId).Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
 
@@ -103,9 +93,7 @@ public class ReportingService(
         var byUser = new List<ProfitByUserLine>();
         foreach (var g in rows.GroupBy(r => (r.UserId, r.UserName)))
         {
-            var hours = g.Sum(x => x.WorkHours + x.OutOfHoursHours);
-            var rate = await rateResolver.GetEffectiveRateAsync(projectId, g.Key.UserId, range.End, ct);
-            var cost = await currencyConversion.ConvertAsync(new Money(hours * rate.CostRatePerHour, projectCurrency), currency, range.End, ct);
+            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
 
             decimal billedAmount;
             if (project?.PaymentModel == PaymentModel.FixedProjectCost)
@@ -114,7 +102,7 @@ public class ReportingService(
             }
             else
             {
-                var billed = await currencyConversion.ConvertAsync(new Money(hours * (rate.BillingRatePerHour ?? 0), projectCurrency), currency, range.End, ct);
+                var billed = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct);
                 billedAmount = billed.Amount;
             }
 
@@ -146,18 +134,10 @@ public class ReportingService(
         {
             var project = await projects.GetByIdAsync(projectGroup.Key.ProjectId, ct);
             var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectGroup.Key.ProjectId, ct);
-
-            decimal costNative = 0;
-            decimal billedNative = 0;
             var projectHours = projectGroup.Sum(x => x.WorkHours + x.OutOfHoursHours);
 
-            foreach (var userGroup in projectGroup.GroupBy(r => r.UserId))
-            {
-                var hours = userGroup.Sum(x => x.WorkHours + x.OutOfHoursHours);
-                var rate = await rateResolver.GetEffectiveRateAsync(projectGroup.Key.ProjectId, userGroup.Key, range.End, ct);
-                costNative += hours * rate.CostRatePerHour;
-                if (project?.PaymentModel != PaymentModel.FixedProjectCost) billedNative += hours * (rate.BillingRatePerHour ?? 0);
-            }
+            var costNative = projectGroup.Sum(x => x.CostAmountNative);
+            var billedNative = project?.PaymentModel == PaymentModel.FixedProjectCost ? 0 : projectGroup.Sum(x => x.BilledAmountNative);
 
             var cost = await currencyConversion.ConvertAsync(new Money(costNative, projectCurrency), currency, range.End, ct);
             var expenseCost = await SumConvertedAsync(

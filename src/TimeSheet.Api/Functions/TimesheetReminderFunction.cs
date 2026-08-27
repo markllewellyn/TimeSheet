@@ -13,7 +13,7 @@ namespace TimeSheet.Api.Functions;
 /// </summary>
 public class TimesheetReminderFunction(
     IUserRepository users,
-    IProjectAssignmentRepository assignments,
+    IStaffProjectRepository assignments,
     ITimesheetEntryRepository entries,
     INotificationService notificationService,
     ILogger<TimesheetReminderFunction> logger)

@@ -13,9 +13,9 @@ public class InvoicingService(
     INotificationService notificationService,
     IUnitOfWork uow) : IInvoicingService
 {
-    public async Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct)
+    public async Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct)
     {
-        var freshDraft = await generation.BuildDraftAsync(clientId, periodStart, periodEnd, ct);
+        var freshDraft = await generation.BuildDraftAsync(clientId, periodStart, periodEnd, manualExchangeRate, ct);
 
         var existing = await invoices.GetDraftAsync(clientId, periodStart, ct);
         if (existing is not null)
@@ -24,6 +24,7 @@ public class InvoicingService(
             invoices.ClearLineItems(existing);
             existing.PeriodEnd = periodEnd;
             existing.ReportingCurrency = freshDraft.ReportingCurrency;
+            existing.ExchangeRate = freshDraft.ExchangeRate;
             existing.TotalAmount = freshDraft.TotalAmount;
             existing.GeneratedAtUtc = DateTimeOffset.UtcNow;
             foreach (var line in freshDraft.LineItems) existing.LineItems.Add(line);
@@ -67,6 +68,7 @@ public class InvoicingService(
             invoice.PeriodStart,
             invoice.PeriodEnd,
             invoice.ReportingCurrency,
+            invoice.ExchangeRate,
             invoice.LineItems.Select(l => new InvoiceDocumentLine(l.Description, l.Hours, l.Amount)).ToList(),
             invoice.TotalAmount);
 

@@ -30,6 +30,7 @@ public class QuestPdfInvoiceRenderer : IPdfInvoiceRenderer
                     column.Item().Text($"Billing Period: {model.PeriodStart:d MMM yyyy} - {model.PeriodEnd:d MMM yyyy}");
                     column.Item().PaddingTop(8).Text(model.ClientName).Bold();
                     if (model.ClientAddress is not null) column.Item().Text(model.ClientAddress);
+                    if (model.ExchangeRate is { } rate) column.Item().PaddingTop(4).Text($"Exchange rate: 1 GBP = {rate:0.####} {model.Currency}");
                 });
 
                 page.Content().PaddingTop(20).Table(table =>

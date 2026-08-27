@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Infrastructure.Data;
@@ -9,7 +8,7 @@ namespace TimeSheet.Infrastructure.Repositories;
 public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
 {
     public Task<Project?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.Projects.Include(p => p.Rates).Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == id, ct);
+        db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<IReadOnlyList<Project>> GetByClientIdAsync(int clientId, bool includeInactive, CancellationToken ct)
     {
@@ -19,11 +18,10 @@ public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
     }
 
     public async Task<IReadOnlyList<Project>> GetAssignedToUserAsync(int userId, DateOnly onDate, CancellationToken ct) =>
-        await db.ProjectAssignments
-            .Where(a => a.UserId == userId && a.Status == AssignmentStatus.Active
-                        && a.StartDate <= onDate && (a.EndDate == null || a.EndDate >= onDate))
-            .Select(a => a.Project!)
-            .Distinct()
+        await db.Projects
+            .Include(p => p.Client)
+            .Where(p => p.Assignments.Any(a => a.StaffId == userId && a.IsActive
+                        && a.StartDate <= onDate && (a.EndDate == null || a.EndDate >= onDate)))
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Project>> GetAllActiveAsync(CancellationToken ct) =>

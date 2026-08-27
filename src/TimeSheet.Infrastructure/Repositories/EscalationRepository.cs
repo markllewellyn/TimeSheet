@@ -12,13 +12,17 @@ public class EscalationRepository(TimesheetDbContext db) : IEscalationRepository
         db.Escalations.Include(e => e.TimesheetEntry).Include(e => e.Project).ThenInclude(p => p!.Client)
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
-    public async Task<IReadOnlyList<Escalation>> GetPendingAsync(CancellationToken ct) =>
-        await db.Escalations
+    public async Task<IReadOnlyList<Escalation>> GetPendingAsync(CancellationToken ct)
+    {
+        // SQLite can't translate ORDER BY on a DateTimeOffset column - order client-side instead (result sets
+        // here are small: currently-pending escalations only).
+        var escalations = await db.Escalations
             .Include(e => e.TimesheetEntry).ThenInclude(te => te!.User)
             .Include(e => e.Project).ThenInclude(p => p!.Client)
             .Where(e => e.Decision == EscalationDecision.Pending)
-            .OrderBy(e => e.RaisedAtUtc)
             .ToListAsync(ct);
+        return escalations.OrderBy(e => e.RaisedAtUtc).ToList();
+    }
 
     public async Task AddAsync(Escalation escalation, CancellationToken ct) => await db.Escalations.AddAsync(escalation, ct);
 

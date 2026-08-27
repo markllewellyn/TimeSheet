@@ -10,11 +10,15 @@ public class NotificationRepository(TimesheetDbContext db) : INotificationReposi
     public Task<Notification?> GetByIdAsync(int id, CancellationToken ct) =>
         db.Notifications.FirstOrDefaultAsync(n => n.Id == id, ct);
 
-    public async Task<IReadOnlyList<Notification>> GetUnreadAsync(int userId, CancellationToken ct) =>
-        await db.Notifications
+    public async Task<IReadOnlyList<Notification>> GetUnreadAsync(int userId, CancellationToken ct)
+    {
+        // SQLite can't translate ORDER BY on a DateTimeOffset column - order client-side instead (result sets
+        // here are small: one user's unread notifications).
+        var notifications = await db.Notifications
             .Where(n => n.RecipientUserId == userId && !n.IsRead)
-            .OrderByDescending(n => n.CreatedAtUtc)
             .ToListAsync(ct);
+        return notifications.OrderByDescending(n => n.CreatedAtUtc).ToList();
+    }
 
     public async Task AddAsync(Notification notification, CancellationToken ct) => await db.Notifications.AddAsync(notification, ct);
 

@@ -18,7 +18,7 @@ public class QuestPdfInvoiceRendererTests
     {
         var model = new InvoiceDocumentModel(
             "Antigua Ltd", "1 Example Street, London", "INV-0001",
-            new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), "GBP",
+            new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), "GBP", null,
             [new InvoiceDocumentLine("D365 Transformation", 40m, 4000m), new InvoiceDocumentLine("Expenses", null, 120.50m)],
             4120.50m);
 

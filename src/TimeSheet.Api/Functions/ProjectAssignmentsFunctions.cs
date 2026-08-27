@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
 using TimeSheet.Contracts;
-using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
@@ -11,9 +10,10 @@ using TimeSheet.Domain.Services;
 namespace TimeSheet.Api.Functions;
 
 public class ProjectAssignmentsFunctions(
-    IProjectAssignmentRepository assignments,
+    IStaffProjectRepository assignments,
     IProjectRepository projects,
     IUserRepository users,
+    IRateResolver rateResolver,
     IUserWorkloadService workloadService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -43,19 +43,35 @@ public class ProjectAssignmentsFunctions(
         var user = await users.GetByIdAsync(body.UserId, ct);
         if (user is null) return new NotFoundObjectResult(new { error = "User not found." });
 
-        // At most one Active/Paused assignment per (project,user) at a time - filtered unique index is
-        // defense-in-depth; check here first so we can return a clean 409 instead of a raw DB constraint error.
-        var existing = await assignments.GetByUserIdAsync(body.UserId, activeOnly: false, ct);
-        if (existing.Any(a => a.ProjectId == body.ProjectId && a.Status != AssignmentStatus.Ended))
+        // Assignment eligibility requires that IRateResolver can produce SOME rate for this person on this
+        // project (a role-tier default counts) - not that a specific person-level override already exists.
+        try
         {
-            return new ConflictObjectResult(new { error = "This user already has an active or paused assignment to this project." });
+            await rateResolver.ResolveAsync(body.UserId, project.ClientId, body.ProjectId, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
+        }
+        catch (RateNotConfiguredException ex)
+        {
+            return new ObjectResult(new { error = $"{user.DisplayName} has no billable rate configured yet - {ex.Message}" })
+            {
+                StatusCode = StatusCodes.Status409Conflict,
+            };
         }
 
-        var assignment = new ProjectAssignment
+        // Block a date-range overlap against this (staff,project) pair's ACTIVE assignment only - an
+        // ended assignment is history and imposes no restriction, however its old dates compare. New
+        // assignments are always open-ended at creation (no EndDate on CreateProjectAssignmentRequest), so
+        // pass endDate: null. The filtered unique index (see StaffProjectConfiguration) is defense-in-depth
+        // for "at most one active", but can't return a clean error message, so it's enforced here first.
+        if (await assignments.IsOverlappingAsync(body.UserId, body.ProjectId, body.StartDate, endDate: null, ct))
         {
+            return new ConflictObjectResult(new { error = "This user already has an active assignment to this project that overlaps with the selected start date." });
+        }
+
+        var assignment = new StaffProject
+        {
+            StaffId = body.UserId,
             ProjectId = body.ProjectId,
-            UserId = body.UserId,
-            Status = AssignmentStatus.Active,
+            IsActive = true,
             StartDate = body.StartDate,
             AllocatedHoursPerWeek = body.AllocatedHoursPerWeek,
             Notes = body.Notes,
@@ -80,12 +96,9 @@ public class ProjectAssignmentsFunctions(
         var body = await req.ReadFromJsonAsync<UpdateProjectAssignmentRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
-        if (!Enum.TryParse<AssignmentStatus>(body.Status, out var status))
-        {
-            return new BadRequestObjectResult(new { error = "Invalid Status." });
-        }
-
-        assignment.Status = status;
+        // The legacy [StaffProjects] table only has an Active bit - the old Active/Paused/Ended distinction
+        // collapses to it (anything other than "Active" is treated as inactive).
+        assignment.IsActive = body.Status == "Active";
         assignment.EndDate = body.EndDate;
         assignment.AllocatedHoursPerWeek = body.AllocatedHoursPerWeek;
         assignment.Notes = body.Notes;
@@ -95,7 +108,7 @@ public class ProjectAssignmentsFunctions(
         return new OkObjectResult(ToDto(assignment));
     }
 
-    /// <summary>Sums AllocatedHoursPerWeek across the caller's Active assignments overlapping the given week -
+    /// <summary>Sums AllocatedHoursPerWeek across the caller's active assignments overlapping the given week -
     /// deliberately explicit, not derived from remaining budget / remaining weeks. See IUserWorkloadService.</summary>
     [Function("Me_EstimatedHoursThisWeek")]
     public async Task<IActionResult> EstimatedHoursThisWeek(
@@ -122,11 +135,11 @@ public class ProjectAssignmentsFunctions(
         return date.AddDays(-diff);
     }
 
-    private static ProjectAssignmentDto ToDto(ProjectAssignment a) => new(
-        a.Id, a.ProjectId, a.Project?.Name ?? "", a.UserId, a.User?.DisplayName ?? "",
-        a.Status.ToString(), a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes);
+    private static ProjectAssignmentDto ToDto(StaffProject a) => new(
+        a.Id, a.ProjectId, a.Project?.Name ?? "", a.StaffId, a.Staff?.DisplayName ?? "",
+        a.IsActive ? "Active" : "Ended", a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes);
 
-    private static ProjectAssignmentDto ToDtoWith(ProjectAssignment a, Project project, User user) => new(
-        a.Id, a.ProjectId, project.Name, a.UserId, user.DisplayName,
-        a.Status.ToString(), a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes);
+    private static ProjectAssignmentDto ToDtoWith(StaffProject a, Project project, User user) => new(
+        a.Id, a.ProjectId, project.Name, user.Id, user.DisplayName,
+        a.IsActive ? "Active" : "Ended", a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes);
 }

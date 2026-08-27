@@ -1,5 +1,12 @@
 namespace TimeSheet.Domain.Entities;
 
+/// <summary>
+/// Maps onto the legacy [Staff] table (Id/DisplayName/Email/PayrollNumber/Role/IsActive, plus
+/// PasswordHash/EntraObjectId added directly onto it for the app's dual local/SSO auth) plus a table-split
+/// partner [StaffProfiles] holding audit fields, which have no legacy equivalent - see UserConfiguration.
+/// HourlyCost/JobTitle have been replaced by the effective-dated StaffCost entity and the JobRoleId FK
+/// respectively - see StaffCost and Role.
+/// </summary>
 public class User
 {
     /// <summary>App's own surrogate key, deliberately decoupled from EntraObjectId (keeps the PK stable independent of the identity provider).</summary>
@@ -18,18 +25,26 @@ public class User
     public required string Email { get; set; }
     public required string DisplayName { get; set; }
 
-    /// <summary>Flat, global role — NOT per-client. This is the app's own authorization source of truth.</summary>
+    /// <summary>Legacy [Staff].PayrollNumber - no equivalent in the app's original design; required by the legacy schema.</summary>
+    public required string PayrollNumber { get; set; }
+
+    /// <summary>Flat, global role — NOT per-client. This is the app's own authorization source of truth.
+    /// Stored as the legacy [Staff].Admin bit via a value conversion (UserRole has exactly two values). NOT to
+    /// be confused with JobRoleId below - that's the FDD's job-function Role (Developer/Consultant), used for
+    /// RateCard resolution; this is purely Admin-vs-User permissions.</summary>
     public UserRole Role { get; set; } = UserRole.User;
 
-    public string? JobTitle { get; set; }
+    /// <summary>The job-function Role (e.g. Developer, Consultant) this person's role-tier RateCard rates
+    /// resolve against - replaces the old free-text JobTitle. Nullable: a person with no Role assigned can only
+    /// be billed via a person-level RateCard override (tiers 1/2), never a role tier (3/4/5).</summary>
+    public int? JobRoleId { get; set; }
+    public Role? JobRole { get; set; }
 
-    /// <summary>Soft-disable leavers; preserves FK history on timesheets/assignments/rates.</summary>
+    /// <summary>Soft-disable leavers; preserves FK history on timesheets/assignments/costs.</summary>
     public bool IsActive { get; set; } = true;
 
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? ModifiedUtc { get; set; }
-
-    public List<ProjectAssignment> Assignments { get; set; } = [];
 
     public bool IsLocalAccount => PasswordHash is not null;
 }

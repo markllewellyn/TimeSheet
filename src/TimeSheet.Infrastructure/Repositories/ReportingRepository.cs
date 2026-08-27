@@ -32,7 +32,9 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
             select new TimeEntryAggregateRow(
                 g.Key.ProjectId, g.Key.ProjectName, g.Key.ClientId, g.Key.ClientName,
                 g.Key.UserId, g.Key.UserName, g.Key.Date,
-                g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours));
+                g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours),
+                g.Sum(x => (x.WorkHours + x.OutOfHoursHours) * (x.ResolvedCustomerRate ?? 0)),
+                g.Sum(x => x.WorkHours * (x.ResolvedHourlyCost ?? 0) + x.OutOfHoursHours * (x.ResolvedOutOfHoursCost ?? 0)));
 
         return await query.ToListAsync(ct);
     }

@@ -3,9 +3,15 @@ namespace TimeSheet.Contracts;
 public record TimesheetEntryDto(
     int Id, int ProjectId, string ProjectName, int ClientId, string ClientName,
     DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description, string Status,
+    decimal ToPayroll, bool ApprovedPayroll, bool SentToPayroll,
     IReadOnlyList<AttachmentDto> Attachments);
 
-public record CreateTimesheetEntryRequest(int ProjectId, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description);
+/// <summary>AdminSendToPayroll mirrors the legacy app's admin-only "Sent to Payroll" checkbox on Add - if
+/// true, the created entry is simultaneously approved and sent in one step. OnBehalfOfUserId lets an Admin log
+/// time for another staff member (impersonation) - the entry is stamped UserId=that person,
+/// CreatedByUserId=the admin, so the two are never conflated. Both are ignored server-side unless the caller is
+/// an Admin (see TimesheetEntriesFunctions.Create).</summary>
+public record CreateTimesheetEntryRequest(int ProjectId, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description, bool? AdminSendToPayroll = null, int? OnBehalfOfUserId = null);
 
 public record UpdateTimesheetEntryRequest(DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description);
 

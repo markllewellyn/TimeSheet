@@ -33,7 +33,7 @@ public class InvoicesFunctions(IInvoiceRepository invoiceRepository, IInvoicingS
 
         try
         {
-            var invoice = await invoicing.GenerateDraftInvoiceAsync(clientId, body.PeriodStart, body.PeriodEnd, ct);
+            var invoice = await invoicing.GenerateDraftInvoiceAsync(clientId, body.PeriodStart, body.PeriodEnd, body.ManualExchangeRate, ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -82,7 +82,7 @@ public class InvoicesFunctions(IInvoiceRepository invoiceRepository, IInvoicingS
     }
 
     private static InvoiceDto ToDto(Invoice i, string clientName) => new(
-        i.Id, i.ClientId, clientName, i.PeriodStart, i.PeriodEnd, i.ReportingCurrency, i.Status.ToString(),
+        i.Id, i.ClientId, clientName, i.PeriodStart, i.PeriodEnd, i.ReportingCurrency, i.ExchangeRate, i.Status.ToString(),
         i.InvoiceNumber, i.TotalAmount, i.GeneratedAtUtc, i.FinalizedAtUtc,
         i.LineItems.Select(l => new InvoiceLineItemDto(l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.Amount, l.Type.ToString())).ToList());
 }

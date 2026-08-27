@@ -27,7 +27,8 @@ public class ReportingServiceTests
     {
         await using var db = CreateInMemoryDb();
 
-        var client = new Client { Name = "Antigua", AccountCode = "C13673", ReportingCurrencyCode = "GBP", CreatedUtc = DateTimeOffset.UtcNow };
+        // No Currency row - Client.ReportingCurrencyCode falls back to "GBP", matching this test's expectations.
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
         db.Clients.Add(client);
         await db.SaveChangesAsync();
 
@@ -39,32 +40,33 @@ public class ReportingServiceTests
         db.Projects.Add(project);
         await db.SaveChangesAsync();
 
-        var user = new User { EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow };
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
         db.Users.Add(user);
         await db.SaveChangesAsync();
 
-        db.ProjectRates.Add(new ProjectRate
-        {
-            ProjectId = project.Id, UserId = null, BillingRatePerHour = 100m, CostRatePerHour = 40m,
-            EffectiveFrom = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow,
-        });
-
+        // ReportingService now sums each entry's own stamped Resolved* snapshot rather than re-resolving via
+        // IRateResolver - so this test stamps the entry directly (£100/h billed, £40/h internal cost) instead
+        // of seeding RateCard/StaffCost rows and relying on the resolver. RateResolver's own resolution logic
+        // is covered separately by RateResolverTests.
         db.TimesheetEntries.Add(new TimesheetEntry
         {
-            UserId = user.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
-            WorkHours = 10m, OutOfHoursHours = 0m, Status = TimesheetEntryStatus.Normal, CreatedUtc = DateTimeOffset.UtcNow,
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 10m, OutOfHoursHours = 0m, Description = "FDD work", Status = TimesheetEntryStatus.Normal, CreatedUtc = DateTimeOffset.UtcNow,
+            ResolvedCustomerRate = 100m, ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
         });
         await db.SaveChangesAsync();
 
         var clients = new ClientRepository(db);
         var projects = new ProjectRepository(db);
-        var rates = new ProjectRateRepository(db);
         var reportingRepo = new ReportingRepository(db);
-        var rateResolver = new RateResolver(rates);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
 
-        var reportingService = new ReportingService(reportingRepo, clients, projects, rateResolver, currencyConversion, revenueRecognition);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);

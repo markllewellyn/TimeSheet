@@ -11,14 +11,14 @@ using TimeSheet.Infrastructure.Data;
 namespace TimeSheet.Infrastructure.Data.Migrations
 {
     [DbContext(typeof(TimesheetDbContext))]
-    [Migration("20260825120005_AddLocalAccountSupport")]
-    partial class AddLocalAccountSupport
+    [Migration("20260827142347_AddRoleAndRateCard")]
+    partial class AddRoleAndRateCard
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
-            modelBuilder.HasAnnotation("ProductVersion", "10.0.11");
+            modelBuilder.HasAnnotation("ProductVersion", "9.0.19");
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.AppSettings", b =>
                 {
@@ -91,26 +91,33 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Customers");
 
                     b.Property<string>("AccountCode")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Account");
 
                     b.Property<string>("BillingAddressLine1")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BillingAddressLine2")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BillingCity")
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BillingCountryCode")
+                        .HasMaxLength(2)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("BillingPostalCode")
+                        .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
                     b.Property<int?>("CreatedByUserId")
@@ -119,11 +126,16 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("CurrencyId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Currency");
+
                     b.Property<int?>("InvoicingMonthEndDay")
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Active");
 
                     b.Property<int?>("ModifiedByUserId")
                         .HasColumnType("INTEGER");
@@ -133,32 +145,38 @@ namespace TimeSheet.Infrastructure.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CustomerName");
 
                     b.Property<string>("Notes")
+                        .HasMaxLength(2000)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PrimaryContactEmail")
+                        .HasMaxLength(320)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PrimaryContactName")
+                        .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PrimaryContactPhone")
+                        .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("ReportingCurrencyCode")
-                        .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("TEXT");
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("StartDate");
 
                     b.HasKey("Id");
 
                     b.HasIndex("AccountCode")
                         .IsUnique();
 
-                    b.ToTable("Clients");
+                    b.HasIndex("CurrencyId");
+
+                    b.ToTable("Customers", (string)null);
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.ClientAccountManager", b =>
@@ -187,6 +205,75 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("ClientAccountManagers");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.Currency", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Currency");
+
+                    b.Property<string>("CurrencyCode")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CurrencyCode");
+
+                    b.Property<string>("CurrencyName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CurrencyName");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ExchangeRate");
+
+                    b.Property<bool?>("IsActive")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("IsActive");
+
+                    b.Property<DateTimeOffset?>("LastUpdated")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("LastUpdated");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Currency", (string)null);
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.CurrencyExchangeHistory", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_History");
+
+                    b.Property<DateTimeOffset>("ChangeDate")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ChangeDate");
+
+                    b.Property<int>("CurrencyId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Currency");
+
+                    b.Property<decimal>("NewExchangeRate")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("NewExchangeRate");
+
+                    b.Property<decimal>("OldExchangeRate")
+                        .HasPrecision(18, 3)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("OldExchangeRate");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CurrencyId");
+
+                    b.ToTable("CurrencyExchangeHistory", (string)null);
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.CurrencyRate", b =>
@@ -310,6 +397,9 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Property<bool>("IsBillable")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Kind")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTimeOffset?>("ModifiedUtc")
                         .HasColumnType("TEXT");
 
@@ -336,6 +426,10 @@ namespace TimeSheet.Infrastructure.Data.Migrations
 
                     b.Property<int>("ClientId")
                         .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("ExchangeRate")
+                        .HasPrecision(18, 8)
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTimeOffset?>("FinalizedAtUtc")
                         .HasColumnType("TEXT");
@@ -466,7 +560,8 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Projects");
 
                     b.Property<int>("BudgetAlertThresholdPercent")
                         .HasColumnType("INTEGER");
@@ -475,8 +570,13 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<bool?>("CanInvoice")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("CanInvoice");
+
                     b.Property<int>("ClientId")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Customers");
 
                     b.Property<string>("Code")
                         .IsRequired()
@@ -504,7 +604,8 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Active");
 
                     b.Property<int?>("LatestHealthAssessmentId")
                         .HasColumnType("INTEGER");
@@ -514,8 +615,9 @@ namespace TimeSheet.Infrastructure.Data.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ProjectName");
 
                     b.Property<int>("PaymentModel")
                         .HasColumnType("INTEGER");
@@ -528,54 +630,7 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.HasIndex("ClientId", "Code")
                         .IsUnique();
 
-                    b.ToTable("Projects");
-                });
-
-            modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectAssignment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal?>("AllocatedHoursPerWeek")
-                        .HasPrecision(9, 2)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateTimeOffset>("CreatedUtc")
-                        .HasColumnType("TEXT");
-
-                    b.Property<DateOnly?>("EndDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Notes")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProjectId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<DateOnly>("StartDate")
-                        .HasColumnType("TEXT");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("UserId");
-
-                    b.HasIndex("ProjectId", "UserId")
-                        .IsUnique()
-                        .HasFilter("\"Status\" <> 'Ended'");
-
-                    b.ToTable("ProjectAssignments");
+                    b.ToTable("Projects", (string)null);
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectHealthAssessment", b =>
@@ -630,19 +685,14 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.ToTable("ProjectHealthAssessments");
                 });
 
-            modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectRate", b =>
+            modelBuilder.Entity("TimeSheet.Domain.Entities.RateCard", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<decimal?>("BillingRatePerHour")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
-
-                    b.Property<decimal>("CostRatePerHour")
-                        .HasPrecision(18, 4)
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("ClientId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("INTEGER");
@@ -653,25 +703,136 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Property<DateOnly>("EffectiveFrom")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateOnly?>("EffectiveTo")
-                        .HasColumnType("TEXT");
-
-                    b.Property<int>("ProjectId")
+                    b.Property<int?>("ProjectId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("UserId")
+                    b.Property<decimal>("Rate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("RoleId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("StaffId")
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("ClientId");
 
-                    b.HasIndex("ProjectId", "UserId", "EffectiveFrom");
+                    b.HasIndex("ProjectId");
 
-                    b.ToTable("ProjectRates");
+                    b.HasIndex("StaffId");
+
+                    b.HasIndex("RoleId", "StaffId", "ClientId", "ProjectId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("RateCards", t =>
+                        {
+                            t.HasCheckConstraint("CK_RateCard_NotBothClientProject", "\"ClientId\" IS NULL OR \"ProjectId\" IS NULL");
+
+                            t.HasCheckConstraint("CK_RateCard_ScopeXor", "(\"RoleId\" IS NOT NULL AND \"StaffId\" IS NULL) OR (\"RoleId\" IS NULL AND \"StaffId\" IS NOT NULL)");
+
+                            t.HasCheckConstraint("CK_RateCard_StaffRequiresScope", "\"StaffId\" IS NULL OR \"ClientId\" IS NOT NULL OR \"ProjectId\" IS NOT NULL");
+                        });
                 });
 
-            modelBuilder.Entity("TimeSheet.Domain.Entities.TimesheetEntry", b =>
+            modelBuilder.Entity("TimeSheet.Domain.Entities.RecordedTimeArchive", b =>
+                {
+                    b.Property<int>("Id")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_RecordedTimes");
+
+                    b.Property<string>("ApprovedByName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ApprovedByName");
+
+                    b.Property<int?>("ApprovedByStaffId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("ApprovedPayroll")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Customers");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreatedDate");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("TaskDate");
+
+                    b.Property<DateTimeOffset?>("DateApprovedPayroll")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("DateSentToPayroll")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Description");
+
+                    b.Property<decimal?>("ExpensesValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ExpensesValue");
+
+                    b.Property<decimal>("OutOfHoursHours")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("OutOfHours");
+
+                    b.Property<string>("PostingBatch")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("PostingBatch");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Projects");
+
+                    b.Property<string>("SentByName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("SentByName");
+
+                    b.Property<int?>("SentByStaffId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("SentToPayroll")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("ToCompany")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ToCompany");
+
+                    b.Property<decimal>("ToPayroll")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ToPayroll");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Staff");
+
+                    b.Property<decimal>("WorkHours")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("WorkHours");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("RecordedTimesarc", (string)null);
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.Role", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
@@ -680,21 +841,207 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateOnly>("Date")
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("Roles");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.StaffCost", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateOnly>("EffectiveFrom")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("HourlyCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("OutOfHoursCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StaffId")
+                        .HasColumnType("INTEGER");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StaffId", "EffectiveFrom")
+                        .IsUnique();
+
+                    b.ToTable("StaffCosts");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.StaffProject", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_StaffProjects");
+
+                    b.Property<decimal?>("AllocatedHoursPerWeek")
+                        .HasPrecision(9, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("AllocatedHoursPerWeek");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateOnly?>("EndDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Active");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(1000)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProjectId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Projects");
+
+                    b.Property<int>("StaffId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Staff");
+
+                    b.Property<DateOnly>("StartDate")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId");
+
+                    b.HasIndex("StaffId", "ProjectId")
+                        .IsUnique()
+                        .HasFilter("\"Active\" = 1");
+
+                    b.ToTable("StaffProjects", (string)null);
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.TimesheetEntry", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_RecordedTimes");
+
+                    b.Property<string>("ApprovedByName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ApprovedByName");
+
+                    b.Property<int?>("ApprovedByStaffId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ApprovedByStaffId");
+
+                    b.Property<bool>("ApprovedPayroll")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("ApprovedPayroll");
+
+                    b.Property<int>("ClientId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Customers");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTimeOffset>("CreatedUtc")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("CreatedDate");
+
+                    b.Property<DateOnly>("Date")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("TaskDate");
+
+                    b.Property<DateTimeOffset?>("DateApprovedPayroll")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DateApprovedPayroll");
+
+                    b.Property<DateTimeOffset?>("DateSentToPayroll")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("DateSentToPayroll");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Description");
+
+                    b.Property<decimal?>("ExpensesValue")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ExpensesValue");
 
                     b.Property<DateTimeOffset?>("ModifiedUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<decimal>("OutOfHoursHours")
-                        .HasPrecision(6, 2)
-                        .HasColumnType("TEXT");
+                        .HasPrecision(4, 1)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("OutOfHours");
+
+                    b.Property<string>("PostingBatch")
+                        .HasMaxLength(20)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("PostingBatch");
 
                     b.Property<int>("ProjectId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Projects");
+
+                    b.Property<int?>("RateCardId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("ResolvedCustomerRate")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("ResolvedHourlyCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("ResolvedOutOfHoursCost")
+                        .HasPrecision(18, 2)
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SentByName")
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("SentByName");
+
+                    b.Property<int?>("SentByStaffId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("SentByStaffId");
+
+                    b.Property<bool>("SentToPayroll")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("SentToPayroll");
+
+                    b.Property<int?>("StaffCostId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("Status")
@@ -702,62 +1049,95 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("INTEGER");
-
-                    b.Property<decimal>("WorkHours")
-                        .HasPrecision(6, 2)
+                    b.Property<string>("Tier")
+                        .HasMaxLength(30)
                         .HasColumnType("TEXT");
 
+                    b.Property<decimal>("ToCompany")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ToCompany");
+
+                    b.Property<decimal>("ToPayroll")
+                        .HasPrecision(7, 2)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ToPayroll");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Staff");
+
+                    b.Property<decimal>("WorkHours")
+                        .HasPrecision(4, 1)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("WorkHours");
+
                     b.HasKey("Id");
+
+                    b.HasIndex("RateCardId");
+
+                    b.HasIndex("StaffCostId");
+
+                    b.HasIndex("ClientId", "Date");
 
                     b.HasIndex("ProjectId", "Date");
 
                     b.HasIndex("UserId", "Date");
 
-                    b.ToTable("TimesheetEntries");
+                    b.ToTable("RecordedTimes", (string)null);
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.User", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("PK_Staff");
 
                     b.Property<DateTimeOffset>("CreatedUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("DisplayName")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(40)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("FullName");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(320)
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("Email");
 
                     b.Property<string>("EntraObjectId")
                         .HasMaxLength(100)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .HasColumnName("EntraObjectId");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("INTEGER");
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Active");
 
-                    b.Property<string>("JobTitle")
-                        .HasColumnType("TEXT");
+                    b.Property<int?>("JobRoleId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateTimeOffset?>("ModifiedUtc")
                         .HasColumnType("TEXT");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(500)
-                        .HasColumnType("TEXT");
+                        .HasColumnType("TEXT")
+                        .HasColumnName("PasswordHash");
 
-                    b.Property<string>("Role")
+                    b.Property<string>("PayrollNumber")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("TEXT");
+                        .HasMaxLength(10)
+                        .HasColumnType("TEXT")
+                        .HasColumnName("PayrollNumber");
+
+                    b.Property<bool>("Role")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("Admin");
 
                     b.HasKey("Id");
 
@@ -767,7 +1147,9 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.HasIndex("EntraObjectId")
                         .IsUnique();
 
-                    b.ToTable("Users");
+                    b.HasIndex("JobRoleId");
+
+                    b.ToTable("Staff", (string)null);
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.Attachment", b =>
@@ -779,6 +1161,16 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("TimesheetEntry");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.Client", b =>
+                {
+                    b.HasOne("TimeSheet.Domain.Entities.Currency", "Currency")
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.ClientAccountManager", b =>
@@ -798,6 +1190,17 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Navigation("Client");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.CurrencyExchangeHistory", b =>
+                {
+                    b.HasOne("TimeSheet.Domain.Entities.Currency", "Currency")
+                        .WithMany()
+                        .HasForeignKey("CurrencyId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Currency");
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.Escalation", b =>
@@ -890,25 +1293,6 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Navigation("Client");
                 });
 
-            modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectAssignment", b =>
-                {
-                    b.HasOne("TimeSheet.Domain.Entities.Project", "Project")
-                        .WithMany("Assignments")
-                        .HasForeignKey("ProjectId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("TimeSheet.Domain.Entities.User", "User")
-                        .WithMany("Assignments")
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Project");
-
-                    b.Navigation("User");
-                });
-
             modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectHealthAssessment", b =>
                 {
                     b.HasOne("TimeSheet.Domain.Entities.Project", "Project")
@@ -920,41 +1304,116 @@ namespace TimeSheet.Infrastructure.Data.Migrations
                     b.Navigation("Project");
                 });
 
-            modelBuilder.Entity("TimeSheet.Domain.Entities.ProjectRate", b =>
+            modelBuilder.Entity("TimeSheet.Domain.Entities.RateCard", b =>
+                {
+                    b.HasOne("TimeSheet.Domain.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TimeSheet.Domain.Entities.Project", "Project")
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TimeSheet.Domain.Entities.Role", "Role")
+                        .WithMany()
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TimeSheet.Domain.Entities.User", "Staff")
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("Client");
+
+                    b.Navigation("Project");
+
+                    b.Navigation("Role");
+
+                    b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.StaffCost", b =>
+                {
+                    b.HasOne("TimeSheet.Domain.Entities.User", "Staff")
+                        .WithMany()
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Staff");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.StaffProject", b =>
                 {
                     b.HasOne("TimeSheet.Domain.Entities.Project", "Project")
-                        .WithMany("Rates")
+                        .WithMany("Assignments")
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("TimeSheet.Domain.Entities.User", "User")
+                    b.HasOne("TimeSheet.Domain.Entities.User", "Staff")
                         .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Restrict);
+                        .HasForeignKey("StaffId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
 
                     b.Navigation("Project");
 
-                    b.Navigation("User");
+                    b.Navigation("Staff");
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.TimesheetEntry", b =>
                 {
+                    b.HasOne("TimeSheet.Domain.Entities.Client", "Client")
+                        .WithMany()
+                        .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.HasOne("TimeSheet.Domain.Entities.Project", "Project")
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("TimeSheet.Domain.Entities.RateCard", "RateCard")
+                        .WithMany()
+                        .HasForeignKey("RateCardId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("TimeSheet.Domain.Entities.StaffCost", "StaffCost")
+                        .WithMany()
+                        .HasForeignKey("StaffCostId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("TimeSheet.Domain.Entities.User", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Client");
+
                     b.Navigation("Project");
 
+                    b.Navigation("RateCard");
+
+                    b.Navigation("StaffCost");
+
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("TimeSheet.Domain.Entities.User", b =>
+                {
+                    b.HasOne("TimeSheet.Domain.Entities.Role", "JobRole")
+                        .WithMany()
+                        .HasForeignKey("JobRoleId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("JobRole");
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.Client", b =>
@@ -972,18 +1431,11 @@ namespace TimeSheet.Infrastructure.Data.Migrations
             modelBuilder.Entity("TimeSheet.Domain.Entities.Project", b =>
                 {
                     b.Navigation("Assignments");
-
-                    b.Navigation("Rates");
                 });
 
             modelBuilder.Entity("TimeSheet.Domain.Entities.TimesheetEntry", b =>
                 {
                     b.Navigation("Attachments");
-                });
-
-            modelBuilder.Entity("TimeSheet.Domain.Entities.User", b =>
-                {
-                    b.Navigation("Assignments");
                 });
 #pragma warning restore 612, 618
         }

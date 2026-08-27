@@ -24,12 +24,15 @@ public static class DependencyInjection
 
         services.AddScoped<IClientRepository, ClientRepository>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
-        services.AddScoped<IProjectRateRepository, ProjectRateRepository>();
+        services.AddScoped<IStaffCostRepository, StaffCostRepository>();
+        services.AddScoped<IRateCardRepository, RateCardRepository>();
+        services.AddScoped<IRoleRepository, RoleRepository>();
         services.AddScoped<IUserRepository, UserRepository>();
-        services.AddScoped<IProjectAssignmentRepository, ProjectAssignmentRepository>();
+        services.AddScoped<IStaffProjectRepository, StaffProjectRepository>();
         services.AddScoped<ITimesheetEntryRepository, TimesheetEntryRepository>();
         services.AddScoped<IExpenseEntryRepository, ExpenseEntryRepository>();
         services.AddScoped<IAttachmentRepository, AttachmentRepository>();
+        services.AddScoped<ICurrencyRepository, CurrencyRepository>();
         services.AddScoped<ICurrencyRateRepository, CurrencyRateRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IEscalationRepository, EscalationRepository>();

@@ -2,9 +2,14 @@ namespace TimeSheet.Domain.Repositories;
 
 public record ReportScope(int? ClientId, int? ProjectId);
 
+/// <summary>BilledAmountNative/CostAmountNative are summed directly from each entry's stamped
+/// ResolvedCustomerRate/ResolvedHourlyCost/ResolvedOutOfHoursCost (see TimesheetEntry) - not re-resolved via
+/// IRateResolver at report time, so reports reflect the rate that actually applied when each entry was
+/// recorded, never "today's" rate. Entries with no snapshot (pre-migration) contribute 0 to both.</summary>
 public record TimeEntryAggregateRow(
     int ProjectId, string ProjectName, int ClientId, string ClientName,
-    int UserId, string UserName, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours);
+    int UserId, string UserName, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours,
+    decimal BilledAmountNative, decimal CostAmountNative);
 
 public record ExpenseAggregateRow(int ProjectId, int ClientId, DateOnly Date, decimal Amount, string Currency);
 

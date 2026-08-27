@@ -53,6 +53,7 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
         {
             Name = body.Name,
             AccountCode = body.AccountCode,
+            StartDate = body.StartDate,
             BillingAddressLine1 = body.BillingAddressLine1,
             BillingAddressLine2 = body.BillingAddressLine2,
             BillingCity = body.BillingCity,
@@ -61,7 +62,7 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
             PrimaryContactName = body.PrimaryContactName,
             PrimaryContactEmail = body.PrimaryContactEmail,
             PrimaryContactPhone = body.PrimaryContactPhone,
-            ReportingCurrencyCode = body.ReportingCurrencyCode,
+            CurrencyId = body.CurrencyId,
             InvoicingMonthEndDay = body.InvoicingMonthEndDay,
             Notes = body.Notes,
             CreatedUtc = DateTimeOffset.UtcNow,
@@ -72,7 +73,10 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
         await uow.SaveChangesAsync(ct);
 
         logger.LogInformation("Client {ClientId} ({AccountCode}) created by user {UserId}", client.Id, client.AccountCode, currentUser.RequireUser().UserId);
-        return new CreatedResult($"/api/clients/{client.Id}", ToDto(client));
+
+        // Re-fetch so the Currency navigation (needed for ReportingCurrencyCode) is populated for the response.
+        var saved = await clients.GetByIdAsync(client.Id, ct);
+        return new CreatedResult($"/api/clients/{client.Id}", ToDto(saved!));
     }
 
     [Function("Clients_Update")]
@@ -94,6 +98,7 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
 
         client.Name = body.Name;
         client.AccountCode = body.AccountCode;
+        client.StartDate = body.StartDate;
         client.BillingAddressLine1 = body.BillingAddressLine1;
         client.BillingAddressLine2 = body.BillingAddressLine2;
         client.BillingCity = body.BillingCity;
@@ -102,7 +107,7 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
         client.PrimaryContactName = body.PrimaryContactName;
         client.PrimaryContactEmail = body.PrimaryContactEmail;
         client.PrimaryContactPhone = body.PrimaryContactPhone;
-        client.ReportingCurrencyCode = body.ReportingCurrencyCode;
+        client.CurrencyId = body.CurrencyId;
         client.InvoicingMonthEndDay = body.InvoicingMonthEndDay;
         client.Notes = body.Notes;
         client.ModifiedUtc = DateTimeOffset.UtcNow;
@@ -110,7 +115,10 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
 
         clients.Update(client);
         await uow.SaveChangesAsync(ct);
-        return new OkObjectResult(ToDto(client));
+
+        // Re-fetch so the Currency navigation reflects any CurrencyId change for the response.
+        var saved = await clients.GetByIdAsync(id, ct);
+        return new OkObjectResult(ToDto(saved!));
     }
 
     [Function("Clients_Deactivate")]
@@ -132,8 +140,8 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
     }
 
     private static ClientDto ToDto(Client c) => new(
-        c.Id, c.Name, c.AccountCode,
+        c.Id, c.Name, c.AccountCode, c.StartDate,
         c.BillingAddressLine1, c.BillingAddressLine2, c.BillingCity, c.BillingPostalCode, c.BillingCountryCode,
         c.PrimaryContactName, c.PrimaryContactEmail, c.PrimaryContactPhone,
-        c.ReportingCurrencyCode, c.InvoicingMonthEndDay, c.Notes, c.IsActive);
+        c.CurrencyId, c.ReportingCurrencyCode, c.InvoicingMonthEndDay, c.Notes, c.IsActive);
 }

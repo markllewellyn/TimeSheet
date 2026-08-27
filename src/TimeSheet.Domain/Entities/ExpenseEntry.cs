@@ -8,6 +8,10 @@ public class ExpenseEntry
     public int ProjectId { get; set; }
     public Project? Project { get; set; }
 
+    /// <summary>Expense (default, any assigned staff member) vs Contract (Admin-only, logged against a
+    /// non-invoiceable project) - see ExpenseEntriesFunctions.Create for the validation split.</summary>
+    public ExpenseEntryKind Kind { get; set; } = ExpenseEntryKind.Expense;
+
     public DateOnly Date { get; set; }
 
     /// <summary>Stored in the currency it was actually incurred in — never converted at write time (see ICurrencyConversionService).</summary>

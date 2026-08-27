@@ -3,7 +3,7 @@ using TimeSheet.Domain.Services;
 
 namespace TimeSheet.Infrastructure.Services;
 
-public class UserWorkloadService(IProjectAssignmentRepository assignments) : IUserWorkloadService
+public class UserWorkloadService(IStaffProjectRepository assignments) : IUserWorkloadService
 {
     public async Task<EstimatedWeeklyWorkload> GetEstimatedHoursThisWeekAsync(int userId, DateOnly weekStart, CancellationToken ct)
     {

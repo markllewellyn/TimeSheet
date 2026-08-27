@@ -77,3 +77,23 @@ public enum ProjectHealthStatus
     AtRisk,
     Behind
 }
+
+/// <summary>Distinguishes a staff expense claim (billable/reimbursable) from an Admin-only "Contract" value -
+/// a monetary figure logged against a non-invoiceable project, mirroring the legacy Power App's separate
+/// admin-only value-entry flow (see ExpenseEntriesFunctions.Create).</summary>
+public enum ExpenseEntryKind
+{
+    Expense,
+    Contract
+}
+
+/// <summary>Which of RateCard's 5 resolution tiers produced the rate stamped on a TimesheetEntry, most
+/// specific first - see IRateResolver.</summary>
+public enum RateCardTier
+{
+    PersonProject,
+    PersonClient,
+    RoleProject,
+    RoleClient,
+    RoleDefault
+}
