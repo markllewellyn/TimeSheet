@@ -2,7 +2,7 @@ namespace TimeSheet.Contracts;
 
 public record TimesheetEntryDto(
     int Id, int ProjectId, string ProjectName, int ClientId, string ClientName,
-    DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description, string Status,
+    DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description,
     decimal ToPayroll, bool ApprovedPayroll, bool SentToPayroll,
     IReadOnlyList<AttachmentDto> Attachments);
 
@@ -13,7 +13,9 @@ public record TimesheetEntryDto(
 /// an Admin (see TimesheetEntriesFunctions.Create).</summary>
 public record CreateTimesheetEntryRequest(int ProjectId, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description, bool? AdminSendToPayroll = null, int? OnBehalfOfUserId = null);
 
-public record UpdateTimesheetEntryRequest(DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description);
+/// <summary>OnBehalfOfUserId lets an Admin edit an entry while impersonating its owner - must equal the
+/// entry's own UserId (see TimesheetEntriesFunctions.Update), ignored unless the caller is an Admin.</summary>
+public record UpdateTimesheetEntryRequest(DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description, int? OnBehalfOfUserId = null);
 
 public record TimesheetEntrySummaryDto(
     decimal MostRecentDayHours, decimal TotalWorkHours, decimal TotalOutOfHoursHours, decimal TotalHours);

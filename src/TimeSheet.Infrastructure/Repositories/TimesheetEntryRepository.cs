@@ -11,13 +11,12 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
     public async Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct) =>
         await db.TimesheetEntries
             .Include(e => e.User)
-            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to
-                        && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))
+            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to)
             .ToListAsync(ct);
 
     public async Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct) =>
         await db.TimesheetEntries
-            .Where(e => e.ProjectId == projectId && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved))
+            .Where(e => e.ProjectId == projectId)
             .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
 
     public async Task<decimal> GetTotalHoursForUserDateAsync(int userId, DateOnly date, int? excludeEntryId, CancellationToken ct) =>
@@ -65,7 +64,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Include(e => e.User)
             .Include(e => e.Client)
             .Include(e => e.Project)
-            .Where(e => !e.ApprovedPayroll && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved));
+            .Where(e => !e.ApprovedPayroll);
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {

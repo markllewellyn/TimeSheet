@@ -13,6 +13,7 @@ export interface TimesheetEntriesFilter {
   search?: string;
   from?: string;
   to?: string;
+  onBehalfOfUserId?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -20,8 +21,13 @@ export class TimesheetEntriesService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/timesheet-entries`;
 
-  getById(id: number): Observable<TimesheetEntry> {
-    return this.http.get<TimesheetEntry>(`${this.baseUrl}/${id}`);
+  /// onBehalfOfUserId is honored server-side only for an Admin actively impersonating that user (see
+  /// TimesheetEntriesFunctions.CheckOwnership) - lets the same Get/Update/Delete/Duplicate calls used for a
+  /// self-edit work while impersonating too.
+  getById(id: number, onBehalfOfUserId?: number | null): Observable<TimesheetEntry> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.get<TimesheetEntry>(`${this.baseUrl}/${id}`, { params });
   }
 
   list(filter: TimesheetEntriesFilter = {}): Observable<TimesheetEntriesResponse> {
@@ -29,6 +35,7 @@ export class TimesheetEntriesService {
     if (filter.search) params = params.set('search', filter.search);
     if (filter.from) params = params.set('from', filter.from);
     if (filter.to) params = params.set('to', filter.to);
+    if (filter.onBehalfOfUserId) params = params.set('onBehalfOfUserId', filter.onBehalfOfUserId);
     return this.http.get<TimesheetEntriesResponse>(this.baseUrl, { params });
   }
 
@@ -40,12 +47,14 @@ export class TimesheetEntriesService {
     return this.http.put<TimesheetEntry>(`${this.baseUrl}/${id}`, request);
   }
 
-  delete(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  delete(id: number, onBehalfOfUserId?: number | null): Observable<void> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.delete<void>(`${this.baseUrl}/${id}`, { params });
   }
 
-  duplicate(id: number, date?: string): Observable<TimesheetEntry> {
-    return this.http.post<TimesheetEntry>(`${this.baseUrl}/${id}/duplicate`, { date: date ?? null });
+  duplicate(id: number, date?: string, onBehalfOfUserId?: number | null): Observable<TimesheetEntry> {
+    return this.http.post<TimesheetEntry>(`${this.baseUrl}/${id}/duplicate`, { date: date ?? null, onBehalfOfUserId: onBehalfOfUserId ?? null });
   }
 
   uploadAttachment(entryId: number, file: File): Observable<unknown> {

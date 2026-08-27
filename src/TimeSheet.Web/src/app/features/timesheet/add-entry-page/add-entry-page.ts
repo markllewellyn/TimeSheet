@@ -48,9 +48,10 @@ export class AddEntryPage {
   protected readonly saving = signal(false);
 
   constructor() {
-    // Impersonation only applies to logging a brand-new entry - editing an existing one always acts as that
-    // entry's actual owner (enforced server-side by TimesheetEntries_Update's ownership check regardless).
-    const onBehalfOf = this.isEditMode ? null : this.impersonation.actingAs();
+    // Impersonation applies to both logging a brand-new entry and editing an existing one - an Admin can
+    // impersonate a user and edit that user's timesheet entries while impersonating (FDD). Enforced
+    // server-side regardless (TimesheetEntriesFunctions.CheckOwnership).
+    const onBehalfOf = this.impersonation.actingAs();
     this.projectsService.listAssignedToMe(onBehalfOf?.id).subscribe((projects) => {
       this.projects.set(projects);
       this.projectsLoaded.set(true);
@@ -59,7 +60,7 @@ export class AddEntryPage {
   }
 
   private loadExisting(id: number): void {
-    this.timesheetEntries.getById(id).subscribe((entry) => {
+    this.timesheetEntries.getById(id, this.impersonation.actingAs()?.id).subscribe((entry) => {
       this.selectedClientId.set(entry.clientId);
       this.selectedProjectId.set(entry.projectId);
       this.date.set(entry.date);
@@ -110,6 +111,7 @@ export class AddEntryPage {
       workHours: this.workHours(),
       outOfHoursHours: this.outOfHoursHours(),
       description: this.description() || null,
+      onBehalfOfUserId: this.impersonation.actingAs()?.id ?? null,
     };
 
     const save$ = this.isEditMode
@@ -118,7 +120,6 @@ export class AddEntryPage {
           projectId,
           ...request,
           adminSendToPayroll: this.adminSendToPayroll(),
-          onBehalfOfUserId: this.impersonation.actingAs()?.id ?? null,
         });
 
     this.saving.set(true);

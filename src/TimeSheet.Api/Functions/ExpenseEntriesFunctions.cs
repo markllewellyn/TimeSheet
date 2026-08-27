@@ -14,6 +14,7 @@ public class ExpenseEntriesFunctions(
     IExpenseEntryRepository expenses,
     IStaffProjectRepository assignments,
     IProjectRepository projects,
+    IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -79,6 +80,12 @@ public class ExpenseEntriesFunctions(
         await expenses.AddAsync(entry, ct);
         await uow.SaveChangesAsync(ct);
 
+        // Two-step save - EntityId needs the entry's generated Id, only assigned once the entry's own save above
+        // has run.
+        await auditLog.LogAsync(user, "ExpenseEntry.Created", "ExpenseEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency} ({kind})", impersonatedUserId: null, ct);
+        await uow.SaveChangesAsync(ct);
+
         var saved = await expenses.GetByIdAsync(entry.Id, ct);
         return new CreatedResult($"/api/expense-entries/{entry.Id}", ToDto(saved!));
     }
@@ -110,6 +117,8 @@ public class ExpenseEntriesFunctions(
         entry.ModifiedUtc = DateTimeOffset.UtcNow;
 
         expenses.Update(entry);
+        await auditLog.LogAsync(user, "ExpenseEntry.Updated", "ExpenseEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
         return new OkObjectResult(ToDto(entry));
     }
@@ -123,6 +132,8 @@ public class ExpenseEntriesFunctions(
         if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
 
         expenses.Remove(entry);
+        await auditLog.LogAsync(user, "ExpenseEntry.Deleted", "ExpenseEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
     }

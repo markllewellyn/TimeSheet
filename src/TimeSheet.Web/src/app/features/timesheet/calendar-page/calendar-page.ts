@@ -2,6 +2,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
 import { TimesheetEntry } from '../../../core/models/timesheet-entry.models';
+import { ImpersonationService } from '../../../core/services/impersonation.service';
 
 // A small fixed palette, indexed deterministically by clientId (see colorForClient) - avoids hardcoding
 // specific client names to specific colors (the legacy app did this, which breaks the moment a client is
@@ -26,6 +27,7 @@ interface CalendarDay {
 })
 export class CalendarPage {
   private readonly timesheetEntries = inject(TimesheetEntriesService);
+  private readonly impersonation = inject(ImpersonationService);
 
   private readonly today = new Date();
   protected readonly viewYear = signal(this.today.getFullYear());
@@ -151,8 +153,10 @@ export class CalendarPage {
 
   private refresh(): void {
     const { firstInView, lastInView } = this.viewRange();
-    this.timesheetEntries.list({ from: toIso(firstInView), to: toIso(lastInView) }).subscribe((res) => {
-      this.entries.set(res.entries);
-    });
+    this.timesheetEntries
+      .list({ from: toIso(firstInView), to: toIso(lastInView), onBehalfOfUserId: this.impersonation.actingAs()?.id })
+      .subscribe((res) => {
+        this.entries.set(res.entries);
+      });
   }
 }

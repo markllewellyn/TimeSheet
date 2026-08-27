@@ -1,5 +1,4 @@
 using Microsoft.EntityFrameworkCore;
-using TimeSheet.Domain;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Infrastructure.Data;
 
@@ -15,7 +14,6 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
             join c in db.Clients on p.ClientId equals c.Id
             join u in db.Users on e.UserId equals u.Id
             where e.Date >= start && e.Date <= end
-                  && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved)
                   && (scope.ClientId == null || p.ClientId == scope.ClientId)
                   && (scope.ProjectId == null || p.Id == scope.ProjectId)
             group e by new

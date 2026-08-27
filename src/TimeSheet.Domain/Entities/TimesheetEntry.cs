@@ -6,7 +6,8 @@ namespace TimeSheet.Domain.Entities;
 /// SentToPayroll/PostingBatch payroll-workflow columns are present for schema fidelity but not yet wired to any
 /// business logic - nothing in the app reads or writes them beyond a default value. ExpensesValue is likewise
 /// present but deliberately unused - expenses are tracked via the separate ExpenseEntry table instead.
-/// Status/ModifiedUtc extend the legacy table directly (no legacy equivalent, too small to warrant a split table).
+/// ModifiedUtc extends the legacy table directly (no legacy equivalent, too small to warrant a split table).
+/// An entry is never blocked or gated - see EntryFlag for the FDD's non-blocking "flag for query" model.
 /// </summary>
 public class TimesheetEntry
 {
@@ -54,10 +55,6 @@ public class TimesheetEntry
 
     /// <summary>Legacy [RecordedTimes].ExpensesValue - deliberately unused; expenses are tracked via ExpenseEntry instead.</summary>
     public decimal? ExpensesValue { get; set; }
-
-    /// <summary>Normal entries count toward billing/reporting immediately. PendingApproval entries are excluded
-    /// until an Admin decides (see Escalation). Declined entries are excluded permanently.</summary>
-    public TimesheetEntryStatus Status { get; set; } = TimesheetEntryStatus.Normal;
 
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? ModifiedUtc { get; set; }

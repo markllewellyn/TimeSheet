@@ -1,0 +1,51 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Audit Log</h1>
+  <p class="-mt-2 text-xs text-muted-foreground">A record of who changed what and when, including who was impersonating at the time.</p>
+
+  <div class="card-padded flex flex-wrap items-end gap-3">
+    <label class="field">
+      <span class="field-label">User Id</span>
+      <input type="number" min="1" class="input w-32" [ngModel]="userIdFilter()" (ngModelChange)="userIdFilter.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">From</span>
+      <input type="date" class="input" [ngModel]="from()" (ngModelChange)="from.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">To</span>
+      <input type="date" class="input" [ngModel]="to()" (ngModelChange)="to.set($event)" />
+    </label>
+    <button class="btn-secondary" (click)="refresh()">Filter</button>
+  </div>
+
+  <div class="card overflow-hidden px-4">
+    <table class="table-clean">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>User</th>
+          <th>Impersonating</th>
+          <th>Action</th>
+          <th>Entity</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (l of logs(); track l.id) {
+          <tr>
+            <td class="text-muted-foreground">{{ l.createdUtc | date: 'short' }}</td>
+            <td class="font-medium text-foreground">{{ l.userDisplayName }}</td>
+            <td class="text-muted-foreground">{{ l.impersonatedUserDisplayName ?? '-' }}</td>
+            <td>{{ l.action }}</td>
+            <td class="text-muted-foreground">{{ l.entityType }}{{ l.entityId ? ' #' + l.entityId : '' }}</td>
+            <td class="text-muted-foreground">{{ l.details ?? '-' }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="6" class="text-center text-sm text-muted-foreground">No audit log entries match this filter.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

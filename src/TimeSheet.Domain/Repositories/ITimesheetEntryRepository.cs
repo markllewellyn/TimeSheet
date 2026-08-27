@@ -15,18 +15,18 @@ public interface ITimesheetEntryRepository
     /// side when null). Powers the master-list CSV export.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(DateOnly? from, DateOnly? to, CancellationToken ct);
 
-    /// <summary>All Normal/Approved entries for a project within a date range, across all users - used by
-    /// invoicing (billing is per-project, not per-user) and, later, reporting.</summary>
+    /// <summary>Every entry for a project within a date range, across all users - used by invoicing (billing is
+    /// per-project, not per-user) and reporting. Entries are never excluded here - an EntryFlag is a prompt to
+    /// query an entry, not a gate, so a flagged entry still counts (FDD).</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct);
 
-    /// <summary>Sum of WorkHours+OutOfHoursHours for a project across entries that count toward its budget
-    /// (Normal + Approved - PendingApproval/Declined are excluded until/unless approved). Used by
+    /// <summary>Sum of WorkHours+OutOfHoursHours for every entry against a project. Used by
     /// IBudgetMonitoringService to evaluate a new entry against Project.BudgetHours.</summary>
     Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct);
 
-    /// <summary>Sum of WorkHours+OutOfHoursHours for ALL of a user's entries on a date, regardless of Status
-    /// (Declined/PendingApproval count too) - a physical "a day only has 24 hours" cap, not a payroll rule.
-    /// excludeEntryId lets Update exclude the row being edited (its OLD hours are still persisted at validation time).</summary>
+    /// <summary>Sum of WorkHours+OutOfHoursHours for ALL of a user's entries on a date - a physical "a day only
+    /// has 24 hours" cap, not a payroll rule. excludeEntryId lets Update exclude the row being edited (its OLD
+    /// hours are still persisted at validation time).</summary>
     Task<decimal> GetTotalHoursForUserDateAsync(int userId, DateOnly date, int? excludeEntryId, CancellationToken ct);
 
     /// <summary>Entries not yet approved for payroll, across all users - the Admin Approvals queue. Filtered by

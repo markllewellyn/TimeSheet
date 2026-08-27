@@ -106,11 +106,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/rate-cards/rate-cards-page/rate-cards-page').then((m) => m.RateCardsPage),
   },
 
-  // --- Escalations, Reports, Invoicing, Project Health (Req 6, 7, 4, 8) ---
+  // --- Entry Flags, Reports, Invoicing, Project Health (Req 6, 7, 4, 8) ---
   {
-    path: 'admin/escalations',
+    path: 'admin/entry-flags',
     canActivate: [authGuard, adminGuard],
-    loadComponent: () => import('./features/admin/escalations/escalations-page/escalations-page').then((m) => m.EscalationsPage),
+    loadComponent: () => import('./features/admin/entry-flags/entry-flags-page/entry-flags-page').then((m) => m.EntryFlagsPage),
+  },
+  {
+    path: 'admin/audit-log',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/audit-log/audit-log-page/audit-log-page').then((m) => m.AuditLogPage),
   },
   {
     path: 'admin/reports',

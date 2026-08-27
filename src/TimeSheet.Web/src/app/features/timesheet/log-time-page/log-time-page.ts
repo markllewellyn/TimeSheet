@@ -8,6 +8,7 @@ import { TimesheetEntry, TimesheetEntrySummary } from '../../../core/models/time
 import { EstimatedWeeklyWorkload } from '../../../core/models/workload.models';
 import { EntryActionsCell, EntryActionsContext } from './entry-actions-cell';
 import { ThemeService } from '../../../core/services/theme.service';
+import { ImpersonationService } from '../../../core/services/impersonation.service';
 
 const GRID_THEME_BASE = {
   borderRadius: 8,
@@ -42,6 +43,7 @@ export class LogTimePage {
   private readonly workloadService = inject(WorkloadService);
   private readonly router = inject(Router);
   protected readonly themeService = inject(ThemeService);
+  protected readonly impersonation = inject(ImpersonationService);
 
   // Mirrors the :root.dark tokens in styles.scss so the grid matches the rest of the app.
   protected readonly theme = computed(() => (this.themeService.mode() === 'dark' ? DARK_GRID_THEME : LIGHT_GRID_THEME));
@@ -69,7 +71,6 @@ export class LogTimePage {
       valueGetter: (p) => (p.data ? p.data.workHours + p.data.outOfHoursHours : null),
     },
     { headerName: 'Description', field: 'description', flex: 2 },
-    { headerName: 'Status', field: 'status', width: 130 },
     { headerName: 'To Payroll', field: 'toPayroll', width: 110, type: 'numericColumn', valueFormatter: (p) => (p.value ?? 0).toFixed(2) },
     {
       headerName: 'Sent to Payroll',
@@ -93,10 +94,12 @@ export class LogTimePage {
   }
 
   protected refresh(): void {
-    this.timesheetEntries.list({ search: this.searchText() || undefined }).subscribe((res) => {
-      this.rowData.set(res.entries);
-      this.summary.set(res.summary);
-    });
+    this.timesheetEntries
+      .list({ search: this.searchText() || undefined, onBehalfOfUserId: this.impersonation.actingAs()?.id })
+      .subscribe((res) => {
+        this.rowData.set(res.entries);
+        this.summary.set(res.summary);
+      });
   }
 
   protected onSearchChange(value: string): void {
@@ -113,11 +116,11 @@ export class LogTimePage {
   }
 
   private duplicate(entry: TimesheetEntry): void {
-    this.timesheetEntries.duplicate(entry.id).subscribe(() => this.refresh());
+    this.timesheetEntries.duplicate(entry.id, undefined, this.impersonation.actingAs()?.id).subscribe(() => this.refresh());
   }
 
   private delete(entry: TimesheetEntry): void {
     if (!confirm(`Delete this ${entry.workHours + entry.outOfHoursHours}h entry on ${entry.date}?`)) return;
-    this.timesheetEntries.delete(entry.id).subscribe(() => this.refresh());
+    this.timesheetEntries.delete(entry.id, this.impersonation.actingAs()?.id).subscribe(() => this.refresh());
   }
 }

@@ -27,7 +27,8 @@ public class TimesheetDbContext(DbContextOptions<TimesheetDbContext> options) : 
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceLineItem> InvoiceLineItems => Set<InvoiceLineItem>();
     public DbSet<Notification> Notifications => Set<Notification>();
-    public DbSet<Escalation> Escalations => Set<Escalation>();
+    public DbSet<EntryFlag> EntryFlags => Set<EntryFlag>();
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProjectHealthAssessment> ProjectHealthAssessments => Set<ProjectHealthAssessment>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
 

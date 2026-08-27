@@ -19,14 +19,6 @@ public enum AssignmentStatus
     Ended
 }
 
-public enum TimesheetEntryStatus
-{
-    Normal,
-    PendingApproval,
-    Approved,
-    Declined
-}
-
 public enum InvoiceStatus
 {
     Draft,
@@ -45,10 +37,14 @@ public enum NotificationType
     TimesheetReminder,
     BudgetWarning,
     BudgetExceeded,
+    // Unused going forward (replaced by FlagRaised/FlagCleared) - kept so historical Notification rows
+    // (Type is HasConversion<string>()) still deserialize.
     EscalationRaised,
     EscalationDecided,
     InvoiceGenerated,
-    ProjectHealthDeclined
+    ProjectHealthDeclined,
+    FlagRaised,
+    FlagCleared
 }
 
 public enum NotificationChannel
@@ -58,17 +54,13 @@ public enum NotificationChannel
     Both
 }
 
-public enum EscalationReason
+/// <summary>Why an EntryFlag was raised. ProjectBudgetExceeded/UserAllocationExceeded are system-raised (see
+/// BudgetMonitoringService); Manual is an admin/PM flagging an entry for query without a triggering condition.</summary>
+public enum EntryFlagReason
 {
     ProjectBudgetExceeded,
-    UserAllocationExceeded
-}
-
-public enum EscalationDecision
-{
-    Pending,
-    Approved,
-    Declined
+    UserAllocationExceeded,
+    Manual
 }
 
 public enum ProjectHealthStatus

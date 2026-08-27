@@ -20,8 +20,9 @@ public class TimesheetEntriesFunctions(
     IClientRepository clients,
     IRateResolver rateResolver,
     IBudgetMonitoringService budgetMonitoring,
-    IEscalationService escalationService,
+    IEntryFlagService entryFlagService,
     INotificationService notificationService,
+    IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -30,11 +31,14 @@ public class TimesheetEntriesFunctions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timesheet-entries")] HttpRequest req, CancellationToken ct)
     {
         var user = currentUser.RequireUser();
+        var (viewError, effectiveUserId) = ResolveViewTarget(user, ParseOnBehalfOfUserId(req));
+        if (viewError is not null) return viewError;
+
         var search = req.Query["search"].ToString();
         var from = req.Query.TryGetValue("from", out var f) && DateOnly.TryParse(f, out var fd) ? fd : (DateOnly?)null;
         var to = req.Query.TryGetValue("to", out var t) && DateOnly.TryParse(t, out var td) ? td : (DateOnly?)null;
 
-        var result = await entries.GetForUserAsync(user.UserId, search, from, to, ct);
+        var result = await entries.GetForUserAsync(effectiveUserId, search, from, to, ct);
         var dtos = result.Select(ToDto).ToList();
 
         return new OkObjectResult(new
@@ -50,7 +54,9 @@ public class TimesheetEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, _) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
         return new OkObjectResult(ToDto(entry));
     }
 
@@ -103,7 +109,6 @@ public class TimesheetEntriesFunctions(
             WorkHours = body.WorkHours,
             OutOfHoursHours = body.OutOfHoursHours,
             Description = body.Description,
-            Status = TimesheetEntryStatus.Normal,
             ToPayroll = amounts!.ToPayroll,
             ToCompany = amounts.ToCompany,
             ResolvedCustomerRate = amounts.ResolvedCustomerRate,
@@ -116,15 +121,11 @@ public class TimesheetEntriesFunctions(
             CreatedUtc = DateTimeOffset.UtcNow,
         };
 
-        // Budget check is synchronous, gating the save itself - going over budget is an explicit admin
-        // decision, never a silent event (see IBudgetMonitoringService/IEscalationService). Must run before
-        // the fast-track below, so an entry that needs escalation can never be waved straight into payroll.
+        // Budget check never gates the save (FDD: "nothing is blocked") - an over-budget entry is still saved
+        // and counts normally immediately; it's flagged for query instead (see IEntryFlagService). Still runs
+        // before the fast-track below purely so the notification/flag reflects the entry as actually saved.
         var budgetCheck = await budgetMonitoring.EvaluateAsync(entry, ct);
-        if (budgetCheck.RequiresEscalation)
-        {
-            entry.Status = TimesheetEntryStatus.PendingApproval;
-        }
-        else if (body.AdminSendToPayroll == true && user.IsAdmin)
+        if (body.AdminSendToPayroll == true && user.IsAdmin)
         {
             // Admin-only fast-track (mirrors the legacy app's Add-screen "Sent to Payroll" checkbox) - creates
             // the entry already approved and sent, bypassing the normal Approvals queue in one step.
@@ -142,9 +143,17 @@ public class TimesheetEntriesFunctions(
         await entries.AddAsync(entry, ct);
         await uow.SaveChangesAsync(ct);
 
+        // Two-step save: the audit row's EntityId needs the entry's generated Id, which SQLite only assigns
+        // once the entry's own SaveChangesAsync above has actually run (mirrors how EntryFlag/notifications
+        // already save as their own step after the entry itself, rather than one big atomic transaction).
+        var impersonatedUserId = createdByUserId is not null ? effectiveUserId : (int?)null;
+        await auditLog.LogAsync(user, "TimesheetEntry.Created", "TimesheetEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.WorkHours + entry.OutOfHoursHours}h on project {entry.ProjectId}", impersonatedUserId, ct);
+        await uow.SaveChangesAsync(ct);
+
         if (budgetCheck.RequiresEscalation)
         {
-            await escalationService.RaiseAsync(entry, EscalationReason.ProjectBudgetExceeded, budgetCheck.Limit!.Value, budgetCheck.CumulativeValue, ct);
+            await entryFlagService.RaiseSystemAsync(entry, EntryFlagReason.ProjectBudgetExceeded, budgetCheck.Limit!.Value, budgetCheck.CumulativeValue, ct);
         }
         else if (budgetCheck.IsWarningOnly)
         {
@@ -164,24 +173,27 @@ public class TimesheetEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
 
         var body = await req.ReadFromJsonAsync<UpdateTimesheetEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
+
+        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, body.OnBehalfOfUserId);
+        if (!authorized) return new NotFoundResult();
 
         if (string.IsNullOrWhiteSpace(body.Description))
         {
             return new BadRequestObjectResult(new { error = "Description is required." });
         }
 
-        var (validationError, _) = await ValidateAssignmentAsync(user.UserId, entry.ProjectId, body.Date, ct);
+        var (validationError, _) = await ValidateAssignmentAsync(entry.UserId, entry.ProjectId, body.Date, ct);
         if (validationError is not null) return validationError;
 
         var valuesError = await ValidateEntryValuesAsync(entry.ClientId, entry.UserId, body.Date, body.WorkHours, body.OutOfHoursHours, excludeEntryId: entry.Id, ct);
         if (valuesError is not null) return valuesError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(user.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
         if (payrollError is not null) return payrollError;
 
         entry.Date = body.Date;
@@ -199,6 +211,8 @@ public class TimesheetEntriesFunctions(
         entry.ModifiedUtc = DateTimeOffset.UtcNow;
 
         entries.Update(entry);
+        await auditLog.LogAsync(user, "TimesheetEntry.Updated", "TimesheetEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.WorkHours + entry.OutOfHoursHours}h on project {entry.ProjectId}", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
         return new OkObjectResult(ToDto(entry));
     }
@@ -209,10 +223,14 @@ public class TimesheetEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
 
         entries.Remove(entry);
+        await auditLog.LogAsync(user, "TimesheetEntry.Deleted", "TimesheetEntry", entry.Id,
+            $"{entry.Date:yyyy-MM-dd}, {entry.WorkHours + entry.OutOfHoursHours}h on project {entry.ProjectId}", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
     }
@@ -224,19 +242,22 @@ public class TimesheetEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var source = await entries.GetByIdAsync(id, ct);
-        if (source is null || source.UserId != user.UserId) return new NotFoundResult();
-        if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
+        if (source is null) return new NotFoundResult();
 
         var body = await req.ReadFromJsonAsync<DuplicateTimesheetEntryRequest>(ct);
+        var (authorized, impersonatedUserId) = CheckOwnership(source, user, body?.OnBehalfOfUserId);
+        if (!authorized) return new NotFoundResult();
+        if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
+
         var targetDate = body?.Date ?? source.Date;
 
-        var (validationError, project) = await ValidateAssignmentAsync(user.UserId, source.ProjectId, targetDate, ct);
+        var (validationError, project) = await ValidateAssignmentAsync(source.UserId, source.ProjectId, targetDate, ct);
         if (validationError is not null) return validationError;
 
-        var valuesError = await ValidateEntryValuesAsync(project!.ClientId, user.UserId, targetDate, source.WorkHours, source.OutOfHoursHours, excludeEntryId: null, ct);
+        var valuesError = await ValidateEntryValuesAsync(project!.ClientId, source.UserId, targetDate, source.WorkHours, source.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(user.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(source.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, ct);
         if (payrollError is not null) return payrollError;
 
         // Deliberately does NOT carry over the source's ApprovedPayroll/SentToPayroll/audit fields - the legacy
@@ -244,14 +265,13 @@ public class TimesheetEntriesFunctions(
         // like a bug, not intended behavior. A duplicate is always a fresh, unapproved entry here.
         var copy = new TimesheetEntry
         {
-            UserId = user.UserId,
+            UserId = source.UserId,
             ClientId = project!.ClientId,
             ProjectId = source.ProjectId,
             Date = targetDate,
             WorkHours = source.WorkHours,
             OutOfHoursHours = source.OutOfHoursHours,
             Description = source.Description,
-            Status = TimesheetEntryStatus.Normal,
             ToPayroll = amounts!.ToPayroll,
             ToCompany = amounts.ToCompany,
             ResolvedCustomerRate = amounts.ResolvedCustomerRate,
@@ -263,6 +283,11 @@ public class TimesheetEntriesFunctions(
             CreatedUtc = DateTimeOffset.UtcNow,
         };
         await entries.AddAsync(copy, ct);
+        await uow.SaveChangesAsync(ct);
+
+        // Two-step save - see the matching comment in Create.
+        await auditLog.LogAsync(user, "TimesheetEntry.Duplicated", "TimesheetEntry", copy.Id,
+            $"from entry {source.Id}, {copy.Date:yyyy-MM-dd}, {copy.WorkHours + copy.OutOfHoursHours}h on project {copy.ProjectId}", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
 
         var saved = await entries.GetByIdAsync(copy.Id, ct);
@@ -385,11 +410,45 @@ public class TimesheetEntriesFunctions(
             StatusCode = StatusCodes.Status409Conflict,
         };
 
+    /// <summary>Query-string form of impersonation context, for endpoints (Get/List/Delete) that have no JSON
+    /// body to carry OnBehalfOfUserId on.</summary>
+    private static int? ParseOnBehalfOfUserId(HttpRequest req) =>
+        req.Query.TryGetValue("onBehalfOfUserId", out var v) && int.TryParse(v, out var id) ? id : null;
+
+    /// <summary>List/Get's "whose entries" gate - an Admin may view another user's entries by supplying their
+    /// id; anyone else is confined to their own.</summary>
+    private static (IActionResult? Error, int EffectiveUserId) ResolveViewTarget(CurrentUserContext user, int? onBehalfOfUserId)
+    {
+        if (onBehalfOfUserId is { } id && id != user.UserId)
+        {
+            if (!user.IsAdmin)
+            {
+                return (new ObjectResult(new { error = "Admin role required to view another user's timesheet." })
+                {
+                    StatusCode = StatusCodes.Status403Forbidden,
+                }, 0);
+            }
+            return (null, id);
+        }
+        return (null, user.UserId);
+    }
+
+    /// <summary>Get/Update/Delete/Duplicate's ownership gate - the caller owns the entry outright, or is an
+    /// Admin actively impersonating its owner (onBehalfOfUserId must equal the entry's own UserId, matching
+    /// Create's existing impersonation check). Returns the impersonated user id for AuditLog when the second
+    /// branch is what authorized the call, so a plain self-edit never gets tagged as impersonation.</summary>
+    private static (bool Authorized, int? ImpersonatedUserId) CheckOwnership(TimesheetEntry entry, CurrentUserContext user, int? onBehalfOfUserId)
+    {
+        if (entry.UserId == user.UserId) return (true, null);
+        if (user.IsAdmin && onBehalfOfUserId == entry.UserId) return (true, entry.UserId);
+        return (false, null);
+    }
+
     private static TimesheetEntryDto ToDto(TimesheetEntry e) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.ClientId, e.Client?.Name ?? e.Project?.Client?.Name ?? "",
-        e.Date, e.WorkHours, e.OutOfHoursHours, e.Description, e.Status.ToString(),
+        e.Date, e.WorkHours, e.OutOfHoursHours, e.Description,
         e.ToPayroll, e.ApprovedPayroll, e.SentToPayroll,
         e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList());
 }
 
-public record DuplicateTimesheetEntryRequest(DateOnly? Date);
+public record DuplicateTimesheetEntryRequest(DateOnly? Date, int? OnBehalfOfUserId = null);

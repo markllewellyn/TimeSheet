@@ -83,19 +83,35 @@ public class NotificationConfiguration : IEntityTypeConfiguration<Notification>
     }
 }
 
-public class EscalationConfiguration : IEntityTypeConfiguration<Escalation>
+public class EntryFlagConfiguration : IEntityTypeConfiguration<EntryFlag>
 {
-    public void Configure(EntityTypeBuilder<Escalation> builder)
+    public void Configure(EntityTypeBuilder<EntryFlag> builder)
     {
         builder.Property(e => e.Reason).HasConversion<string>().HasMaxLength(30);
-        builder.Property(e => e.Decision).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.BudgetLimitAtTimeOfEntry).HasPrecision(18, 2);
         builder.Property(e => e.CumulativeValueAtTimeOfEntry).HasPrecision(18, 2);
-        builder.Property(e => e.DecisionNotes).HasMaxLength(1000);
+        builder.Property(e => e.RaisedNotes).HasMaxLength(1000);
+        builder.Property(e => e.ClearedNotes).HasMaxLength(1000);
 
-        builder.HasIndex(e => e.Decision);
+        builder.HasIndex(e => e.IsCleared);
         builder.HasOne(e => e.TimesheetEntry).WithMany().HasForeignKey(e => e.TimesheetEntryId).OnDelete(DeleteBehavior.Cascade);
         builder.HasOne(e => e.Project).WithMany().HasForeignKey(e => e.ProjectId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
+public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
+{
+    public void Configure(EntityTypeBuilder<AuditLog> builder)
+    {
+        builder.Property(a => a.UserDisplayName).HasMaxLength(200).IsRequired();
+        builder.Property(a => a.ImpersonatedUserDisplayName).HasMaxLength(200);
+        builder.Property(a => a.Action).HasMaxLength(100).IsRequired();
+        builder.Property(a => a.EntityType).HasMaxLength(100).IsRequired();
+        builder.Property(a => a.Details).HasMaxLength(1000);
+
+        // No FK constraints - deliberate, the audit trail must survive the user/entry it describes being deleted.
+        builder.HasIndex(a => a.UserId);
+        builder.HasIndex(a => a.ImpersonatedUserId);
     }
 }
 

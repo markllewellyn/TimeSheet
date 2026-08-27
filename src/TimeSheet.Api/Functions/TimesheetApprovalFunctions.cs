@@ -10,10 +10,11 @@ namespace TimeSheet.Api.Functions;
 
 /// <summary>The two-stage payroll workflow mirrored from the legacy Power App's Admin Overview screen: approve
 /// raw timesheet entries (grouping them into a named Posting Batch), then separately mark the approved batch as
-/// sent to payroll. Distinct from the budget-overrun Escalations queue - this approves the entry itself, not a
+/// sent to payroll. Distinct from the budget-overrun EntryFlags queue - this approves the entry itself, not a
 /// budget exception. Admin-only throughout.</summary>
 public class TimesheetApprovalFunctions(
     ITimesheetEntryRepository entries,
+    IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -62,6 +63,8 @@ public class TimesheetApprovalFunctions(
             entry.DateApprovedPayroll = now;
             entry.PostingBatch = body.PostingBatch;
             entries.Update(entry);
+            await auditLog.LogAsync(admin, "TimesheetEntry.ApprovedForPayroll", "TimesheetEntry", entry.Id,
+                $"batch '{body.PostingBatch}'", impersonatedUserId: null, ct);
             approved++;
         }
 
@@ -105,6 +108,8 @@ public class TimesheetApprovalFunctions(
             entry.SentByName = admin.DisplayName;
             entry.DateSentToPayroll = now;
             entries.Update(entry);
+            await auditLog.LogAsync(admin, "TimesheetEntry.SentToPayroll", "TimesheetEntry", entry.Id,
+                null, impersonatedUserId: null, ct);
             sent++;
         }
 

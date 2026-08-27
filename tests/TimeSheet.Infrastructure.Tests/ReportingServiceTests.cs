@@ -55,7 +55,7 @@ public class ReportingServiceTests
         db.TimesheetEntries.Add(new TimesheetEntry
         {
             UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
-            WorkHours = 10m, OutOfHoursHours = 0m, Description = "FDD work", Status = TimesheetEntryStatus.Normal, CreatedUtc = DateTimeOffset.UtcNow,
+            WorkHours = 10m, OutOfHoursHours = 0m, Description = "FDD work", CreatedUtc = DateTimeOffset.UtcNow,
             ResolvedCustomerRate = 100m, ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
         });
         await db.SaveChangesAsync();

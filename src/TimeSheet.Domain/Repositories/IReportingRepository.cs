@@ -16,8 +16,8 @@ public record ExpenseAggregateRow(int ProjectId, int ClientId, DateOnly Date, de
 /// <summary>
 /// One row per (Project, User, Date) - day granularity bounds the aggregate row count by the date range
 /// (<=366 rows for the 1-year filter), not by raw timesheet-entry volume, which is what keeps this efficient
-/// on SQLite without a materialized rollup table. Only Normal/Approved entries count (PendingApproval/Declined
-/// are excluded), matching the same "counted" definition used by budget monitoring and invoicing.
+/// on SQLite without a materialized rollup table. Every entry counts - an EntryFlag is a prompt to query an
+/// entry, not a gate, so a flagged entry is never excluded here (FDD).
 /// </summary>
 public interface IReportingRepository
 {

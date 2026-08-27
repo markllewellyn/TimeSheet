@@ -35,7 +35,8 @@ public static class DependencyInjection
         services.AddScoped<ICurrencyRepository, CurrencyRepository>();
         services.AddScoped<ICurrencyRateRepository, CurrencyRateRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
-        services.AddScoped<IEscalationRepository, EscalationRepository>();
+        services.AddScoped<IEntryFlagRepository, EntryFlagRepository>();
+        services.AddScoped<IAuditLogRepository, AuditLogRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IReportingRepository, ReportingRepository>();
         services.AddScoped<IProjectHealthAssessmentRepository, ProjectHealthAssessmentRepository>();
@@ -49,7 +50,8 @@ public static class DependencyInjection
         services.AddScoped<IAdminUserService, GraphAdminUserService>();
         services.AddScoped<INotificationService, NotificationService>();
         services.AddScoped<IBudgetMonitoringService, BudgetMonitoringService>();
-        services.AddScoped<IEscalationService, EscalationService>();
+        services.AddScoped<IEntryFlagService, EntryFlagService>();
+        services.AddScoped<IAuditLogService, AuditLogService>();
         services.AddScoped<IInvoiceGenerationService, InvoiceGenerationService>();
         services.AddScoped<IInvoicingService, InvoicingService>();
         services.AddScoped<IPdfInvoiceRenderer, QuestPdfInvoiceRenderer>();

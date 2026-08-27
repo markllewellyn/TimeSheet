@@ -32,7 +32,7 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, ICurrentUse
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(',', [
             "Staff Name", "Client", "Project", "Date", "Description", "Work Hours", "Out of Hours", "Total Hours",
-            "To Payroll", "Status", "Approved for Payroll", "Sent to Payroll", "Posting Batch",
+            "To Payroll", "Approved for Payroll", "Sent to Payroll", "Posting Batch",
         ]));
 
         foreach (var e in rows)
@@ -47,7 +47,6 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, ICurrentUse
                 CsvField(e.OutOfHoursHours.ToString()),
                 CsvField((e.WorkHours + e.OutOfHoursHours).ToString()),
                 CsvField(e.ToPayroll.ToString("0.00")),
-                CsvField(e.Status.ToString()),
                 CsvField(e.ApprovedPayroll ? "Yes" : "No"),
                 CsvField(e.SentToPayroll ? "Yes" : "No"),
                 CsvField(e.PostingBatch),

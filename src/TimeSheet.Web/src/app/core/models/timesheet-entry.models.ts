@@ -1,7 +1,5 @@
 // Mirrors TimeSheet.Contracts.TimesheetEntryDto / TimesheetEntrySummaryDto / AttachmentDto (C#) 1:1.
 
-export type TimesheetEntryStatus = 'Normal' | 'PendingApproval' | 'Approved' | 'Declined';
-
 export interface Attachment {
   id: number;
   fileName: string;
@@ -20,7 +18,6 @@ export interface TimesheetEntry {
   workHours: number;
   outOfHoursHours: number;
   description: string | null;
-  status: TimesheetEntryStatus;
   toPayroll: number;
   approvedPayroll: boolean;
   sentToPayroll: boolean;

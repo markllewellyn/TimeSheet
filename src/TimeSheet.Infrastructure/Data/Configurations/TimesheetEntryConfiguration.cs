@@ -31,7 +31,6 @@ public class TimesheetEntryConfiguration : IEntityTypeConfiguration<TimesheetEnt
         builder.Property(e => e.DateSentToPayroll).HasColumnName("DateSentToPayroll");
         builder.Property(e => e.PostingBatch).HasColumnName("PostingBatch").HasMaxLength(20);
         builder.Property(e => e.ExpensesValue).HasColumnName("ExpensesValue").HasPrecision(18, 2);
-        builder.Property(e => e.Status).HasConversion<string>().HasMaxLength(20);
         builder.Property(e => e.ResolvedCustomerRate).HasPrecision(18, 2);
         builder.Property(e => e.ResolvedHourlyCost).HasPrecision(18, 2);
         builder.Property(e => e.ResolvedOutOfHoursCost).HasPrecision(18, 2);
