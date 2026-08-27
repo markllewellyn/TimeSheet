@@ -1,5 +1,6 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { Project } from '../../../../core/models/project.models';
@@ -7,7 +8,7 @@ import { Project } from '../../../../core/models/project.models';
 @Component({
   selector: 'app-projects-list-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, FormsModule],
   templateUrl: './projects-list-page.html',
 })
 export class ProjectsListPage {
@@ -18,6 +19,10 @@ export class ProjectsListPage {
   protected readonly clientId = Number(this.route.snapshot.paramMap.get('clientId'));
   protected readonly clientName = signal('');
   protected readonly projects = signal<Project[]>([]);
+  protected readonly activeOnly = signal(true);
+  protected readonly visibleProjects = computed(() =>
+    this.activeOnly() ? this.projects().filter((p) => p.isActive) : this.projects(),
+  );
 
   constructor() {
     this.clientsService.getById(this.clientId).subscribe((c) => this.clientName.set(c.name));

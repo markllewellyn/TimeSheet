@@ -7,6 +7,7 @@ import { Client } from '../models/project.models';
 export interface UpsertClientRequest {
   name: string;
   accountCode: string;
+  startDate: string;
   billingAddressLine1: string | null;
   billingAddressLine2: string | null;
   billingCity: string | null;
@@ -15,7 +16,7 @@ export interface UpsertClientRequest {
   primaryContactName: string | null;
   primaryContactEmail: string | null;
   primaryContactPhone: string | null;
-  reportingCurrencyCode: string;
+  currencyId: number | null;
   invoicingMonthEndDay: number | null;
   notes: string | null;
 }

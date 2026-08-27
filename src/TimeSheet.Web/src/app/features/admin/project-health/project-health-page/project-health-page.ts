@@ -27,11 +27,11 @@ export class ProjectHealthPage {
   protected statusClass(status: string): string {
     switch (status) {
       case 'Behind':
-        return 'bg-red-100 text-red-800';
+        return 'badge-danger';
       case 'AtRisk':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'badge-warning';
       default:
-        return 'bg-green-100 text-green-800';
+        return 'badge-success';
     }
   }
 }

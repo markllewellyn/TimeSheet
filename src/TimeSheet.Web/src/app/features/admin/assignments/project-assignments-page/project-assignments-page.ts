@@ -24,6 +24,7 @@ export class ProjectAssignmentsPage {
   protected readonly newStartDate = signal(new Date().toISOString().slice(0, 10));
   protected readonly newAllocatedHoursPerWeek = signal<number | null>(null);
   protected readonly error = signal<string | null>(null);
+  protected readonly saving = signal(false);
 
   constructor() {
     this.refresh();
@@ -41,16 +42,21 @@ export class ProjectAssignmentsPage {
       return;
     }
 
+    this.saving.set(true);
     this.assignmentsService
       .create({ projectId: this.projectId, userId, startDate: this.newStartDate(), allocatedHoursPerWeek: this.newAllocatedHoursPerWeek(), notes: null })
       .subscribe({
         next: () => {
+          this.saving.set(false);
           this.error.set(null);
           this.newUserId.set(null);
           this.newAllocatedHoursPerWeek.set(null);
           this.refresh();
         },
-        error: (err) => this.error.set(err?.error?.error ?? 'Could not add the assignment.'),
+        error: (err) => {
+          this.saving.set(false);
+          this.error.set(err?.error?.error ?? 'Could not add the assignment.');
+        },
       });
   }
 

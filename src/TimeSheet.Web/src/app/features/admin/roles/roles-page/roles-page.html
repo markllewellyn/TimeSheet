@@ -1,0 +1,48 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Roles</h1>
+  <p class="-mt-2 text-xs text-muted-foreground">
+    Job-function roles (e.g. Developer, Consultant) that default rate cards attach to. Set a person's Job Role
+    on the Users screen, then set default rates for a role here or on the Rate Cards screen.
+  </p>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="card-padded flex items-end gap-3">
+    <label class="field">
+      <span class="field-label">Name</span>
+      <input class="input" [ngModel]="newName()" (ngModelChange)="newName.set($event)" />
+    </label>
+    <button class="btn-primary" [disabled]="saving()" (click)="add()">{{ saving() ? 'Saving…' : 'Add Role' }}</button>
+  </div>
+
+  <div class="card overflow-hidden px-4">
+    <table class="table-clean">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of roles(); track r.id) {
+          <tr>
+            <td class="font-medium text-foreground">{{ r.name }}</td>
+            <td>
+              <span [class]="r.isActive ? 'badge-success' : 'badge-danger'">{{ r.isActive ? 'Active' : 'Inactive' }}</span>
+            </td>
+            <td class="text-right">
+              <button class="btn-link" (click)="toggleActive(r)">{{ r.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+            </td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="3" class="text-center text-sm text-muted-foreground">No roles yet.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</div>

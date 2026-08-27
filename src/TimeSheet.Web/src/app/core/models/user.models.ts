@@ -14,6 +14,8 @@ export interface AppUser {
   email: string;
   displayName: string;
   role: 'Admin' | 'User';
-  jobTitle: string | null;
+  jobRoleId: number | null;
+  jobRoleName: string | null;
   isActive: boolean;
+  payrollNumber: string;
 }

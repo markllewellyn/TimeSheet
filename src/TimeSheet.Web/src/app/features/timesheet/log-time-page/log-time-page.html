@@ -1,39 +1,80 @@
-<div class="flex flex-col gap-4">
-  <div class="flex flex-wrap items-center justify-between gap-4">
-    <div class="flex items-center gap-2">
-      <input
-        class="rounded border border-border bg-card px-3 py-1.5 text-sm"
-        placeholder="Customer Name/Account, Project..."
-        [value]="searchText()"
-        (input)="onSearchChange($any($event.target).value)"
-      />
-      <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="refresh()">
-        Refresh
-      </button>
+<div class="flex flex-col gap-6">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Log Time</h1>
+      <p class="page-subtitle">Your timesheet entries across all assigned projects.</p>
     </div>
-
     <div class="flex items-center gap-2">
-      <button class="rounded border border-border px-3 py-1.5 text-sm" (click)="addExpense()">+ Expense</button>
-      <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="addEntry()">
-        + Log Time
-      </button>
+      <button class="btn-secondary" (click)="addExpense()">+ Expense</button>
+      <button class="btn-primary" (click)="addEntry()">+ Log Time</button>
     </div>
   </div>
 
   @if (summary(); as s) {
-    <div class="flex flex-wrap gap-6 text-sm text-muted-foreground">
-      <span>Most Recent Day's Hours: <strong class="text-foreground">{{ s.mostRecentDayHours }}</strong></span>
-      <span>Total Work Hours: <strong class="text-foreground">{{ s.totalWorkHours }}</strong></span>
-      <span>Total Out Of Office Hours: <strong class="text-foreground">{{ s.totalOutOfHoursHours }}</strong></span>
-      <span>Total Hours: <strong class="text-foreground">{{ s.totalHours }}</strong></span>
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="card-padded !p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Most Recent Day</p>
+        <p class="mt-1 text-2xl font-semibold tracking-tight">{{ s.mostRecentDayHours }}<span class="text-sm font-normal text-muted-foreground"> h</span></p>
+      </div>
+      <div class="card-padded !p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Work Hours</p>
+        <p class="mt-1 text-2xl font-semibold tracking-tight">{{ s.totalWorkHours }}<span class="text-sm font-normal text-muted-foreground"> h</span></p>
+      </div>
+      <div class="card-padded !p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Out of Office</p>
+        <p class="mt-1 text-2xl font-semibold tracking-tight">{{ s.totalOutOfHoursHours }}<span class="text-sm font-normal text-muted-foreground"> h</span></p>
+      </div>
+      <div class="card-padded !p-4">
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Hours</p>
+        <p class="mt-1 text-2xl font-semibold tracking-tight">{{ s.totalHours }}<span class="text-sm font-normal text-muted-foreground"> h</span></p>
+      </div>
     </div>
   }
 
-  <ag-grid-angular
-    class="h-[600px] w-full"
-    [theme]="theme"
-    [rowData]="rowData()"
-    [columnDefs]="columnDefs"
-    [defaultColDef]="{ sortable: true, resizable: true }"
-  />
+  @if (workload(); as w) {
+    <div class="card-padded flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <p class="text-xs font-medium uppercase tracking-wide text-muted-foreground">Estimated Hours This Week</p>
+        <p class="mt-1 text-2xl font-semibold tracking-tight">
+          {{ w.estimatedHoursThisWeek }}<span class="text-sm font-normal text-muted-foreground"> h allocated</span>
+        </p>
+      </div>
+
+      @if (w.byProject.length > 0) {
+        <div class="flex flex-wrap gap-2">
+          @for (p of w.byProject; track p.projectId) {
+            <span class="badge-neutral">{{ p.projectName }} · {{ p.allocatedHoursPerWeek }}h</span>
+          }
+        </div>
+      } @else {
+        <p class="text-sm text-muted-foreground">No active project assignments this week.</p>
+      }
+
+      @if (w.assignmentsMissingAllocation.length > 0) {
+        <p class="w-full text-xs text-muted-foreground">
+          {{ w.assignmentsMissingAllocation.length }} active assignment(s) have no weekly hours allocated yet - ask an Admin to set one.
+        </p>
+      }
+    </div>
+  }
+
+  <div class="card overflow-hidden">
+    <div class="flex items-center gap-2 border-b border-border p-3">
+      <input
+        class="input max-w-xs"
+        placeholder="Search by client, project..."
+        [value]="searchText()"
+        (input)="onSearchChange($any($event.target).value)"
+      />
+      <button class="btn-ghost" (click)="refresh()">Refresh</button>
+    </div>
+
+    <ag-grid-angular
+      class="h-[560px] w-full"
+      [theme]="theme()"
+      [rowData]="rowData()"
+      [columnDefs]="columnDefs"
+      [defaultColDef]="{ sortable: true, resizable: true }"
+    />
+  </div>
 </div>

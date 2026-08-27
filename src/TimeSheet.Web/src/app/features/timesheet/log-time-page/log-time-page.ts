@@ -1,10 +1,35 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, themeQuartz } from 'ag-grid-community';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
+import { WorkloadService } from '../../../core/services/workload.service';
 import { TimesheetEntry, TimesheetEntrySummary } from '../../../core/models/timesheet-entry.models';
+import { EstimatedWeeklyWorkload } from '../../../core/models/workload.models';
 import { EntryActionsCell, EntryActionsContext } from './entry-actions-cell';
+import { ThemeService } from '../../../core/services/theme.service';
+
+const GRID_THEME_BASE = {
+  borderRadius: 8,
+  wrapperBorder: false,
+  headerRowBorder: true,
+  rowBorder: true,
+  headerFontWeight: 600,
+  fontFamily: { googleFont: 'Inter' },
+} as const;
+
+// Two complete theme objects, swapped wholesale via [theme] binding - more reliable than AG Grid's
+// data-ag-theme-mode part-switching attribute, which didn't pick up the app's dark-mode toggle.
+const LIGHT_GRID_THEME = themeQuartz.withParams({ ...GRID_THEME_BASE, accentColor: '#4F46E5' });
+const DARK_GRID_THEME = themeQuartz.withParams({
+  ...GRID_THEME_BASE,
+  accentColor: '#818CF8',
+  backgroundColor: '#232326',
+  foregroundColor: '#fafafa',
+  headerBackgroundColor: '#28282c',
+  borderColor: 'rgba(255, 255, 255, 0.1)',
+  chromeBackgroundColor: '#232326',
+});
 
 @Component({
   selector: 'app-log-time-page',
@@ -14,12 +39,16 @@ import { EntryActionsCell, EntryActionsContext } from './entry-actions-cell';
 })
 export class LogTimePage {
   private readonly timesheetEntries = inject(TimesheetEntriesService);
+  private readonly workloadService = inject(WorkloadService);
   private readonly router = inject(Router);
+  protected readonly themeService = inject(ThemeService);
 
-  protected readonly theme = themeQuartz;
+  // Mirrors the :root.dark tokens in styles.scss so the grid matches the rest of the app.
+  protected readonly theme = computed(() => (this.themeService.mode() === 'dark' ? DARK_GRID_THEME : LIGHT_GRID_THEME));
   protected readonly searchText = signal('');
   protected readonly summary = signal<TimesheetEntrySummary | null>(null);
   protected readonly rowData = signal<TimesheetEntry[]>([]);
+  protected readonly workload = signal<EstimatedWeeklyWorkload | null>(null);
 
   private readonly actionsContext: EntryActionsContext = {
     onEdit: (entry) => this.router.navigate(['/timesheet', entry.id, 'edit']),
@@ -41,6 +70,13 @@ export class LogTimePage {
     },
     { headerName: 'Description', field: 'description', flex: 2 },
     { headerName: 'Status', field: 'status', width: 130 },
+    { headerName: 'To Payroll', field: 'toPayroll', width: 110, type: 'numericColumn', valueFormatter: (p) => (p.value ?? 0).toFixed(2) },
+    {
+      headerName: 'Sent to Payroll',
+      field: 'sentToPayroll',
+      width: 130,
+      valueFormatter: (p) => (p.value ? 'Yes' : 'No'),
+    },
     {
       headerName: '',
       width: 200,
@@ -53,6 +89,7 @@ export class LogTimePage {
 
   constructor() {
     this.refresh();
+    this.workloadService.estimatedHoursThisWeek().subscribe((w) => this.workload.set(w));
   }
 
   protected refresh(): void {

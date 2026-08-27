@@ -1,0 +1,62 @@
+<div class="flex flex-col gap-4">
+  <div class="page-header">
+    <h1 class="page-title">Your Overview</h1>
+  </div>
+
+  <div class="flex flex-wrap items-center gap-4">
+    <input
+      class="input max-w-xs"
+      placeholder="Search by client or project..."
+      [ngModel]="searchText()"
+      (ngModelChange)="searchText.set($event)"
+    />
+    <label class="flex items-center gap-2 text-sm text-muted-foreground">
+      <input type="checkbox" [ngModel]="sentToPayrollOnly()" (ngModelChange)="sentToPayrollOnly.set($event)" />
+      Sent to payroll only
+    </label>
+  </div>
+
+  @if (loaded() && lines().length === 0) {
+    <div class="empty-state">
+      <p class="empty-state-title">Nothing logged yet</p>
+      <p class="empty-state-body">Once you log time, a breakdown by client and project will appear here.</p>
+    </div>
+  } @else if (loaded() && visibleLines().length === 0) {
+    <p class="text-sm text-muted-foreground">No rows match your filters.</p>
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Project</th>
+            <th>Work Hours</th>
+            <th>Out of Office Hours</th>
+            <th>To Payroll</th>
+            <th>Sent to Payroll?</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (l of visibleLines(); track l.clientId + '-' + l.projectId) {
+            <tr>
+              <td class="font-medium text-foreground">{{ l.clientName }}</td>
+              <td class="text-muted-foreground">{{ l.projectName }}</td>
+              <td>{{ l.workHours }}</td>
+              <td>{{ l.outOfHoursHours }}</td>
+              <td>{{ l.toPayroll | number: '1.2-2' }}</td>
+              <td>
+                <span [class]="l.sentToPayroll ? 'badge-success' : 'badge-neutral'">{{ l.sentToPayroll ? 'Yes' : 'No' }}</span>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card-padded flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+      <span>Work Hours: <span class="font-medium text-foreground">{{ totals().workHours }}</span></span>
+      <span>Out of Office Hours: <span class="font-medium text-foreground">{{ totals().outOfHoursHours }}</span></span>
+      <span>Total To Payroll: <span class="font-medium text-foreground">{{ totals().toPayroll | number: '1.2-2' }}</span></span>
+    </div>
+  }
+</div>

@@ -1,0 +1,35 @@
+<div class="auth-backdrop -m-6 flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-6">
+  <div class="mx-auto w-full max-w-sm">
+    <div class="mb-8 flex flex-col items-center gap-3 text-center">
+      <img src="svgit-logo-full.png" alt="SVG IT" class="h-10 w-auto" />
+      <h1 class="text-xl font-semibold tracking-tight">Set Up TimeSheet</h1>
+      <p class="text-sm text-muted-foreground">
+        Create the first Admin account. This only works once - before any other user exists.
+      </p>
+    </div>
+
+    <div class="card-padded">
+      @if (error(); as e) {
+        <div class="banner-error">{{ e }}</div>
+      }
+
+      <div class="flex flex-col gap-4">
+        <label class="field">
+          <span class="field-label">Your name</span>
+          <input class="input" [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">Email</span>
+          <input type="email" class="input" [ngModel]="email()" (ngModelChange)="email.set($event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">Password (min 8 characters)</span>
+          <input type="password" class="input" [ngModel]="password()" (ngModelChange)="password.set($event)" />
+        </label>
+        <button class="btn-primary w-full" [disabled]="working()" (click)="create()">
+          Create Admin Account
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

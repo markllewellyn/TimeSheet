@@ -1,75 +1,105 @@
 <div class="flex flex-col gap-4">
-  <h1 class="text-xl font-semibold">Invoicing</h1>
+  <h1 class="page-title">Invoicing</h1>
 
   @if (error(); as e) {
-    <div class="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+    <div class="banner-error">{{ e }}</div>
+  }
+  @if (successMessage(); as s) {
+    <div class="banner-success">{{ s }}</div>
   }
 
-  <div class="flex flex-wrap items-end gap-3 rounded border border-border p-4">
-    <label class="flex flex-col gap-1 text-sm">
-      Client
-      <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
+  <div class="card-padded flex flex-wrap items-end gap-3">
+    <label class="field">
+      <span class="field-label">Client</span>
+      <select class="input" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
         <option [ngValue]="null" disabled>Select a client</option>
         @for (c of clients(); track c.id) {
           <option [ngValue]="c.id">{{ c.name }}</option>
         }
       </select>
     </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Period Start
-      <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="periodStart()" (ngModelChange)="periodStart.set($event)" />
+    <label class="field">
+      <span class="field-label">Period Start</span>
+      <input type="date" class="input" [ngModel]="periodStart()" (ngModelChange)="periodStart.set($event)" />
     </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Period End
-      <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="periodEnd()" (ngModelChange)="periodEnd.set($event)" />
+    <label class="field">
+      <span class="field-label">Period End</span>
+      <input type="date" class="input" [ngModel]="periodEnd()" (ngModelChange)="periodEnd.set($event)" />
     </label>
-    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="generateDraft()">Generate Draft</button>
+    @if (requiresExchangeRate()) {
+      <label class="field">
+        <span class="field-label">Exchange rate (1 GBP = X {{ selectedClient()?.reportingCurrencyCode }})</span>
+        <input
+          type="number"
+          step="0.0001"
+          min="0"
+          class="input max-w-[10rem]"
+          [ngModel]="manualExchangeRateInput()"
+          (ngModelChange)="manualExchangeRateInput.set($event)"
+        />
+      </label>
+    }
+    <button class="btn-primary" (click)="generateDraft()">Generate Draft</button>
   </div>
 
   @if (selectedClientId()) {
-    <div class="flex flex-col gap-6">
-      @for (invoice of invoices(); track invoice.id) {
-        <div class="rounded border border-border p-4">
+    <div class="flex flex-col gap-4">
+      @if (invoices().length > 1) {
+        <label class="field w-48 self-end">
+          <span class="field-label">Sort by</span>
+          <select class="input" [ngModel]="sortNewestFirst()" (ngModelChange)="sortNewestFirst.set($event)">
+            <option [ngValue]="true">Newest first</option>
+            <option [ngValue]="false">Oldest first</option>
+          </select>
+        </label>
+      }
+      @for (invoice of sortedInvoices(); track invoice.id) {
+        <div class="card-padded card-hover">
           <div class="mb-3 flex items-center justify-between">
-            <div>
-              <span class="font-semibold">{{ invoice.periodStart }} - {{ invoice.periodEnd }}</span>
-              <span class="ml-3 rounded px-2 py-0.5 text-xs" [class.bg-green-100]="invoice.status === 'Finalized'" [class.bg-yellow-100]="invoice.status === 'Draft'">
+            <div class="flex items-center gap-3">
+              <span class="font-semibold text-foreground">{{ invoice.periodStart }} – {{ invoice.periodEnd }}</span>
+              <span [class]="invoice.status === 'Finalized' ? 'badge-success' : 'badge-warning'">
                 {{ invoice.status }}
               </span>
               @if (invoice.invoiceNumber) {
-                <span class="ml-2 text-sm text-muted-foreground">#{{ invoice.invoiceNumber }}</span>
+                <span class="text-sm text-muted-foreground">#{{ invoice.invoiceNumber }}</span>
               }
             </div>
-            <div class="text-right font-semibold">{{ invoice.totalAmount | number: '1.2-2' }} {{ invoice.reportingCurrency }}</div>
+            <div class="text-right">
+              <div class="text-lg font-semibold tracking-tight">{{ invoice.totalAmount | number: '1.2-2' }} {{ invoice.reportingCurrency }}</div>
+              @if (invoice.exchangeRate) {
+                <div class="text-xs text-muted-foreground">1 GBP = {{ invoice.exchangeRate }} {{ invoice.reportingCurrency }}</div>
+              }
+            </div>
           </div>
 
-          <table class="w-full border-collapse text-sm">
+          <table class="table-clean">
             <thead>
-              <tr class="border-b border-border text-left">
-                <th class="py-1">Description</th>
-                <th class="py-1">Hours</th>
-                <th class="py-1">Amount</th>
+              <tr>
+                <th>Description</th>
+                <th>Hours</th>
+                <th>Amount</th>
               </tr>
             </thead>
             <tbody>
               @for (line of invoice.lineItems; track line.id) {
-                <tr class="border-b border-border">
-                  <td class="py-1">{{ line.description }}</td>
-                  <td class="py-1">{{ line.hours ?? '-' }}</td>
-                  <td class="py-1">{{ line.amount | number: '1.2-2' }}</td>
+                <tr>
+                  <td>{{ line.description }}</td>
+                  <td class="text-muted-foreground">{{ line.hours ?? '-' }}</td>
+                  <td class="text-muted-foreground">{{ line.amount | number: '1.2-2' }}</td>
                 </tr>
               }
             </tbody>
           </table>
 
           @if (invoice.status === 'Draft') {
-            <div class="mt-3 flex items-center gap-3">
-              <input placeholder="Invoice number" class="rounded border border-border bg-card px-3 py-1.5 text-sm" [ngModel]="invoiceNumberDraft()" (ngModelChange)="invoiceNumberDraft.set($event)" />
-              <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="finalize(invoice)">Finalize</button>
+            <div class="mt-4 flex items-center gap-3">
+              <input placeholder="Invoice number" class="input max-w-xs" [ngModel]="invoiceNumberDraft()" (ngModelChange)="invoiceNumberDraft.set($event)" />
+              <button class="btn-primary" (click)="finalize(invoice)">Finalize</button>
             </div>
           } @else {
-            <div class="mt-3">
-              <button class="rounded border border-border px-3 py-1.5 text-sm" (click)="downloadPdf(invoice)">Download PDF</button>
+            <div class="mt-4">
+              <button class="btn-secondary" (click)="downloadPdf(invoice)">Download PDF</button>
             </div>
           }
         </div>

@@ -10,7 +10,9 @@ export interface InviteUserRequest {
   email: string;
   displayName: string;
   role: 'Admin' | 'User';
-  jobTitle: string | null;
+  jobRoleId: number | null;
+  // Leave blank to auto-generate a placeholder - fill in when the real payroll number is known.
+  payrollNumber?: string | null;
 }
 
 export interface InviteUserResponse {
@@ -22,8 +24,9 @@ export interface InviteUserResponse {
 export interface UpdateUserRequest {
   displayName: string;
   role: 'Admin' | 'User';
-  jobTitle: string | null;
+  jobRoleId: number | null;
   isActive: boolean;
+  payrollNumber: string;
 }
 
 @Injectable({ providedIn: 'root' })

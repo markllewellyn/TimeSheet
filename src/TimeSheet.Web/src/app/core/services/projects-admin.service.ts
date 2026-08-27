@@ -10,44 +10,25 @@ export interface CreateProjectRequest {
   code: string;
   description: string | null;
   paymentModel: PaymentModel;
+  canInvoice: boolean | null;
   currencyOverride: string | null;
   startDate: string;
   endDate: string | null;
   budgetHours: number | null;
   fixedFeeAmount: number | null;
   budgetAlertThresholdPercent: number;
-  defaultCostRatePerHour: number;
-  defaultBillingRatePerHour: number | null;
 }
 
 export interface UpdateProjectRequest {
   name: string;
   description: string | null;
+  canInvoice: boolean | null;
   currencyOverride: string | null;
   endDate: string | null;
   budgetHours: number | null;
   fixedFeeAmount: number | null;
   budgetAlertThresholdPercent: number;
   isActive: boolean;
-}
-
-export interface ProjectRate {
-  id: number;
-  projectId: number;
-  userId: number | null;
-  userName: string | null;
-  billingRatePerHour: number | null;
-  costRatePerHour: number;
-  effectiveFrom: string;
-  effectiveTo: string | null;
-}
-
-export interface UpsertProjectRateRequest {
-  userId: number | null;
-  billingRatePerHour: number | null;
-  costRatePerHour: number;
-  effectiveFrom: string;
-  effectiveTo: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -69,13 +50,5 @@ export class ProjectsAdminService {
 
   update(id: number, request: UpdateProjectRequest): Observable<Project> {
     return this.http.put<Project>(`${this.baseUrl}/projects/${id}`, request);
-  }
-
-  listRates(projectId: number): Observable<ProjectRate[]> {
-    return this.http.get<ProjectRate[]>(`${this.baseUrl}/projects/${projectId}/rates`);
-  }
-
-  createRate(projectId: number, request: UpsertProjectRateRequest): Observable<ProjectRate> {
-    return this.http.post<ProjectRate>(`${this.baseUrl}/projects/${projectId}/rates`, request);
   }
 }

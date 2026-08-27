@@ -1,0 +1,92 @@
+<div class="flex flex-col gap-4">
+  <div class="page-header">
+    <h1 class="page-title">Your Calendar</h1>
+  </div>
+
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-2">
+      <button class="btn-ghost" (click)="prevMonth()" aria-label="Previous month">&larr;</button>
+      <span class="min-w-40 text-center text-sm font-semibold text-foreground">{{ monthLabel() }}</span>
+      <button class="btn-ghost" (click)="nextMonth()" aria-label="Next month">&rarr;</button>
+    </div>
+
+    <div class="flex items-center gap-3 text-sm">
+      <select class="input" [ngModel]="clientFilter()" (ngModelChange)="clientFilter.set($event)">
+        <option [ngValue]="null">All clients</option>
+        @for (c of distinctClients(); track c.id) {
+          <option [ngValue]="c.id">{{ c.name }}</option>
+        }
+      </select>
+      <span class="text-muted-foreground">Month total: <span class="font-medium text-foreground">{{ monthTotal() }}h</span></span>
+    </div>
+  </div>
+
+  <div class="card overflow-hidden">
+    <div class="grid grid-cols-7 border-b border-border text-center text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      <div class="py-2">Mon</div>
+      <div class="py-2">Tue</div>
+      <div class="py-2">Wed</div>
+      <div class="py-2">Thu</div>
+      <div class="py-2">Fri</div>
+      <div class="py-2">Sat</div>
+      <div class="py-2">Sun</div>
+    </div>
+    <div class="grid grid-cols-7">
+      @for (day of gridDays(); track day.date) {
+        <button
+          class="flex min-h-24 flex-col gap-1 border-b border-r border-border p-1.5 text-left transition-colors hover:bg-secondary/50"
+          [class.opacity-40]="!day.inMonth"
+          [class.bg-secondary]="selectedDate() === day.date"
+          (click)="selectDay(day.date)"
+        >
+          <span
+            class="flex h-6 w-6 items-center justify-center rounded-full text-xs"
+            [class.font-semibold]="day.isToday"
+            [class]="day.isToday ? 'bg-[var(--primary)] text-white' : 'text-foreground'"
+          >
+            {{ day.date.slice(8, 10) }}
+          </span>
+          <div class="flex flex-col gap-0.5">
+            @for (c of (clientsByDate().get(day.date) ?? []); track c.clientId) {
+              <span class="truncate rounded px-1 py-0.5 text-[10px] leading-tight text-white" [style.background-color]="colorForClient(c.clientId)">
+                {{ c.clientName }}: {{ c.hours }}h
+              </span>
+            }
+          </div>
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (selectedDate(); as d) {
+    <div class="card-padded">
+      <h2 class="mb-3 text-sm font-semibold text-foreground">{{ d }}</h2>
+      @if (selectedDayEntries().length === 0) {
+        <p class="text-sm text-muted-foreground">No entries logged on this day.</p>
+      } @else {
+        <table class="table-clean">
+          <thead>
+            <tr>
+              <th>Client</th>
+              <th>Project</th>
+              <th>Description</th>
+              <th>W/H</th>
+              <th>O/H</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of selectedDayEntries(); track e.id) {
+              <tr>
+                <td class="font-medium text-foreground">{{ e.clientName }}</td>
+                <td class="text-muted-foreground">{{ e.projectName }}</td>
+                <td class="text-muted-foreground">{{ e.description }}</td>
+                <td>{{ e.workHours }}</td>
+                <td>{{ e.outOfHoursHours }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+</div>

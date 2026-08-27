@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { Invoice, InvoicesService } from '../../../../core/services/invoices.service';
@@ -22,7 +22,17 @@ export class InvoicingPage {
   protected readonly periodStart = signal(this.firstOfMonth());
   protected readonly periodEnd = signal(new Date().toISOString().slice(0, 10));
   protected readonly invoiceNumberDraft = signal('');
+  protected readonly manualExchangeRateInput = signal('');
   protected readonly error = signal<string | null>(null);
+  protected readonly successMessage = signal<string | null>(null);
+  protected readonly sortNewestFirst = signal(true);
+
+  protected readonly selectedClient = computed(() => this.clients().find((c) => c.id === this.selectedClientId()) ?? null);
+  protected readonly requiresExchangeRate = computed(() => (this.selectedClient()?.reportingCurrencyCode ?? 'GBP').toUpperCase() !== 'GBP');
+  protected readonly sortedInvoices = computed(() => {
+    const sorted = [...this.invoices()].sort((a, b) => a.generatedAtUtc.localeCompare(b.generatedAtUtc));
+    return this.sortNewestFirst() ? sorted.reverse() : sorted;
+  });
 
   constructor() {
     this.clientsService.list().subscribe((clients) => this.clients.set(clients));
@@ -35,6 +45,9 @@ export class InvoicingPage {
 
   protected onClientChange(clientId: number): void {
     this.selectedClientId.set(clientId);
+    this.manualExchangeRateInput.set('');
+    this.error.set(null);
+    this.successMessage.set(null);
     this.refresh(clientId);
   }
 
@@ -46,9 +59,26 @@ export class InvoicingPage {
     const clientId = this.selectedClientId();
     if (!clientId) return;
 
-    this.invoicesService.generateDraft(clientId, this.periodStart(), this.periodEnd()).subscribe({
-      next: () => this.refresh(clientId),
-      error: (err) => this.error.set(err?.error?.error ?? 'Could not generate the draft invoice.'),
+    let manualExchangeRate: number | undefined;
+    if (this.requiresExchangeRate()) {
+      const parsed = Number(this.manualExchangeRateInput());
+      if (!Number.isFinite(parsed) || parsed <= 0) {
+        this.error.set('Enter a valid exchange rate before generating this invoice.');
+        return;
+      }
+      manualExchangeRate = parsed;
+    }
+
+    this.invoicesService.generateDraft(clientId, this.periodStart(), this.periodEnd(), manualExchangeRate).subscribe({
+      next: () => {
+        this.error.set(null);
+        this.successMessage.set('Draft invoice generated.');
+        this.refresh(clientId);
+      },
+      error: (err) => {
+        this.successMessage.set(null);
+        this.error.set(err?.error?.error ?? 'Could not generate the draft invoice.');
+      },
     });
   }
 
@@ -61,9 +91,13 @@ export class InvoicingPage {
       next: () => {
         this.invoiceNumberDraft.set('');
         this.error.set(null);
+        this.successMessage.set('Invoice finalized.');
         this.refresh(invoice.clientId);
       },
-      error: (err) => this.error.set(err?.error?.error ?? 'Could not finalize the invoice.'),
+      error: (err) => {
+        this.successMessage.set(null);
+        this.error.set(err?.error?.error ?? 'Could not finalize the invoice.');
+      },
     });
   }
 

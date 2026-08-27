@@ -16,7 +16,13 @@ const msalInstance = MSALInstanceFactory();
 
 msalInstance
   .initialize()
-  .then(() => msalInstance.handleRedirectPromise())
+  // Default (true) makes MSAL Browser do a full window.location navigation back to the page that started
+  // login BEFORE this promise resolves - since that happens ahead of bootstrapApplication below (deliberately,
+  // so the redirect response is consumed before the app renders), that auto-navigation cuts this page load
+  // short and reloads from scratch at the origin page, outside any Angular-integrated navigation. Disabled so
+  // this resolves right here at the callback URL instead; CurrentUserService navigates to /timesheet itself
+  // on LOGIN_SUCCESS once the app has actually bootstrapped.
+  .then(() => msalInstance.handleRedirectPromise({ navigateToLoginRequestUrl: false }))
   .then(() =>
     bootstrapApplication(App, {
       providers: [...appConfig.providers, { provide: MSAL_INSTANCE, useValue: msalInstance }],

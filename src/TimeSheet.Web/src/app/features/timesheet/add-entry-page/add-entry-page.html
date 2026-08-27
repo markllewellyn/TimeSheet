@@ -1,30 +1,42 @@
 <div class="mx-auto max-w-2xl">
-  <h1 class="mb-6 text-xl font-semibold">{{ isEditMode ? 'Edit Log Entry' : 'Add a New Log Entry' }}</h1>
-
-  @if (error(); as e) {
-    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+  <h1 class="page-title" [class.mb-1]="!isEditMode && impersonation.actingAs()" [class.mb-6]="isEditMode || !impersonation.actingAs()">
+    {{ isEditMode ? 'Edit Log Entry' : 'Add a New Log Entry' }}
+  </h1>
+  @if (!isEditMode && impersonation.actingAs(); as target) {
+    <p class="mb-6 text-sm text-muted-foreground">Logging on behalf of <strong>{{ target.displayName }}</strong>.</p>
   }
 
-  <div class="grid grid-cols-2 gap-4">
-    <label class="flex flex-col gap-1 text-sm">
-      Customer
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  @if (projectsLoaded() && clients().length === 0) {
+    <div class="banner-warning">
+      You aren't assigned to any projects yet, so there's nothing to log time against. Ask an Admin to assign you
+      under Clients → (a client) → Projects → (a project) → Assignments.
+    </div>
+  }
+
+  <div class="card-padded grid grid-cols-2 gap-4">
+    <label class="field">
+      <span class="field-label">Client</span>
       <select
-        class="rounded border border-border bg-card px-3 py-2 disabled:opacity-60"
+        class="input"
         [disabled]="isEditMode"
         [ngModel]="selectedClientId()"
         (ngModelChange)="onClientChange($event)"
       >
-        <option [ngValue]="null" disabled>Select a customer</option>
+        <option [ngValue]="null" disabled>Select a client</option>
         @for (c of clients(); track c.id) {
           <option [ngValue]="c.id">{{ c.name }}</option>
         }
       </select>
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      Project
+    <label class="field">
+      <span class="field-label">Project</span>
       <select
-        class="rounded border border-border bg-card px-3 py-2 disabled:opacity-60"
+        class="input"
         [disabled]="isEditMode"
         [ngModel]="selectedProjectId()"
         (ngModelChange)="selectedProjectId.set($event)"
@@ -36,31 +48,38 @@
       </select>
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      Date
-      <input type="date" class="rounded border border-border bg-card px-3 py-2" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+    <label class="field">
+      <span class="field-label">Date</span>
+      <input type="date" class="input" [max]="today" [ngModel]="date()" (ngModelChange)="date.set($event)" />
     </label>
 
     <div></div>
 
-    <label class="flex flex-col gap-1 text-sm">
-      In Work Hours
-      <input type="number" min="0" step="0.25" class="rounded border border-border bg-card px-3 py-2" [ngModel]="workHours()" (ngModelChange)="workHours.set($event)" />
+    <label class="field">
+      <span class="field-label">In Work Hours</span>
+      <input type="number" min="0" step="0.5" class="input" [ngModel]="workHours()" (ngModelChange)="workHours.set($event)" />
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      Out of Hours
-      <input type="number" min="0" step="0.25" class="rounded border border-border bg-card px-3 py-2" [ngModel]="outOfHoursHours()" (ngModelChange)="outOfHoursHours.set($event)" />
+    <label class="field">
+      <span class="field-label">Out of Hours</span>
+      <input type="number" min="0" step="0.5" class="input" [ngModel]="outOfHoursHours()" (ngModelChange)="outOfHoursHours.set($event)" />
     </label>
 
-    <label class="col-span-2 flex flex-col gap-1 text-sm">
-      Description
-      <input type="text" placeholder="Task description" class="rounded border border-border bg-card px-3 py-2" [ngModel]="description()" (ngModelChange)="description.set($event)" />
+    <label class="field col-span-2">
+      <span class="field-label">Description</span>
+      <input type="text" placeholder="Task description" class="input" [ngModel]="description()" (ngModelChange)="description.set($event)" />
     </label>
+
+    @if (!isEditMode && currentUser.isAdmin()) {
+      <label class="flex items-center gap-2 text-sm col-span-2">
+        <input type="checkbox" [ngModel]="adminSendToPayroll()" (ngModelChange)="adminSendToPayroll.set($event)" />
+        Mark as approved and sent to payroll immediately (Admin only - skips the Approvals queue)
+      </label>
+    }
   </div>
 
   <div class="mt-6 flex gap-3">
-    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="save()">Log</button>
-    <button class="rounded border border-border px-4 py-2 text-sm" (click)="cancel()">Cancel</button>
+    <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Log' }}</button>
+    <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
   </div>
 </div>

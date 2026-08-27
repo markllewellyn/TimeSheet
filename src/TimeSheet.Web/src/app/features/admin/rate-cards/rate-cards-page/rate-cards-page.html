@@ -1,0 +1,102 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Rate Cards</h1>
+  <p class="-mt-2 text-xs text-muted-foreground">
+    Role-based billing rates - a role's default rate, optionally narrowed to one client or one project. Every
+    rate ever added is effective-dated and kept; "adding" a new rate never edits or replaces an old one.
+    Person-specific overrides are set from a client's own edit page instead.
+  </p>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="card-padded flex flex-col gap-3">
+    <label class="field max-w-xs">
+      <span class="field-label">Role</span>
+      <select class="input" [ngModel]="selectedRoleId()" (ngModelChange)="onRoleChange($event)">
+        <option [ngValue]="null" disabled>Select a role</option>
+        @for (r of roles(); track r.id) {
+          <option [ngValue]="r.id">{{ r.name }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="flex gap-4 text-sm">
+      <label class="flex items-center gap-1.5">
+        <input type="radio" name="scopeType" value="default" [ngModel]="scopeType()" (ngModelChange)="scopeType.set($event)" />
+        Default (all clients/projects)
+      </label>
+      <label class="flex items-center gap-1.5">
+        <input type="radio" name="scopeType" value="client" [ngModel]="scopeType()" (ngModelChange)="scopeType.set($event)" />
+        Specific client
+      </label>
+      <label class="flex items-center gap-1.5">
+        <input type="radio" name="scopeType" value="project" [ngModel]="scopeType()" (ngModelChange)="scopeType.set($event)" />
+        Specific project
+      </label>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-3">
+      @if (scopeType() === 'client' || scopeType() === 'project') {
+        <label class="field">
+          <span class="field-label">Client</span>
+          <select class="input" [ngModel]="scopeClientId()" (ngModelChange)="onScopeClientChange($event)">
+            <option [ngValue]="null" disabled>Select a client</option>
+            @for (c of clients(); track c.id) {
+              <option [ngValue]="c.id">{{ c.name }}</option>
+            }
+          </select>
+        </label>
+      }
+      @if (scopeType() === 'project') {
+        <label class="field">
+          <span class="field-label">Project</span>
+          <select class="input" [ngModel]="scopeProjectId()" (ngModelChange)="scopeProjectId.set($event)">
+            <option [ngValue]="null" disabled>Select a project</option>
+            @for (p of projectsForClient(); track p.id) {
+              <option [ngValue]="p.id">{{ p.name }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label class="field">
+        <span class="field-label">Rate</span>
+        <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="rate()" (ngModelChange)="rate.set($event)" />
+      </label>
+      <label class="field">
+        <span class="field-label">Effective From</span>
+        <input type="date" class="input" [ngModel]="effectiveFrom()" (ngModelChange)="effectiveFrom.set($event)" />
+      </label>
+      <button class="btn-primary" [disabled]="saving() || !selectedRoleId()" (click)="add()">{{ saving() ? 'Saving…' : 'Add Rate' }}</button>
+    </div>
+  </div>
+
+  @if (selectedRoleId()) {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Project</th>
+            <th>Rate</th>
+            <th>Effective From</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of rateCards(); track c.id) {
+            <tr>
+              <td class="text-muted-foreground">{{ c.clientName ?? '-' }}</td>
+              <td class="text-muted-foreground">{{ c.projectName ?? '-' }}</td>
+              <td>{{ c.rate }}</td>
+              <td class="text-muted-foreground">{{ c.effectiveFrom }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="4" class="text-center text-sm text-muted-foreground">No rates set for this role yet.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

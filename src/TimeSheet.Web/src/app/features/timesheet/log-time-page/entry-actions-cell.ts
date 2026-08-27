@@ -14,9 +14,13 @@ export interface EntryActionsContext {
   standalone: true,
   template: `
     <div class="flex h-full items-center gap-3 text-sm">
-      <button class="hover:underline" (click)="edit()">Edit</button>
-      <button class="hover:underline" (click)="duplicate()">Duplicate</button>
-      <button class="text-red-600 hover:underline" (click)="delete()">Delete</button>
+      @if (locked()) {
+        <span class="text-xs text-muted-foreground">Locked (sent to payroll)</span>
+      } @else {
+        <button class="hover:underline" (click)="edit()">Edit</button>
+        <button class="hover:underline" (click)="duplicate()">Duplicate</button>
+        <button class="text-red-600 hover:underline" (click)="delete()">Delete</button>
+      }
     </div>
   `,
 })
@@ -25,6 +29,10 @@ export class EntryActionsCell implements ICellRendererAngularComp {
 
   agInit(params: ICellRendererParams<TimesheetEntry> & EntryActionsContext): void {
     this.params = params;
+  }
+
+  locked(): boolean {
+    return this.params.data?.sentToPayroll === true;
   }
 
   refresh(): boolean {

@@ -21,6 +21,9 @@ export interface TimesheetEntry {
   outOfHoursHours: number;
   description: string | null;
   status: TimesheetEntryStatus;
+  toPayroll: number;
+  approvedPayroll: boolean;
+  sentToPayroll: boolean;
   attachments: Attachment[];
 }
 
@@ -42,6 +45,8 @@ export interface CreateTimesheetEntryRequest {
   workHours: number;
   outOfHoursHours: number;
   description: string | null;
+  adminSendToPayroll?: boolean | null;
+  onBehalfOfUserId?: number | null;
 }
 
 export type UpdateTimesheetEntryRequest = Omit<CreateTimesheetEntryRequest, 'projectId'>;

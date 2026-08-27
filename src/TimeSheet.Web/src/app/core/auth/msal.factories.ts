@@ -19,7 +19,10 @@ export function MSALInstanceFactory(): IPublicClientApplication {
     auth: {
       clientId: environment.entra.clientId,
       authority: environment.entra.authority,
-      redirectUri: '/',
+      // Must exactly match the redirect URI registered on the Entra app registration - this org's app
+      // registration only has this one (a NextAuth.js-style path reused across their Angular apps), not the
+      // app's own origin root, so this can't be a relative '/'.
+      redirectUri: 'http://localhost:3000/api/auth/callback/microsoft-entra-id',
       postLogoutRedirectUri: '/',
     },
     cache: {

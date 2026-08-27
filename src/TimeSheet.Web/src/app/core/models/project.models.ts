@@ -4,6 +4,7 @@ export interface Client {
   id: number;
   name: string;
   accountCode: string;
+  startDate: string;
   billingAddressLine1: string | null;
   billingAddressLine2: string | null;
   billingCity: string | null;
@@ -12,6 +13,7 @@ export interface Client {
   primaryContactName: string | null;
   primaryContactEmail: string | null;
   primaryContactPhone: string | null;
+  currencyId: number | null;
   reportingCurrencyCode: string;
   invoicingMonthEndDay: number | null;
   notes: string | null;
@@ -28,6 +30,7 @@ export interface Project {
   code: string;
   description: string | null;
   paymentModel: PaymentModel;
+  canInvoice: boolean | null;
   currencyOverride: string | null;
   startDate: string;
   endDate: string | null;

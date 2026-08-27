@@ -1,31 +1,27 @@
 import { ApplicationConfig, provideBrowserGlobalErrorListeners } from '@angular/core';
 import { provideRouter } from '@angular/router';
-import { HTTP_INTERCEPTORS, provideHttpClient, withFetch, withInterceptors, withInterceptorsFromDi } from '@angular/common/http';
+import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import {
   MSAL_GUARD_CONFIG,
   MSAL_INSTANCE,
-  MSAL_INTERCEPTOR_CONFIG,
   MsalBroadcastService,
   MsalGuard,
-  MsalInterceptor,
   MsalService,
 } from '@azure/msal-angular';
 import { routes } from './app.routes';
 import { localAuthInterceptor } from './core/auth/local-auth.interceptor';
-import {
-  MSALGuardConfigFactory,
-  MSALInstanceFactory,
-  MSALInterceptorConfigFactory,
-} from './core/auth/msal.factories';
+import { MSALGuardConfigFactory, MSALInstanceFactory } from './core/auth/msal.factories';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideRouter(routes),
-    // A pure standalone app using withInterceptors([...]) will NOT pick up the class-based MsalInterceptor -
-    // withInterceptorsFromDi() is required alongside the HTTP_INTERCEPTORS provider below (known MSAL Angular
-    // gotcha). localAuthInterceptor (functional) runs first and is a no-op unless a local session exists.
-    provideHttpClient(withInterceptors([localAuthInterceptor]), withInterceptorsFromDi(), withFetch()),
+    // MsalInterceptor is deliberately NOT registered here: with SSO not yet configured (placeholder tenant),
+    // it would match every /api/* call via its protectedResourceMap and silently redirect the whole tab to
+    // Entra to acquire a token, before the request ever reaches the backend - including local-account calls
+    // that don't need one. localAuthInterceptor (functional) attaches the local Bearer token instead, and is
+    // a no-op if no local session exists. Re-add MsalInterceptor once real Entra SSO config is in place.
+    provideHttpClient(withInterceptors([localAuthInterceptor]), withFetch()),
     {
       provide: MSAL_INSTANCE,
       useFactory: MSALInstanceFactory,
@@ -33,15 +29,6 @@ export const appConfig: ApplicationConfig = {
     {
       provide: MSAL_GUARD_CONFIG,
       useFactory: MSALGuardConfigFactory,
-    },
-    {
-      provide: MSAL_INTERCEPTOR_CONFIG,
-      useFactory: MSALInterceptorConfigFactory,
-    },
-    {
-      provide: HTTP_INTERCEPTORS,
-      useClass: MsalInterceptor,
-      multi: true,
     },
     MsalService,
     MsalGuard,

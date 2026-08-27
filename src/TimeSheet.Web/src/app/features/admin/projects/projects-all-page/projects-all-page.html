@@ -1,0 +1,48 @@
+<div class="flex flex-col gap-4">
+  <div class="page-header">
+    <h1 class="page-title">Projects</h1>
+    <a routerLink="/admin/clients" class="btn-primary">
+      + New Project (via a Client)
+    </a>
+  </div>
+
+  @if (loaded() && projects().length === 0) {
+    <p class="text-sm text-muted-foreground">
+      No projects yet. Create a Client first, then add a Project under it.
+    </p>
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Payment Model</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of projects(); track p.id) {
+            <tr>
+              <td class="text-muted-foreground">{{ p.clientName }}</td>
+              <td class="text-muted-foreground">{{ p.code }}</td>
+              <td class="font-medium text-foreground">{{ p.name }}</td>
+              <td>
+                <span class="badge-neutral">{{ p.paymentModel === 'TimeAndMaterials' ? 'Time & Materials' : 'Fixed Cost' }}</span>
+              </td>
+              <td>
+                <span [class]="p.isActive ? 'badge-success' : 'badge-danger'">{{ p.isActive ? 'Active' : 'Inactive' }}</span>
+              </td>
+              <td class="text-right">
+                <a [routerLink]="['/admin/projects', p.id]" class="btn-link mr-3">Edit / Rates</a>
+                <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="btn-link">Assignments</a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

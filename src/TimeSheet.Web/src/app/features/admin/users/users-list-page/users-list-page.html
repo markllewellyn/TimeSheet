@@ -1,60 +1,69 @@
 <div class="flex flex-col gap-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Users</h1>
-    <button class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground" (click)="showInviteForm.set(!showInviteForm())">
+  <div class="page-header">
+    <h1 class="page-title">Users</h1>
+    <button class="btn-primary" (click)="showInviteForm.set(!showInviteForm())">
       + Invite User
     </button>
   </div>
 
   @if (newTemporaryPassword(); as pwd) {
-    <div class="flex items-center justify-between rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-900">
+    <div class="banner flex items-center justify-between border-green-200 bg-green-50 text-green-900">
       <span>One-time temporary password: <strong class="font-mono">{{ pwd }}</strong> - hand this to the user, they'll need it to sign in.</span>
-      <button class="underline" (click)="newTemporaryPassword.set(null)">Dismiss</button>
+      <button class="btn-link" (click)="newTemporaryPassword.set(null)">Dismiss</button>
     </div>
   }
 
-  @if (showInviteForm()) {
-    <div class="rounded border border-border p-4">
-      @if (error(); as e) {
-        <div class="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
-      }
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
 
-      <div class="mb-3 flex gap-4 text-sm">
-        <label class="flex items-center gap-1">
+  @if (showInviteForm()) {
+    <div class="card-padded">
+      <div class="mb-4 flex gap-4 text-sm">
+        <label class="flex items-center gap-1.5">
           <input type="radio" name="accountType" value="sso" [ngModel]="accountType()" (ngModelChange)="accountType.set($event)" />
           SSO (Entra ID)
         </label>
-        <label class="flex items-center gap-1">
+        <label class="flex items-center gap-1.5">
           <input type="radio" name="accountType" value="local" [ngModel]="accountType()" (ngModelChange)="accountType.set($event)" />
           Local account (username/password)
         </label>
       </div>
 
-      <div class="grid grid-cols-2 gap-3">
+      <div class="grid grid-cols-2 gap-4">
         @if (accountType() === 'sso') {
-          <label class="flex flex-col gap-1 text-sm">
-            Entra Object Id
-            <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
+          <label class="field">
+            <span class="field-label">Entra Object Id</span>
+            <input class="input" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
           </label>
         }
-        <label class="flex flex-col gap-1 text-sm">
-          Email
-          <input type="email" class="rounded border border-border bg-card px-3 py-2" [ngModel]="email()" (ngModelChange)="email.set($event)" />
+        <label class="field">
+          <span class="field-label">Email</span>
+          <input type="email" class="input" [ngModel]="email()" (ngModelChange)="email.set($event)" />
         </label>
-        <label class="flex flex-col gap-1 text-sm">
-          Display Name
-          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" />
+        <label class="field">
+          <span class="field-label">Display Name</span>
+          <input class="input" [ngModel]="displayName()" (ngModelChange)="displayName.set($event)" />
         </label>
-        <label class="flex flex-col gap-1 text-sm">
-          Role
-          <select class="rounded border border-border bg-card px-3 py-2" [ngModel]="role()" (ngModelChange)="role.set($event)">
+        <label class="field">
+          <span class="field-label">Role</span>
+          <select class="input" [ngModel]="role()" (ngModelChange)="role.set($event)">
             <option value="User">User</option>
             <option value="Admin">Admin</option>
           </select>
         </label>
-        <label class="flex flex-col gap-1 text-sm">
-          Job Title
-          <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="jobTitle()" (ngModelChange)="jobTitle.set($event)" />
+        <label class="field">
+          <span class="field-label">Job Role</span>
+          <select class="input" [ngModel]="jobRoleId()" (ngModelChange)="jobRoleId.set($event)">
+            <option [ngValue]="null">(none - billed only via person-level rate overrides)</option>
+            @for (r of roles(); track r.id) {
+              <option [ngValue]="r.id">{{ r.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Payroll Number</span>
+          <input class="input" placeholder="(auto-generated if left blank)" [ngModel]="payrollNumber()" (ngModelChange)="payrollNumber.set($event)" />
         </label>
       </div>
 
@@ -64,38 +73,85 @@
         </p>
       }
 
-      <button class="mt-4 rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="invite()">
+      <button class="btn-primary mt-4" (click)="invite()">
         {{ accountType() === 'local' ? 'Create Account' : 'Send Invite' }}
       </button>
     </div>
   }
 
-  <table class="w-full border-collapse text-sm">
-    <thead>
-      <tr class="border-b border-border text-left">
-        <th class="py-2">Name</th>
-        <th class="py-2">Email</th>
-        <th class="py-2">Account</th>
-        <th class="py-2">Role</th>
-        <th class="py-2">Status</th>
-        <th class="py-2"></th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (u of users(); track u.id) {
-        <tr class="border-b border-border">
-          <td class="py-2">{{ u.displayName }}</td>
-          <td class="py-2">{{ u.email }}</td>
-          <td class="py-2">{{ u.isLocalAccount ? 'Local' : 'SSO' }}</td>
-          <td class="py-2">{{ u.role }}</td>
-          <td class="py-2">{{ u.isActive ? 'Active' : 'Inactive' }}</td>
-          <td class="py-2 text-right">
-            <button class="mr-3 hover:underline" (click)="toggleRole(u)">Make {{ u.role === 'Admin' ? 'User' : 'Admin' }}</button>
-            <button class="mr-3 hover:underline" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
-            <button class="hover:underline" (click)="resetPassword(u)">Reset Password</button>
-          </td>
+  <div class="card overflow-hidden px-4">
+    <table class="table-clean">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Account</th>
+          <th>Role</th>
+          <th>Job Role</th>
+          <th>Status</th>
+          <th>Payroll Number</th>
+          <th></th>
         </tr>
-      }
-    </tbody>
-  </table>
+      </thead>
+      <tbody>
+        @for (u of users(); track u.id) {
+          <tr>
+            <td class="font-medium text-foreground">{{ u.displayName }}</td>
+            <td class="text-muted-foreground">{{ u.email }}</td>
+            <td>
+              <span class="badge-neutral">{{ u.isLocalAccount ? 'Local' : 'SSO' }}</span>
+            </td>
+            <td>
+              <span [class]="u.role === 'Admin' ? 'badge-success' : 'badge-neutral'">{{ u.role }}</span>
+            </td>
+            <td class="text-muted-foreground">{{ u.jobRoleName ?? '-' }}</td>
+            <td>
+              <span [class]="u.isActive ? 'badge-success' : 'badge-danger'">{{ u.isActive ? 'Active' : 'Inactive' }}</span>
+            </td>
+            <td>
+              @if (editingPayrollUserId() === u.id) {
+                <input class="input w-28" [ngModel]="editPayrollNumber()" (ngModelChange)="editPayrollNumber.set($event)" />
+              } @else {
+                <span class="text-muted-foreground">{{ u.payrollNumber }}</span>
+              }
+            </td>
+            <td class="text-right">
+              @if (editingPayrollUserId() === u.id) {
+                <button class="btn-link mr-3" [disabled]="editSaving()" (click)="saveEditPayroll(u)">{{ editSaving() ? 'Saving…' : 'Save' }}</button>
+                <button class="btn-link text-muted-foreground" [disabled]="editSaving()" (click)="cancelEditPayroll()">Cancel</button>
+              } @else {
+                <button class="btn-link mr-3" (click)="startEditPayroll(u)">Edit Payroll #</button>
+                <button class="btn-link mr-3" (click)="startAddCost(u)">Add Cost</button>
+                <button class="btn-link mr-3" (click)="toggleRole(u)">Make {{ u.role === 'Admin' ? 'User' : 'Admin' }}</button>
+                <button class="btn-link mr-3" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+                <button class="btn-link" (click)="resetPassword(u)">Reset Password</button>
+              }
+            </td>
+          </tr>
+          @if (addingCostUserId() === u.id) {
+            <tr>
+              <td colspan="8" class="bg-[var(--muted)]/40 px-4 py-3">
+                <div class="flex flex-wrap items-end gap-3">
+                  <label class="field">
+                    <span class="field-label">Hourly Cost</span>
+                    <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="newCostHourlyCost()" (ngModelChange)="newCostHourlyCost.set($event)" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Out of Hours Cost</span>
+                    <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="newCostOutOfHoursCost()" (ngModelChange)="newCostOutOfHoursCost.set($event)" />
+                  </label>
+                  <label class="field">
+                    <span class="field-label">Effective From</span>
+                    <input type="date" class="input" [ngModel]="newCostEffectiveFrom()" (ngModelChange)="newCostEffectiveFrom.set($event)" />
+                  </label>
+                  <button class="btn-primary" [disabled]="costSaving()" (click)="saveAddCost(u)">{{ costSaving() ? 'Saving…' : 'Save' }}</button>
+                  <button class="btn-secondary" [disabled]="costSaving()" (click)="cancelAddCost()">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+  </div>
 </div>

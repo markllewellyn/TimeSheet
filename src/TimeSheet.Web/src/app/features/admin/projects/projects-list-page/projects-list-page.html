@@ -1,36 +1,65 @@
 <div class="flex flex-col gap-4">
-  <div class="flex items-center justify-between">
-    <h1 class="text-xl font-semibold">Projects - {{ clientName() }}</h1>
-    <a [routerLink]="['/admin/clients', clientId, 'projects', 'new']" class="rounded bg-primary px-3 py-1.5 text-sm text-primary-foreground">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Projects</h1>
+      <p class="page-subtitle">{{ clientName() }}</p>
+    </div>
+    <a [routerLink]="['/admin/clients', clientId, 'projects', 'new']" class="btn-primary">
       + New Project
     </a>
   </div>
 
-  <table class="w-full border-collapse text-sm">
-    <thead>
-      <tr class="border-b border-border text-left">
-        <th class="py-2">Code</th>
-        <th class="py-2">Name</th>
-        <th class="py-2">Payment Model</th>
-        <th class="py-2">Budget Hours</th>
-        <th class="py-2">Status</th>
-        <th class="py-2"></th>
-      </tr>
-    </thead>
-    <tbody>
-      @for (p of projects(); track p.id) {
-        <tr class="border-b border-border">
-          <td class="py-2">{{ p.code }}</td>
-          <td class="py-2">{{ p.name }}</td>
-          <td class="py-2">{{ p.paymentModel }}</td>
-          <td class="py-2">{{ p.budgetHours ?? '-' }}</td>
-          <td class="py-2">{{ p.isActive ? 'Active' : 'Inactive' }}</td>
-          <td class="py-2 text-right">
-            <a [routerLink]="['/admin/projects', p.id]" class="mr-3 hover:underline">Edit / Rates</a>
-            <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="hover:underline">Assignments</a>
-          </td>
-        </tr>
-      }
-    </tbody>
-  </table>
+  <label class="flex items-center gap-2 text-sm text-muted-foreground">
+    <input type="checkbox" [ngModel]="activeOnly()" (ngModelChange)="activeOnly.set($event)" />
+    Active only
+  </label>
+
+  @if (projects().length === 0) {
+    <div class="empty-state">
+      <span class="empty-state-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-5 w-5 text-[var(--accent-foreground)]" aria-hidden="true">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 0 0-1.883 2.542l.857 6a2.25 2.25 0 0 0 2.227 1.932H19.05a2.25 2.25 0 0 0 2.227-1.932l.857-6a2.25 2.25 0 0 0-1.883-2.542m-16.5 0V6A2.25 2.25 0 0 1 6 3.75h3.879a1.5 1.5 0 0 1 1.06.44l2.122 2.12a1.5 1.5 0 0 0 1.06.44H18A2.25 2.25 0 0 1 20.25 9v.776" />
+        </svg>
+      </span>
+      <p class="empty-state-title">No projects for this client yet</p>
+      <p class="empty-state-body">Add a project to start logging time, tracking budget, and billing this client.</p>
+      <a [routerLink]="['/admin/clients', clientId, 'projects', 'new']" class="btn-primary mt-2">+ New Project</a>
+    </div>
+  } @else if (visibleProjects().length === 0) {
+    <p class="text-sm text-muted-foreground">No active projects for this client - uncheck "Active only" to see inactive ones.</p>
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Code</th>
+            <th>Name</th>
+            <th>Payment Model</th>
+            <th>Budget Hours</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (p of visibleProjects(); track p.id) {
+            <tr>
+              <td class="text-muted-foreground">{{ p.code }}</td>
+              <td class="font-medium text-foreground">{{ p.name }}</td>
+              <td>
+                <span class="badge-neutral">{{ p.paymentModel === 'TimeAndMaterials' ? 'Time & Materials' : 'Fixed Cost' }}</span>
+              </td>
+              <td class="text-muted-foreground">{{ p.budgetHours ?? '-' }}</td>
+              <td>
+                <span [class]="p.isActive ? 'badge-success' : 'badge-danger'">{{ p.isActive ? 'Active' : 'Inactive' }}</span>
+              </td>
+              <td class="text-right">
+                <a [routerLink]="['/admin/projects', p.id]" class="btn-link mr-3">Edit / Rates</a>
+                <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="btn-link">Assignments</a>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 </div>

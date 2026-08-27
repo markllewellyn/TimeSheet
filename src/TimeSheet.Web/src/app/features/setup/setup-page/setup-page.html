@@ -1,19 +1,15 @@
-<div class="mx-auto max-w-md text-center">
-  <h1 class="mb-4 text-xl font-semibold">Welcome to TimeSheet</h1>
+<div class="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center text-center">
+  <h1 class="page-title mb-4">Welcome to TimeSheet</h1>
   <p class="mb-6 text-sm text-muted-foreground">
     This database doesn't have any users yet. Claim admin access to get started - you'll be able to invite
     everyone else from the Users screen afterwards.
   </p>
 
   @if (error(); as e) {
-    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+    <div class="banner-error">{{ e }}</div>
   }
 
-  <button
-    class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground disabled:opacity-60"
-    [disabled]="working()"
-    (click)="claimAdmin()"
-  >
+  <button class="btn-primary mx-auto" [disabled]="working()" (click)="claimAdmin()">
     Claim Admin Access
   </button>
 </div>

@@ -1,0 +1,162 @@
+<div class="flex flex-col gap-4">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Payroll Approvals</h1>
+      <p class="page-subtitle">Approve raw timesheet entries, group them into a posting batch, then send the batch to payroll.</p>
+    </div>
+  </div>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="flex gap-1 border-b border-border">
+    <button
+      class="px-3 py-2 text-sm font-medium"
+      [class]="activeTab() === 'pending' ? 'border-b-2 border-[var(--primary)] text-foreground' : 'text-muted-foreground'"
+      (click)="switchTab('pending')"
+    >
+      Approval Queue @if (pending().length > 0) { ({{ pending().length }}) }
+    </button>
+    <button
+      class="px-3 py-2 text-sm font-medium"
+      [class]="activeTab() === 'ready' ? 'border-b-2 border-[var(--primary)] text-foreground' : 'text-muted-foreground'"
+      (click)="switchTab('ready')"
+    >
+      Ready for Payroll @if (readyLoaded() && ready().length > 0) { ({{ ready().length }}) }
+    </button>
+  </div>
+
+  @if (activeTab() === 'pending') {
+    <div class="flex items-center gap-2">
+      <input
+        class="input max-w-xs"
+        placeholder="Search by staff, client, project..."
+        [ngModel]="searchText()"
+        (ngModelChange)="searchText.set($event); refreshPending()"
+      />
+      <button class="btn-ghost" (click)="refreshPending()">Refresh</button>
+    </div>
+
+    @if (pending().length === 0) {
+      <div class="empty-state">
+        <p class="empty-state-title">Nothing waiting for approval</p>
+        <p class="empty-state-body">All timesheet entries have been approved for payroll.</p>
+      </div>
+    } @else {
+      <div class="card overflow-hidden px-4">
+        <table class="table-clean">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" [checked]="selectedPendingIds().size === pending().length" (change)="toggleSelectAllPending()" />
+              </th>
+              <th>Staff</th>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Project</th>
+              <th>Description</th>
+              <th>W/H</th>
+              <th>O/H</th>
+              <th>To Payroll</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of pending(); track e.id) {
+              <tr>
+                <td><input type="checkbox" [checked]="selectedPendingIds().has(e.id)" (change)="togglePendingSelected(e.id)" /></td>
+                <td class="font-medium text-foreground">{{ e.staffName }}</td>
+                <td class="text-muted-foreground">{{ e.date }}</td>
+                <td class="text-muted-foreground">{{ e.clientName }}</td>
+                <td class="text-muted-foreground">{{ e.projectName }}</td>
+                <td class="text-muted-foreground">{{ e.description }}</td>
+                <td>{{ e.workHours }}</td>
+                <td>{{ e.outOfHoursHours }}</td>
+                <td>{{ e.toPayroll | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-padded flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <span>Work Hours: <span class="font-medium text-foreground">{{ pendingTotals().workHours }}</span></span>
+        <span>Out of Office Hours: <span class="font-medium text-foreground">{{ pendingTotals().outOfHoursHours }}</span></span>
+        <span>Total To Payroll: <span class="font-medium text-foreground">{{ pendingTotals().toPayroll | number: '1.2-2' }}</span></span>
+      </div>
+
+      <div class="card-padded flex flex-wrap items-end gap-3">
+        <label class="field">
+          <span class="field-label">Posting Batch (existing)</span>
+          <select class="input" [ngModel]="postingBatchChoice()" (ngModelChange)="postingBatchChoice.set($event)">
+            <option value="">(new batch)</option>
+            @for (b of postingBatches(); track b) {
+              <option [value]="b">{{ b }}</option>
+            }
+          </select>
+        </label>
+        @if (!postingBatchChoice()) {
+          <label class="field">
+            <span class="field-label">New Batch Name</span>
+            <input class="input" [ngModel]="newPostingBatchName()" (ngModelChange)="newPostingBatchName.set($event)" />
+          </label>
+        }
+        <button class="btn-primary" [disabled]="approving() || selectedPendingIds().size === 0" (click)="approveSelected()">
+          {{ approving() ? 'Approving…' : 'Approve Selected' }}
+        </button>
+      </div>
+    }
+  } @else {
+    <div class="flex items-center gap-2">
+      <button class="btn-ghost" (click)="refreshReady()">Refresh</button>
+    </div>
+
+    @if (ready().length === 0) {
+      <div class="empty-state">
+        <p class="empty-state-title">Nothing ready to send</p>
+        <p class="empty-state-body">Approved entries waiting to be sent to payroll will appear here.</p>
+      </div>
+    } @else {
+      <div class="card overflow-hidden px-4">
+        <table class="table-clean">
+          <thead>
+            <tr>
+              <th>
+                <input type="checkbox" [checked]="selectedReadyIds().size === ready().length" (change)="toggleSelectAllReady()" />
+              </th>
+              <th>Staff</th>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Project</th>
+              <th>Posting Batch</th>
+              <th>To Payroll</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of ready(); track e.id) {
+              <tr>
+                <td><input type="checkbox" [checked]="selectedReadyIds().has(e.id)" (change)="toggleReadySelected(e.id)" /></td>
+                <td class="font-medium text-foreground">{{ e.staffName }}</td>
+                <td class="text-muted-foreground">{{ e.date }}</td>
+                <td class="text-muted-foreground">{{ e.clientName }}</td>
+                <td class="text-muted-foreground">{{ e.projectName }}</td>
+                <td class="text-muted-foreground">{{ e.postingBatch }}</td>
+                <td>{{ e.toPayroll | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-padded flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+        <span>Total To Payroll: <span class="font-medium text-foreground">{{ readyTotals().toPayroll | number: '1.2-2' }}</span></span>
+      </div>
+
+      <div>
+        <button class="btn-primary" [disabled]="sending() || selectedReadyIds().size === 0" (click)="sendSelected()">
+          {{ sending() ? 'Sending…' : 'Send Selected to Payroll' }}
+        </button>
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,25 @@
+<div class="mx-auto max-w-2xl">
+  <h1 class="page-title mb-2">Export</h1>
+  <p class="mb-6 text-sm text-muted-foreground">
+    Download a master list of every logged timesheet entry, across all staff, as a CSV file. Leave the dates
+    blank to export everything.
+  </p>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="card-padded flex flex-wrap items-end gap-4">
+    <label class="field">
+      <span class="field-label">Start Date</span>
+      <input type="date" class="input" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">End Date</span>
+      <input type="date" class="input" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+    </label>
+    <button class="btn-primary" [disabled]="downloading()" (click)="download()">
+      {{ downloading() ? 'Preparing…' : 'Download CSV' }}
+    </button>
+  </div>
+</div>

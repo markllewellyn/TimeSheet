@@ -1,5 +1,7 @@
 // Mirrors TimeSheet.Contracts.ExpenseEntryDto (C#) 1:1.
 
+export type ExpenseEntryKind = 'Expense' | 'Contract';
+
 export interface ExpenseEntry {
   id: number;
   projectId: number;
@@ -11,6 +13,7 @@ export interface ExpenseEntry {
   currency: string;
   description: string | null;
   isBillable: boolean;
+  kind: ExpenseEntryKind;
 }
 
 export interface CreateExpenseEntryRequest {
@@ -20,6 +23,7 @@ export interface CreateExpenseEntryRequest {
   currency: string;
   description: string | null;
   isBillable: boolean;
+  kind?: ExpenseEntryKind;
 }
 
 export type UpdateExpenseEntryRequest = Omit<CreateExpenseEntryRequest, 'projectId'>;

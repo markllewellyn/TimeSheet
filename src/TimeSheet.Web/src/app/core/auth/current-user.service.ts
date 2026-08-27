@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { MsalBroadcastService, MsalService } from '@azure/msal-angular';
 import { EventType } from '@azure/msal-browser';
 import { filter } from 'rxjs/operators';
@@ -19,6 +20,7 @@ export class CurrentUserService {
   private readonly broadcast = inject(MsalBroadcastService);
   private readonly localAuth = inject(LocalAuthService);
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
 
   private readonly meSignal = signal<Me | null>(null);
   readonly me = this.meSignal.asReadonly();
@@ -32,10 +34,15 @@ export class CurrentUserService {
 
   constructor() {
     // Read login success from the broadcast stream (not synchronously after loginRedirect() resolves) -
-    // idTokenClaims/account info can briefly come back undefined immediately after login otherwise.
+    // idTokenClaims/account info can briefly come back undefined immediately after login otherwise. Also
+    // navigates away from wherever the Entra redirect URI landed us (see msal.factories.ts -
+    // navigateToLoginRequestUrl: false) - mirrors LoginPage.signInLocally()'s post-login navigation.
     this.broadcast.msalSubject$
       .pipe(filter((msg) => msg.eventType === EventType.LOGIN_SUCCESS))
-      .subscribe(() => this.loadMe());
+      .subscribe(() => {
+        this.loadMe();
+        this.router.navigate(['/timesheet']);
+      });
 
     if (this.isSignedIn()) {
       this.loadMe();

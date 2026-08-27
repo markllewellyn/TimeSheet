@@ -1,64 +1,136 @@
-<div class="mx-auto max-w-2xl">
-  <h1 class="mb-6 text-xl font-semibold">{{ isEditMode ? 'Edit Client' : 'New Client' }}</h1>
+<div class="mx-auto max-w-3xl">
+  <h1 class="page-title mb-6">{{ isEditMode ? 'Edit Client' : 'New Client' }}</h1>
 
   @if (error(); as e) {
-    <div class="mb-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700">{{ e }}</div>
+    <div class="banner-error">{{ e }}</div>
   }
 
-  <div class="grid grid-cols-2 gap-4">
-    <label class="flex flex-col gap-1 text-sm">
-      Name
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="name()" (ngModelChange)="name.set($event)" />
+  <div class="card-padded grid grid-cols-2 gap-4">
+    <label class="field">
+      <span class="field-label">Name</span>
+      <input class="input" [ngModel]="name()" (ngModelChange)="name.set($event)" />
     </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Account Code
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="accountCode()" (ngModelChange)="accountCode.set($event)" />
-    </label>
-
-    <label class="flex flex-col gap-1 text-sm">
-      Billing Address
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingAddressLine1()" (ngModelChange)="billingAddressLine1.set($event)" />
-    </label>
-    <label class="flex flex-col gap-1 text-sm">
-      City
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingCity()" (ngModelChange)="billingCity.set($event)" />
+    <label class="field">
+      <span class="field-label">Account Code</span>
+      <input class="input" [ngModel]="accountCode()" (ngModelChange)="accountCode.set($event)" />
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      Postal Code
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="billingPostalCode()" (ngModelChange)="billingPostalCode.set($event)" />
+    <label class="field">
+      <span class="field-label">Start Date</span>
+      <input type="date" class="input" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
     </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Country Code
-      <input maxlength="2" class="rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="billingCountryCode()" (ngModelChange)="billingCountryCode.set($event)" />
-    </label>
-
-    <label class="flex flex-col gap-1 text-sm">
-      Primary Contact Name
-      <input class="rounded border border-border bg-card px-3 py-2" [ngModel]="primaryContactName()" (ngModelChange)="primaryContactName.set($event)" />
-    </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Primary Contact Email
-      <input type="email" class="rounded border border-border bg-card px-3 py-2" [ngModel]="primaryContactEmail()" (ngModelChange)="primaryContactEmail.set($event)" />
+    <label class="field">
+      <span class="field-label">Reporting Currency</span>
+      <select class="input" [ngModel]="currencyId()" (ngModelChange)="currencyId.set($event)">
+        <option [ngValue]="null">(default GBP)</option>
+        @for (c of currencies(); track c.id) {
+          <option [ngValue]="c.id">{{ c.currencyCode }} - {{ c.currencyName }}</option>
+        }
+      </select>
     </label>
 
-    <label class="flex flex-col gap-1 text-sm">
-      Reporting Currency
-      <input maxlength="3" class="rounded border border-border bg-card px-3 py-2 uppercase" [ngModel]="reportingCurrencyCode()" (ngModelChange)="reportingCurrencyCode.set($event)" />
+    <label class="field">
+      <span class="field-label">Billing Address</span>
+      <input class="input" [ngModel]="billingAddressLine1()" (ngModelChange)="billingAddressLine1.set($event)" />
     </label>
-    <label class="flex flex-col gap-1 text-sm">
-      Invoicing Month-End Day
-      <input type="number" min="1" max="31" class="rounded border border-border bg-card px-3 py-2" [ngModel]="invoicingMonthEndDay()" (ngModelChange)="invoicingMonthEndDay.set($event)" />
+    <label class="field">
+      <span class="field-label">City</span>
+      <input class="input" [ngModel]="billingCity()" (ngModelChange)="billingCity.set($event)" />
     </label>
 
-    <label class="col-span-2 flex flex-col gap-1 text-sm">
-      Notes
-      <textarea class="rounded border border-border bg-card px-3 py-2" rows="3" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
+    <label class="field">
+      <span class="field-label">Postal Code</span>
+      <input class="input" [ngModel]="billingPostalCode()" (ngModelChange)="billingPostalCode.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">Country Code</span>
+      <input maxlength="2" class="input uppercase" [ngModel]="billingCountryCode()" (ngModelChange)="billingCountryCode.set($event)" />
+    </label>
+
+    <label class="field">
+      <span class="field-label">Primary Contact Name</span>
+      <input class="input" [ngModel]="primaryContactName()" (ngModelChange)="primaryContactName.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">Primary Contact Email</span>
+      <input type="email" class="input" [ngModel]="primaryContactEmail()" (ngModelChange)="primaryContactEmail.set($event)" />
+    </label>
+
+    <label class="field">
+      <span class="field-label">Invoicing Month-End Day</span>
+      <input type="number" min="1" max="31" class="input" [ngModel]="invoicingMonthEndDay()" (ngModelChange)="invoicingMonthEndDay.set($event)" />
+    </label>
+
+    <label class="field col-span-2">
+      <span class="field-label">Notes</span>
+      <textarea class="input" rows="3" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>
     </label>
   </div>
 
   <div class="mt-6 flex gap-3">
-    <button class="rounded bg-primary px-4 py-2 text-sm text-primary-foreground" (click)="save()">Save</button>
-    <button class="rounded border border-border px-4 py-2 text-sm" (click)="cancel()">Cancel</button>
+    <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+    <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
   </div>
+
+  @if (isEditMode) {
+    <div class="mt-10">
+      <h2 class="mb-3 text-lg font-semibold tracking-tight">Rate Overrides</h2>
+      <p class="mb-3 text-xs text-muted-foreground">
+        Person-specific billing rates for this client, overriding their role's default rate. Every rate ever
+        added is effective-dated and kept - "adding" a new rate never edits or replaces an old one, it just
+        takes over from its effective date onward. A staff member needs either a rate here or a role with a
+        default rate before they can be assigned to one of this client's projects.
+      </p>
+
+      @if (rateCardError(); as e) {
+        <div class="banner-error mb-3">{{ e }}</div>
+      }
+
+      <div class="card overflow-hidden px-4">
+        <table class="table-clean">
+          <thead>
+            <tr>
+              <th>Staff</th>
+              <th>Rate</th>
+              <th>Effective From</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of rateCards(); track c.id) {
+              <tr>
+                <td>{{ c.staffName }}</td>
+                <td>{{ c.rate }}</td>
+                <td class="text-muted-foreground">{{ c.effectiveFrom | date: 'mediumDate' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="3" class="text-center text-sm text-muted-foreground">No rate overrides yet - everyone bills at their role's default rate.</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card-padded mt-2 grid grid-cols-4 gap-3">
+        <label class="field">
+          <span class="field-label">Staff Member</span>
+          <select class="input" [ngModel]="newRateStaffId()" (ngModelChange)="newRateStaffId.set($event)">
+            <option [ngValue]="null" disabled>Select a staff member</option>
+            @for (s of staff(); track s.id) {
+              <option [ngValue]="s.id">{{ s.displayName }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">Rate</span>
+          <input type="number" min="0" step="0.01" class="input" [ngModel]="newRateAmount()" (ngModelChange)="newRateAmount.set($event)" />
+        </label>
+        <label class="field">
+          <span class="field-label">Effective From</span>
+          <input type="date" class="input" [ngModel]="newRateEffectiveFrom()" (ngModelChange)="newRateEffectiveFrom.set($event)" />
+        </label>
+        <button class="btn-secondary mt-6 h-fit" [disabled]="rateCardSaving()" (click)="addRateCard()">{{ rateCardSaving() ? 'Saving…' : 'Add Rate' }}</button>
+      </div>
+    </div>
+  }
 </div>

@@ -20,6 +20,7 @@ export interface Invoice {
   periodStart: string;
   periodEnd: string;
   reportingCurrency: string;
+  exchangeRate: number | null;
   status: 'Draft' | 'Finalized';
   invoiceNumber: string | null;
   totalAmount: number;
@@ -37,8 +38,12 @@ export class InvoicesService {
     return this.http.get<Invoice[]>(`${this.baseUrl}/clients/${clientId}/invoices`);
   }
 
-  generateDraft(clientId: number, periodStart: string, periodEnd: string): Observable<Invoice> {
-    return this.http.post<Invoice>(`${this.baseUrl}/clients/${clientId}/invoices/draft`, { periodStart, periodEnd });
+  generateDraft(clientId: number, periodStart: string, periodEnd: string, manualExchangeRate?: number): Observable<Invoice> {
+    return this.http.post<Invoice>(`${this.baseUrl}/clients/${clientId}/invoices/draft`, {
+      periodStart,
+      periodEnd,
+      manualExchangeRate: manualExchangeRate ?? null,
+    });
   }
 
   finalize(invoiceId: number, invoiceNumber: string): Observable<Invoice> {
