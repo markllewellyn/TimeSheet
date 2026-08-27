@@ -88,6 +88,10 @@ export class AddEntryPage {
       this.error.set('The date cannot be in the future.');
       return;
     }
+    if (this.workHours() < 0 || this.outOfHoursHours() < 0) {
+      this.error.set('Hours cannot be negative.');
+      return;
+    }
     if (this.workHours() + this.outOfHoursHours() <= 0) {
       this.error.set('At least one of Work Hours or Out of Hours must be greater than zero.');
       return;

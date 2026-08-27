@@ -65,7 +65,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Include(e => e.User)
             .Include(e => e.Client)
             .Include(e => e.Project)
-            .Where(e => !e.ApprovedPayroll);
+            .Where(e => !e.ApprovedPayroll && (e.Status == TimesheetEntryStatus.Normal || e.Status == TimesheetEntryStatus.Approved));
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {

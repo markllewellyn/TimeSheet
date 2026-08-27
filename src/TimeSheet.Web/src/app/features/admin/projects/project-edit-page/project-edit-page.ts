@@ -44,7 +44,10 @@ export class ProjectEditPage {
         this.code.set(p.code);
         this.description.set(p.description ?? '');
         this.paymentModel.set(p.paymentModel);
-        this.canInvoice.set(p.canInvoice ?? true);
+        // Null and false both mean "not invoiceable" everywhere else this field is read (the Contract-expense
+        // picker/gate use `canInvoice !== true`) - defaulting an ambiguous null to true here would silently
+        // flip a project's invoicing eligibility as a side effect of an unrelated edit.
+        this.canInvoice.set(p.canInvoice ?? false);
         this.currencyOverride.set(p.currencyOverride ?? '');
         this.startDate.set(p.startDate);
         this.endDate.set(p.endDate ?? '');

@@ -39,6 +39,11 @@ public class TimesheetApprovalFunctions(
         var body = await req.ReadFromJsonAsync<ApproveEntriesRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        if (body.EntryIds is null or { Length: 0 })
+        {
+            return new BadRequestObjectResult(new { error = "At least one entry must be selected." });
+        }
+
         if (string.IsNullOrWhiteSpace(body.PostingBatch))
         {
             return new BadRequestObjectResult(new { error = "A posting batch is required." });
@@ -48,6 +53,7 @@ public class TimesheetApprovalFunctions(
         var now = DateTimeOffset.UtcNow;
         var toApprove = await entries.GetByIdsAsync(body.EntryIds, ct);
 
+        var approved = 0;
         foreach (var entry in toApprove.Where(e => !e.ApprovedPayroll))
         {
             entry.ApprovedPayroll = true;
@@ -56,10 +62,11 @@ public class TimesheetApprovalFunctions(
             entry.DateApprovedPayroll = now;
             entry.PostingBatch = body.PostingBatch;
             entries.Update(entry);
+            approved++;
         }
 
         await uow.SaveChangesAsync(ct);
-        return new OkObjectResult(new { approved = toApprove.Count });
+        return new OkObjectResult(new { approved });
     }
 
     [Function("Approvals_ReadyForPayroll")]
@@ -81,10 +88,16 @@ public class TimesheetApprovalFunctions(
         var body = await req.ReadFromJsonAsync<SendToPayrollRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        if (body.EntryIds is null or { Length: 0 })
+        {
+            return new BadRequestObjectResult(new { error = "At least one entry must be selected." });
+        }
+
         var admin = currentUser.RequireUser();
         var now = DateTimeOffset.UtcNow;
         var toSend = await entries.GetByIdsAsync(body.EntryIds, ct);
 
+        var sent = 0;
         foreach (var entry in toSend.Where(e => e.ApprovedPayroll && !e.SentToPayroll))
         {
             entry.SentToPayroll = true;
@@ -92,10 +105,11 @@ public class TimesheetApprovalFunctions(
             entry.SentByName = admin.DisplayName;
             entry.DateSentToPayroll = now;
             entries.Update(entry);
+            sent++;
         }
 
         await uow.SaveChangesAsync(ct);
-        return new OkObjectResult(new { sent = toSend.Count });
+        return new OkObjectResult(new { sent });
     }
 
     private static ApprovalEntryDto ToDto(Domain.Entities.TimesheetEntry e) => new(

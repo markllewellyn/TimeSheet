@@ -94,8 +94,13 @@ public class ExpenseEntriesFunctions(
         var body = await req.ReadFromJsonAsync<UpdateExpenseEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
-        var validation = await ValidateAssignmentAsync(user.UserId, entry.ProjectId, body.Date, ct);
-        if (validation is not null) return validation;
+        // Mirrors Create's kind-based gate: a Contract entry was never subject to the assignment check to
+        // begin with, so editing one must not suddenly require it either.
+        if (entry.Kind != ExpenseEntryKind.Contract)
+        {
+            var validation = await ValidateAssignmentAsync(user.UserId, entry.ProjectId, body.Date, ct);
+            if (validation is not null) return validation;
+        }
 
         entry.Date = body.Date;
         entry.Amount = body.Amount;

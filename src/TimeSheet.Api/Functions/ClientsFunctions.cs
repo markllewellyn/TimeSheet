@@ -12,7 +12,8 @@ namespace TimeSheet.Api.Functions;
 
 /// <summary>Clients are business/billing entities (addresses, account managers, reporting currency) - all
 /// endpoints are Admin-only per the plan's authorization invariants.</summary>
-public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurrentUserAccessor currentUser, ILogger<ClientsFunctions> logger)
+public class ClientsFunctions(
+    IClientRepository clients, ICurrencyRepository currencies, IUnitOfWork uow, ICurrentUserAccessor currentUser, ILogger<ClientsFunctions> logger)
 {
     [Function("Clients_List")]
     public async Task<IActionResult> List(
@@ -43,6 +44,9 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
 
         var body = await req.ReadFromJsonAsync<UpsertClientRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
+
+        var bodyError = await ValidateBodyAsync(body, ct);
+        if (bodyError is not null) return bodyError;
 
         if (await clients.AccountCodeExistsAsync(body.AccountCode, null, ct))
         {
@@ -91,6 +95,9 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
         var body = await req.ReadFromJsonAsync<UpsertClientRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        var bodyError = await ValidateBodyAsync(body, ct);
+        if (bodyError is not null) return bodyError;
+
         if (body.AccountCode != client.AccountCode && await clients.AccountCodeExistsAsync(body.AccountCode, id, ct))
         {
             return new ConflictObjectResult(new { error = $"Account code '{body.AccountCode}' is already in use." });
@@ -137,6 +144,34 @@ public class ClientsFunctions(IClientRepository clients, IUnitOfWork uow, ICurre
         clients.Update(client);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
+    }
+
+    /// <summary>Client.Name/AccountCode are backed by legacy fixed-width columns (40/50 chars - see
+    /// ClientConfiguration) that would otherwise surface as a raw DB truncation error; CurrencyId, if supplied,
+    /// must reference a real Currency row rather than silently creating a dangling FK.</summary>
+    private async Task<IActionResult?> ValidateBodyAsync(UpsertClientRequest body, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(body.Name))
+        {
+            return new BadRequestObjectResult(new { error = "Name is required." });
+        }
+        if (body.Name.Length > 40)
+        {
+            return new BadRequestObjectResult(new { error = "Name cannot exceed 40 characters." });
+        }
+        if (string.IsNullOrWhiteSpace(body.AccountCode))
+        {
+            return new BadRequestObjectResult(new { error = "Account code is required." });
+        }
+        if (body.AccountCode.Length > 50)
+        {
+            return new BadRequestObjectResult(new { error = "Account code cannot exceed 50 characters." });
+        }
+        if (body.CurrencyId is { } currencyId && await currencies.GetByIdAsync(currencyId, ct) is null)
+        {
+            return new BadRequestObjectResult(new { error = "Invalid currency." });
+        }
+        return null;
     }
 
     private static ClientDto ToDto(Client c) => new(

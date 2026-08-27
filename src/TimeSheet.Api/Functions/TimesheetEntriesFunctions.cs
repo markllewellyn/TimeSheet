@@ -116,10 +116,18 @@ public class TimesheetEntriesFunctions(
             CreatedUtc = DateTimeOffset.UtcNow,
         };
 
-        // Admin-only fast-track (mirrors the legacy app's Add-screen "Sent to Payroll" checkbox) - creates the
-        // entry already approved and sent, bypassing the normal Approvals queue in one step.
-        if (body.AdminSendToPayroll == true && user.IsAdmin)
+        // Budget check is synchronous, gating the save itself - going over budget is an explicit admin
+        // decision, never a silent event (see IBudgetMonitoringService/IEscalationService). Must run before
+        // the fast-track below, so an entry that needs escalation can never be waved straight into payroll.
+        var budgetCheck = await budgetMonitoring.EvaluateAsync(entry, ct);
+        if (budgetCheck.RequiresEscalation)
         {
+            entry.Status = TimesheetEntryStatus.PendingApproval;
+        }
+        else if (body.AdminSendToPayroll == true && user.IsAdmin)
+        {
+            // Admin-only fast-track (mirrors the legacy app's Add-screen "Sent to Payroll" checkbox) - creates
+            // the entry already approved and sent, bypassing the normal Approvals queue in one step.
             var now = DateTimeOffset.UtcNow;
             entry.ApprovedPayroll = true;
             entry.ApprovedByStaffId = user.UserId;
@@ -130,11 +138,6 @@ public class TimesheetEntriesFunctions(
             entry.SentByName = user.DisplayName;
             entry.DateSentToPayroll = now;
         }
-
-        // Budget check is synchronous, gating the save itself - going over budget is an explicit admin
-        // decision, never a silent event (see IBudgetMonitoringService/IEscalationService).
-        var budgetCheck = await budgetMonitoring.EvaluateAsync(entry, ct);
-        if (budgetCheck.RequiresEscalation) entry.Status = TimesheetEntryStatus.PendingApproval;
 
         await entries.AddAsync(entry, ct);
         await uow.SaveChangesAsync(ct);
@@ -162,7 +165,7 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
-        if (entry.SentToPayroll) return SentToPayrollLockedResult();
+        if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
 
         var body = await req.ReadFromJsonAsync<UpdateTimesheetEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
@@ -207,7 +210,7 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
-        if (entry.SentToPayroll) return SentToPayrollLockedResult();
+        if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
 
         entries.Remove(entry);
         await uow.SaveChangesAsync(ct);
@@ -222,7 +225,7 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var source = await entries.GetByIdAsync(id, ct);
         if (source is null || source.UserId != user.UserId) return new NotFoundResult();
-        if (source.SentToPayroll) return SentToPayrollLockedResult();
+        if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
 
         var body = await req.ReadFromJsonAsync<DuplicateTimesheetEntryRequest>(ct);
         var targetDate = body?.Date ?? source.Date;
@@ -302,6 +305,11 @@ public class TimesheetEntriesFunctions(
             return new BadRequestObjectResult(new { error = $"The date cannot be before this client's start date ({client.StartDate:yyyy-MM-dd})." });
         }
 
+        if (workHours < 0 || outOfHoursHours < 0)
+        {
+            return new BadRequestObjectResult(new { error = "Hours cannot be negative." });
+        }
+
         if (workHours + outOfHoursHours <= 0)
         {
             return new BadRequestObjectResult(new { error = "At least one of Work Hours or Out of Hours must be greater than zero." });
@@ -368,10 +376,11 @@ public class TimesheetEntriesFunctions(
         return new TimesheetEntrySummaryDto(mostRecentDayHours, totalWork, totalOutOfHours, totalWork + totalOutOfHours);
     }
 
-    /// <summary>Once an entry has been sent to payroll it's immutable - matches the legacy app's Edit/Delete/
-    /// Copy icons being hidden once SentToPayroll, enforced here rather than only in the UI.</summary>
+    /// <summary>Once an entry has been approved for payroll (or sent) it's immutable - matches the legacy app's
+    /// Edit/Delete/Copy icons being hidden once approved, enforced here rather than only in the UI. Editing or
+    /// deleting an approved-but-not-yet-sent entry would silently invalidate the approval it already has.</summary>
     private static IActionResult SentToPayrollLockedResult() =>
-        new ObjectResult(new { error = "This entry has already been sent to payroll and can no longer be changed." })
+        new ObjectResult(new { error = "This entry has already been approved for payroll and can no longer be changed." })
         {
             StatusCode = StatusCodes.Status409Conflict,
         };

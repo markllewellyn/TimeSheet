@@ -6,6 +6,7 @@ import { EventType } from '@azure/msal-browser';
 import { filter } from 'rxjs/operators';
 import { environment } from '../../../environments/environment';
 import { Me } from '../models/user.models';
+import { ImpersonationService } from '../services/impersonation.service';
 import { LocalAuthService } from './local-auth.service';
 
 /**
@@ -21,6 +22,7 @@ export class CurrentUserService {
   private readonly localAuth = inject(LocalAuthService);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly impersonation = inject(ImpersonationService);
 
   private readonly meSignal = signal<Me | null>(null);
   readonly me = this.meSignal.asReadonly();
@@ -54,6 +56,7 @@ export class CurrentUserService {
   }
 
   logout(): void {
+    this.impersonation.stop();
     if (this.localAuth.isSignedIn()) {
       this.localAuth.logout();
       this.meSignal.set(null);
