@@ -6,6 +6,15 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
 
 ## Done this session (commits, newest first)
 
+- `a41eacb` — Tenant-wide Entra directory search: `GraphAdminUserService.SearchTenantUsersAsync`
+  (Graph `$search` on displayName/mail) exposed via `AdminUsers_SearchTenantDirectory`, wired into
+  the Staff screen's SSO invite flow so an admin can find a tenant member by name/email instead of
+  typing a raw Entra Object Id blind. **Needs a new `User.Read.All` Graph application permission
+  consented on the `GraphAdmin` app registration in the real tenant before it returns real
+  results** — confirmed with you as a follow-up outside this session; the code path is otherwise
+  complete and will surface a clean error until then. "Enable/disable" was scoped, confirmed with
+  you, to remain app-level `IsActive` access control only — this never calls Graph to modify the
+  person's actual Entra/Microsoft 365 account.
 - `bf54538` — Consolidated Staff screen: search/admin/active/role/project filters on the Users
   ("Staff") page; a "assignments across all projects" panel per staff member (new
   `ProjectAssignments_ListByUser`) showing a resolved-rate-and-source preview per assignment via
@@ -22,7 +31,10 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
 
 Prior session's commits (`80e86fe` and earlier) are unchanged — see git log.
 
-All committed to `master`. Backend builds clean, 11/11 tests pass. Angular builds clean (`node node_modules/@angular/cli/bin/ng.js build` — `ng`/`npx tsc` aren't directly runnable in this environment, `node_modules/typescript` has no `bin/` folder for some reason; the Angular CLI's own bundler works fine and was used for every build check this session).
+All committed to `master`. Backend builds clean, 11/11 tests pass (unchanged this pass — the new
+Graph search method has no unit test since it's a thin wrapper over a live external call with no
+local fake/emulator equivalent to test against, consistent with `GraphEmailSender`/
+`ForcePasswordResetAsync` also being untested). Angular builds clean (`node node_modules/@angular/cli/bin/ng.js build` — `ng`/`npx tsc` aren't directly runnable in this environment, `node_modules/typescript` has no `bin/` folder for some reason; the Angular CLI's own bundler works fine and was used for every build check this session).
 
 Local dev servers were left running this session: API on `http://localhost:7071` (`func start`
 from `src/TimeSheet.Api`), Angular on `http://localhost:3000` (`npm start` from
@@ -57,11 +69,10 @@ three local demo Users at password `Demo123!` each: `sarah.chen@svgit.co.uk`,
 
 In rough priority order:
 
-1. **Tenant-wide account browsing** — admin can enable/disable any account within the SVG IT tenancy, not just app-provisioned users.
-2. **Notification settings/thresholds** — FDD specifies 50%/75% project consumption thresholds, configurable in settings (currently hardcoded via `Project.BudgetAlertThresholdPercent` only).
-3. **Export presets/filters** — CSV export by client/project/PM, all-or-specific users, last-7-days/last-calendar-month/custom-range presets.
-4. **Billing/payroll timers** — timer-triggered Functions for monthly recurring billing/roll-forward and out-of-hours payroll aggregation (some of this may already partly exist via `TimesheetReminderFunction`/`NightlyProjectHealthAssessment` — needs checking against the FDD's exact spec). Note: FDD also says "Out of hours work must be approved by project managers or administrators" — the existing `ApprovedPayroll`/`ApprovedByStaffId` fields on `TimesheetEntry` are still Admin-only-implied (not wired to `RequireAdminOrProjectManager` this session) - worth revisiting alongside this item.
-5. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in dev/prod before this is planned.
+1. **Notification settings/thresholds** — FDD specifies 50%/75% project consumption thresholds, configurable in settings (currently hardcoded via `Project.BudgetAlertThresholdPercent` only).
+2. **Export presets/filters** — CSV export by client/project/PM, all-or-specific users, last-7-days/last-calendar-month/custom-range presets.
+3. **Billing/payroll timers** — timer-triggered Functions for monthly recurring billing/roll-forward and out-of-hours payroll aggregation (some of this may already partly exist via `TimesheetReminderFunction`/`NightlyProjectHealthAssessment` — needs checking against the FDD's exact spec). Note: FDD also says "Out of hours work must be approved by project managers or administrators" — the existing `ApprovedPayroll`/`ApprovedByStaffId` fields on `TimesheetEntry` are still Admin-only-implied (not wired to `RequireAdminOrProjectManager` this session) - worth revisiting alongside this item.
+4. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in dev/prod before this is planned.
 
 ## Known loose ends / flags already raised, not yet actioned
 
@@ -71,6 +82,8 @@ In rough priority order:
 - No projects have `EntryType` rows yet (brand new this session) — the "Entry Type" picker on the Add Entry page only appears once an admin adds at least one via a project's new "Entry Types" page.
 - No projects have `ProjectManagerUserId` set yet — the new PM-only surfaces (My Invoices, EntryFlags scoping, EstimatedCost visibility) will show nothing/403 until an admin nominates a PM on each project's edit page.
 - The local dev API host logs repeated `NightlyProjectHealthAssessment`/`DailyTimesheetReminder` timer-function storage-connection warnings on startup (`AzureWebJobsStorage=UseDevelopmentStorage=true` with no Azurite/storage emulator actually running). Pre-existing, harmless to HTTP endpoints, not investigated or fixed this session.
+- Tenant directory search (`AdminUsers_SearchTenantDirectory`) will 500/error until `User.Read.All` is Entra-admin-consented on the `GraphAdmin` app registration — see `GraphClientFactory.cs`'s doc comment for the full list of permissions that registration now needs (`User-PasswordProfile.ReadWrite.All`, `Mail.Send`, `User.Read.All`).
+- Noticed in passing, not touched: `AdminUsersFunctions.ResetPassword` only logs password resets via `ILogger`, not the `AuditLog`/`IAuditLogService` this session's earlier work (and last session's `80e86fe`) added — its own doc comment still says "A dedicated AuditLog table would be a natural future enhancement," which is no longer true, it just hasn't been wired up here yet.
 
 ## How to resume
 
