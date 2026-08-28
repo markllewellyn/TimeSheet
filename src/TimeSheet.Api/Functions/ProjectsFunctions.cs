@@ -34,6 +34,18 @@ public class ProjectsFunctions(
                 l.HourlyCost, l.CustomerRate, l.EstimatedCost, l.EstimatedRevenue, l.EstimatedProfit, l.Warning)).ToList()));
     }
 
+    /// <summary>Flat, all-clients list of every active project - used by the Staff screen's project
+    /// filter/picker so it doesn't need to replicate a per-client fan-out client-side.</summary>
+    [Function("Projects_ListAll")]
+    public async Task<IActionResult> ListAll(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects")] HttpRequest req, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var result = await projects.GetAllActiveAsync(ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "")));
+    }
+
     [Function("Projects_ListByClient")]
     public async Task<IActionResult> ListByClient(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "clients/{clientId:int}/projects")] HttpRequest req, int clientId, CancellationToken ct)

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
 using TimeSheet.Contracts;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
@@ -27,6 +28,35 @@ public class ProjectAssignmentsFunctions(
         var activeOnly = req.Query["activeOnly"] != "false";
         var result = await assignments.GetByProjectIdAsync(projectId, activeOnly, ct);
         return new OkObjectResult(result.Select(ToDto));
+    }
+
+    /// <summary>A staff member's assignments across ALL their projects, with a resolved-rate preview per row -
+    /// FDD's Staff screen ("the rate that will be applied on each project they are assigned to and whether
+    /// that rate comes from their role or from an override"). Contrast with ListByProject above, which is
+    /// scoped to one project's assignees.</summary>
+    [Function("ProjectAssignments_ListByUser")]
+    public async Task<IActionResult> ListByUser(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "users/{userId:int}/assignments")] HttpRequest req, int userId, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
+        var result = await assignments.GetByUserIdAsync(userId, activeOnly: false, ct);
+
+        var dtos = new List<StaffAssignmentDto>();
+        foreach (var a in result)
+        {
+            try
+            {
+                var resolution = await rateResolver.ResolveAsync(userId, a.Project!.ClientId, a.ProjectId, today, ct);
+                dtos.Add(ToStaffAssignmentDto(a, resolution.CustomerRate, ToRateSourceLabel(resolution.Tier), null));
+            }
+            catch (RateNotConfiguredException ex)
+            {
+                dtos.Add(ToStaffAssignmentDto(a, null, null, ex.Message));
+            }
+        }
+        return new OkObjectResult(dtos);
     }
 
     [Function("ProjectAssignments_Create")]
@@ -138,6 +168,24 @@ public class ProjectAssignmentsFunctions(
     private static ProjectAssignmentDto ToDto(StaffProject a) => new(
         a.Id, a.ProjectId, a.Project?.Name ?? "", a.StaffId, a.Staff?.DisplayName ?? "",
         a.IsActive ? "Active" : "Ended", a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes);
+
+    private static StaffAssignmentDto ToStaffAssignmentDto(StaffProject a, decimal? customerRate, string? rateSource, string? rateWarning) => new(
+        a.Id, a.ProjectId, a.Project?.Name ?? "", a.Project?.Client?.Name ?? "",
+        a.IsActive ? "Active" : "Ended", a.StartDate, a.EndDate, a.AllocatedHoursPerWeek, a.Notes,
+        customerRate, rateSource, rateWarning);
+
+    /// <summary>Presentation-only labels for RateCardTier - "whether that rate comes from their role or from
+    /// an override" (FDD). Kept here rather than on the enum itself so the domain layer stays free of display
+    /// concerns.</summary>
+    private static string ToRateSourceLabel(RateCardTier tier) => tier switch
+    {
+        RateCardTier.PersonProject => "Person override (this project)",
+        RateCardTier.PersonClient => "Person override (this client)",
+        RateCardTier.RoleProject => "Role override (this project)",
+        RateCardTier.RoleClient => "Role override (this client)",
+        RateCardTier.RoleDefault => "Role default",
+        _ => tier.ToString(),
+    };
 
     private static ProjectAssignmentDto ToDtoWith(StaffProject a, Project project, User user) => new(
         a.Id, a.ProjectId, project.Name, user.Id, user.DisplayName,

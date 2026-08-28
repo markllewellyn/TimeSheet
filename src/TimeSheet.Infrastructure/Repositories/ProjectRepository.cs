@@ -26,7 +26,7 @@ public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<Project>> GetAllActiveAsync(CancellationToken ct) =>
-        await db.Projects.Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync(ct);
+        await db.Projects.Include(p => p.Client).Where(p => p.IsActive).OrderBy(p => p.Name).ToListAsync(ct);
 
     public async Task<IReadOnlyList<Project>> GetManagedByUserAsync(int userId, CancellationToken ct) =>
         await db.Projects.Include(p => p.Client).Where(p => p.ProjectManagerUserId == userId).OrderBy(p => p.Name).ToListAsync(ct);

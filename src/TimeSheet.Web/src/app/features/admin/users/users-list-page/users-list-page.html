@@ -1,6 +1,6 @@
 <div class="flex flex-col gap-4">
   <div class="page-header">
-    <h1 class="page-title">Users</h1>
+    <h1 class="page-title">Staff</h1>
     <button class="btn-primary" (click)="showInviteForm.set(!showInviteForm())">
       + Invite User
     </button>
@@ -79,6 +79,39 @@
     </div>
   }
 
+  <div class="card-padded flex flex-wrap items-end gap-3">
+    <label class="field">
+      <span class="field-label">Search</span>
+      <input class="input" placeholder="Name or email" [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+    </label>
+    <label class="field">
+      <span class="field-label">Role</span>
+      <select class="input" [ngModel]="roleFilter()" (ngModelChange)="roleFilter.set($event)">
+        <option [ngValue]="null">(all roles)</option>
+        @for (r of roles(); track r.id) {
+          <option [ngValue]="r.id">{{ r.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">Project</span>
+      <select class="input" [ngModel]="projectFilter()" (ngModelChange)="onProjectFilterChange($event)">
+        <option [ngValue]="null">(all projects)</option>
+        @for (p of allProjects(); track p.id) {
+          <option [ngValue]="p.id">{{ p.name }} ({{ p.clientName }})</option>
+        }
+      </select>
+    </label>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" [ngModel]="adminsOnly()" (ngModelChange)="adminsOnly.set($event)" />
+      Admins only
+    </label>
+    <label class="flex items-center gap-2 text-sm">
+      <input type="checkbox" [ngModel]="activeOnly()" (ngModelChange)="activeOnly.set($event)" />
+      Active only
+    </label>
+  </div>
+
   <div class="card overflow-hidden px-4">
     <table class="table-clean">
       <thead>
@@ -94,7 +127,7 @@
         </tr>
       </thead>
       <tbody>
-        @for (u of users(); track u.id) {
+        @for (u of filteredUsers(); track u.id) {
           <tr>
             <td class="font-medium text-foreground">{{ u.displayName }}</td>
             <td class="text-muted-foreground">{{ u.email }}</td>
@@ -104,7 +137,14 @@
             <td>
               <span [class]="u.role === 'Admin' ? 'badge-success' : 'badge-neutral'">{{ u.role }}</span>
             </td>
-            <td class="text-muted-foreground">{{ u.jobRoleName ?? '-' }}</td>
+            <td>
+              <select class="input w-40" [ngModel]="u.jobRoleId" (ngModelChange)="updateJobRole(u, $event)">
+                <option [ngValue]="null">(none)</option>
+                @for (r of roles(); track r.id) {
+                  <option [ngValue]="r.id">{{ r.name }}</option>
+                }
+              </select>
+            </td>
             <td>
               <span [class]="u.isActive ? 'badge-success' : 'badge-danger'">{{ u.isActive ? 'Active' : 'Inactive' }}</span>
             </td>
@@ -121,31 +161,121 @@
                 <button class="btn-link text-muted-foreground" [disabled]="editSaving()" (click)="cancelEditPayroll()">Cancel</button>
               } @else {
                 <button class="btn-link mr-3" (click)="startEditPayroll(u)">Edit Payroll #</button>
-                <button class="btn-link mr-3" (click)="startAddCost(u)">Add Cost</button>
+                <button class="btn-link mr-3" (click)="toggleExpanded(u)">{{ expandedUserId() === u.id ? 'Hide Details' : 'Manage' }}</button>
                 <button class="btn-link mr-3" (click)="toggleRole(u)">Make {{ u.role === 'Admin' ? 'User' : 'Admin' }}</button>
                 <button class="btn-link mr-3" (click)="toggleActive(u)">{{ u.isActive ? 'Deactivate' : 'Reactivate' }}</button>
                 <button class="btn-link" (click)="resetPassword(u)">Reset Password</button>
               }
             </td>
           </tr>
-          @if (addingCostUserId() === u.id) {
+          @if (expandedUserId() === u.id) {
             <tr>
-              <td colspan="8" class="bg-[var(--muted)]/40 px-4 py-3">
-                <div class="flex flex-wrap items-end gap-3">
-                  <label class="field">
-                    <span class="field-label">Hourly Cost</span>
-                    <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="newCostHourlyCost()" (ngModelChange)="newCostHourlyCost.set($event)" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Out of Hours Cost</span>
-                    <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="newCostOutOfHoursCost()" (ngModelChange)="newCostOutOfHoursCost.set($event)" />
-                  </label>
-                  <label class="field">
-                    <span class="field-label">Effective From</span>
-                    <input type="date" class="input" [ngModel]="newCostEffectiveFrom()" (ngModelChange)="newCostEffectiveFrom.set($event)" />
-                  </label>
-                  <button class="btn-primary" [disabled]="costSaving()" (click)="saveAddCost(u)">{{ costSaving() ? 'Saving…' : 'Save' }}</button>
-                  <button class="btn-secondary" [disabled]="costSaving()" (click)="cancelAddCost()">Cancel</button>
+              <td colspan="8" class="bg-[var(--muted)]/40 px-4 py-4">
+                <div class="grid grid-cols-2 gap-6">
+                  <div>
+                    <h3 class="mb-2 text-sm font-semibold text-foreground">Cost History</h3>
+                    <table class="table-clean mb-3">
+                      <thead>
+                        <tr>
+                          <th>Hourly Cost</th>
+                          <th>Out of Hours Cost</th>
+                          <th>Effective From</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (c of costsByUser().get(u.id) ?? []; track c.id) {
+                          <tr>
+                            <td>{{ c.hourlyCost | number: '1.2-2' }}</td>
+                            <td>{{ c.outOfHoursCost | number: '1.2-2' }}</td>
+                            <td class="text-muted-foreground">{{ c.effectiveFrom }}</td>
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td colspan="3" class="text-center text-sm text-muted-foreground">No cost set yet.</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                    <div class="flex flex-wrap items-end gap-2">
+                      <label class="field">
+                        <span class="field-label">Hourly Cost</span>
+                        <input type="number" min="0" step="0.01" class="input w-28" [ngModel]="newCostHourlyCost()" (ngModelChange)="newCostHourlyCost.set($event)" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Out of Hours Cost</span>
+                        <input type="number" min="0" step="0.01" class="input w-28" [ngModel]="newCostOutOfHoursCost()" (ngModelChange)="newCostOutOfHoursCost.set($event)" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Effective From</span>
+                        <input type="date" class="input" [ngModel]="newCostEffectiveFrom()" (ngModelChange)="newCostEffectiveFrom.set($event)" />
+                      </label>
+                      <button class="btn-primary" [disabled]="costSaving()" (click)="saveAddCost(u)">{{ costSaving() ? 'Saving…' : 'Add Cost' }}</button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 class="mb-2 text-sm font-semibold text-foreground">Project Assignments</h3>
+                    <table class="table-clean mb-3">
+                      <thead>
+                        <tr>
+                          <th>Project</th>
+                          <th>Status</th>
+                          <th>Rate</th>
+                          <th></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (a of assignmentsByUser().get(u.id) ?? []; track a.id) {
+                          <tr>
+                            <td>
+                              <div class="font-medium text-foreground">{{ a.projectName }}</div>
+                              <div class="text-xs text-muted-foreground">{{ a.clientName }} · {{ a.startDate }}{{ a.endDate ? ' – ' + a.endDate : '' }}</div>
+                            </td>
+                            <td>
+                              <span [class]="a.status === 'Active' ? 'badge-success' : 'badge-neutral'">{{ a.status }}</span>
+                            </td>
+                            <td>
+                              @if (a.rateWarning) {
+                                <span class="text-xs text-[var(--destructive)]">{{ a.rateWarning }}</span>
+                              } @else {
+                                <div>{{ a.resolvedCustomerRate | number: '1.2-2' }}</div>
+                                <div class="text-xs text-muted-foreground">{{ a.rateSource }}</div>
+                              }
+                            </td>
+                            <td class="text-right">
+                              @if (a.status !== 'Ended') {
+                                <button class="btn-link text-[var(--destructive)]" (click)="endAssignment(u, a)">End</button>
+                              }
+                            </td>
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td colspan="4" class="text-center text-sm text-muted-foreground">Not assigned to any project yet.</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                    <div class="flex flex-wrap items-end gap-2">
+                      <label class="field">
+                        <span class="field-label">Project</span>
+                        <select class="input" [ngModel]="newAssignmentProjectId()" (ngModelChange)="newAssignmentProjectId.set($event)">
+                          <option [ngValue]="null" disabled>Select a project</option>
+                          @for (p of allProjects(); track p.id) {
+                            <option [ngValue]="p.id">{{ p.name }} ({{ p.clientName }})</option>
+                          }
+                        </select>
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Start Date</span>
+                        <input type="date" class="input" [ngModel]="newAssignmentStartDate()" (ngModelChange)="newAssignmentStartDate.set($event)" />
+                      </label>
+                      <label class="field">
+                        <span class="field-label">Allocated Hrs/Wk</span>
+                        <input type="number" min="0" step="0.5" class="input w-24" [ngModel]="newAssignmentAllocatedHoursPerWeek()" (ngModelChange)="newAssignmentAllocatedHoursPerWeek.set($event)" />
+                      </label>
+                      <button class="btn-primary" [disabled]="assignmentSaving()" (click)="saveAssignment(u)">{{ assignmentSaving() ? 'Assigning…' : 'Assign' }}</button>
+                    </div>
+                  </div>
                 </div>
               </td>
             </tr>

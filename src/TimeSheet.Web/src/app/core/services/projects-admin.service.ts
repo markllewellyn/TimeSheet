@@ -44,6 +44,10 @@ export class ProjectsAdminService {
     return this.http.get<Project[]>(`${this.baseUrl}/clients/${clientId}/projects`, { params: { includeInactive } });
   }
 
+  listAll(): Observable<Project[]> {
+    return this.http.get<Project[]>(`${this.baseUrl}/projects`);
+  }
+
   getById(id: number): Observable<Project> {
     return this.http.get<Project>(`${this.baseUrl}/projects/${id}`);
   }
