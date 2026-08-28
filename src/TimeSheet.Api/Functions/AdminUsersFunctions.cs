@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using TimeSheet.Api.Auth;
+using TimeSheet.Contracts;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 
@@ -38,5 +39,31 @@ public class AdminUsersFunctions(
             currentUser.RequireUser().UserId, targetUser.Id, targetUser.Email, targetUser.IsLocalAccount ? "local" : "SSO", DateTimeOffset.UtcNow);
 
         return new OkObjectResult(new { temporaryPassword });
+    }
+
+    /// <summary>FDD: "an administrator can enable or disable any account within the SVG IT tenancy" -
+    /// directory lookup so an admin can find a not-yet-invited tenant member instead of already knowing their
+    /// raw Entra Object Id. Read-only against Entra ID - see IAdminUserService.SearchTenantUsersAsync.</summary>
+    [Function("AdminUsers_SearchTenantDirectory")]
+    public async Task<IActionResult> SearchTenantDirectory(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "tenant-directory/search")] HttpRequest req, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var query = req.Query["q"].ToString();
+        if (query.Trim().Length < 2)
+        {
+            return new BadRequestObjectResult(new { error = "Enter at least 2 characters to search." });
+        }
+
+        var matches = await adminUserService.SearchTenantUsersAsync(query.Trim(), ct);
+
+        var dtos = new List<TenantDirectoryUserDto>();
+        foreach (var m in matches)
+        {
+            var existing = await users.GetByEntraObjectIdAsync(m.EntraObjectId, ct);
+            dtos.Add(new TenantDirectoryUserDto(m.EntraObjectId, m.DisplayName, m.Email, existing is not null, existing?.Id, existing?.IsActive));
+        }
+        return new OkObjectResult(dtos);
     }
 }

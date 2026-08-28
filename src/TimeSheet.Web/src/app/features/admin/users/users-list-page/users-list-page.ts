@@ -6,7 +6,7 @@ import { RolesService, Role } from '../../../../core/services/roles.service';
 import { StaffCostsService } from '../../../../core/services/staff-costs.service';
 import { AssignmentsService, StaffAssignment } from '../../../../core/services/assignments.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
-import { AppUser } from '../../../../core/models/user.models';
+import { AppUser, TenantDirectoryUser } from '../../../../core/models/user.models';
 import { StaffCost } from '../../../../core/models/staff-cost.models';
 import { Project } from '../../../../core/models/project.models';
 
@@ -60,6 +60,15 @@ export class UsersListPage {
   protected readonly error = signal<string | null>(null);
   protected readonly newTemporaryPassword = signal<string | null>(null);
 
+  // Entra directory lookup - FDD: "an administrator can enable or disable any account within the
+  // SVG IT tenancy." Search results only ever pre-fill entraObjectId/email/displayName above;
+  // Users_Invite itself is unchanged. Explicit search action (not live-as-you-type), matching this
+  // app's existing plain-signals style elsewhere.
+  protected readonly directorySearchQuery = signal('');
+  protected readonly directoryResults = signal<TenantDirectoryUser[]>([]);
+  protected readonly directorySearching = signal(false);
+  protected readonly directorySearched = signal(false);
+
   protected readonly editingPayrollUserId = signal<number | null>(null);
   protected readonly editPayrollNumber = signal('');
   protected readonly editSaving = signal(false);
@@ -102,6 +111,40 @@ export class UsersListPage {
     });
   }
 
+  protected searchDirectory(): void {
+    const query = this.directorySearchQuery().trim();
+    if (query.length < 2) {
+      this.error.set('Enter at least 2 characters to search.');
+      return;
+    }
+
+    this.directorySearching.set(true);
+    this.usersAdmin.searchTenantDirectory(query).subscribe({
+      next: (results) => {
+        this.directorySearching.set(false);
+        this.directorySearched.set(true);
+        this.error.set(null);
+        this.directoryResults.set(results);
+      },
+      error: (err) => {
+        this.directorySearching.set(false);
+        this.directorySearched.set(true);
+        this.directoryResults.set([]);
+        this.error.set(err?.error?.error ?? 'Could not search the tenant directory.');
+      },
+    });
+  }
+
+  protected selectDirectoryResult(result: TenantDirectoryUser): void {
+    if (result.isProvisioned) return;
+    this.entraObjectId.set(result.entraObjectId);
+    this.email.set(result.email ?? '');
+    this.displayName.set(result.displayName);
+    this.directoryResults.set([]);
+    this.directorySearchQuery.set('');
+    this.directorySearched.set(false);
+  }
+
   protected invite(): void {
     this.usersAdmin
       .invite({
@@ -120,6 +163,9 @@ export class UsersListPage {
           this.displayName.set('');
           this.jobRoleId.set(null);
           this.payrollNumber.set('');
+          this.directorySearchQuery.set('');
+          this.directoryResults.set([]);
+          this.directorySearched.set(false);
           this.error.set(null);
           this.newTemporaryPassword.set(result.temporaryPassword);
           this.refresh();

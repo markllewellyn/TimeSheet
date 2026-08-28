@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { AppUser } from '../models/user.models';
+import { AppUser, TenantDirectoryUser } from '../models/user.models';
 
 export interface InviteUserRequest {
   // Omit/leave blank for a local (username/password) account instead of an SSO account.
@@ -51,5 +51,11 @@ export class UsersAdminService {
   // reserves that for its own host API and silently drops user-defined routes that start with it.
   resetPassword(id: number): Observable<{ temporaryPassword: string }> {
     return this.http.post<{ temporaryPassword: string }>(`${this.baseUrl}/${id}/reset-password`, {});
+  }
+
+  // Entra directory lookup so an admin can find someone to invite without already knowing their raw Entra
+  // Object Id - see AdminUsers_SearchTenantDirectory. Requires at least 2 characters.
+  searchTenantDirectory(query: string): Observable<TenantDirectoryUser[]> {
+    return this.http.get<TenantDirectoryUser[]>(`${environment.apiBaseUrl}/tenant-directory/search`, { params: { q: query } });
   }
 }

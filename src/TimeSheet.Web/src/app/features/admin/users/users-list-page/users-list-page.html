@@ -30,11 +30,57 @@
         </label>
       </div>
 
+      @if (accountType() === 'sso') {
+        <div class="card-padded mb-4">
+          <label class="field mb-2">
+            <span class="field-label">Find in tenant directory</span>
+            <div class="flex gap-2">
+              <input
+                class="input"
+                placeholder="Search by name or email"
+                [ngModel]="directorySearchQuery()"
+                (ngModelChange)="directorySearchQuery.set($event)"
+                (keydown.enter)="searchDirectory()"
+              />
+              <button class="btn-secondary" [disabled]="directorySearching()" (click)="searchDirectory()">
+                {{ directorySearching() ? 'Searching…' : 'Search' }}
+              </button>
+            </div>
+          </label>
+
+          @if (directoryResults().length > 0) {
+            <div class="flex flex-col gap-1">
+              @for (r of directoryResults(); track r.entraObjectId) {
+                @if (r.isProvisioned) {
+                  <div class="flex items-center justify-between rounded-md bg-[var(--muted)]/40 px-3 py-2 text-sm">
+                    <span>{{ r.displayName }} <span class="text-muted-foreground">({{ r.email }})</span></span>
+                    <span class="flex items-center gap-2">
+                      <span [class]="r.appIsActive ? 'badge-success' : 'badge-danger'">{{ r.appIsActive ? 'Active' : 'Inactive' }}</span>
+                      <span class="text-xs text-muted-foreground">already added - manage below</span>
+                    </span>
+                  </div>
+                } @else {
+                  <button
+                    type="button"
+                    class="rounded-md px-3 py-2 text-left text-sm hover:bg-secondary"
+                    (click)="selectDirectoryResult(r)"
+                  >
+                    {{ r.displayName }} <span class="text-muted-foreground">({{ r.email }})</span>
+                  </button>
+                }
+              }
+            </div>
+          } @else if (directorySearched() && !directorySearching()) {
+            <p class="text-sm text-muted-foreground">No matches in the tenant directory.</p>
+          }
+        </div>
+      }
+
       <div class="grid grid-cols-2 gap-4">
         @if (accountType() === 'sso') {
           <label class="field">
             <span class="field-label">Entra Object Id</span>
-            <input class="input" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
+            <input class="input" placeholder="(fallback - pick a directory result above instead)" [ngModel]="entraObjectId()" (ngModelChange)="entraObjectId.set($event)" />
           </label>
         }
         <label class="field">

@@ -4,9 +4,12 @@ using Microsoft.Graph;
 
 namespace TimeSheet.Infrastructure.ExternalServices;
 
-/// <summary>Shared builder for the Graph-admin app registration's client - used by both GraphEmailSender
-/// (Mail.Send) and GraphAdminUserService (User-PasswordProfile.ReadWrite.All), the same client-credentials
-/// app registration serving both purposes (see the plan's Authentication section).</summary>
+/// <summary>Shared builder for the Graph-admin app registration's client - used by GraphEmailSender
+/// (Mail.Send), GraphAdminUserService.ForcePasswordResetAsync (User-PasswordProfile.ReadWrite.All), and
+/// GraphAdminUserService.SearchTenantUsersAsync (User.Read.All - tenant directory lookup for the "enable/
+/// disable any account in the tenant" FDD requirement), the same client-credentials app registration serving
+/// all three purposes (see the plan's Authentication section). All three permissions need admin consent
+/// granted on this app registration in the Entra tenant before the corresponding feature works at runtime.</summary>
 public class GraphClientFactory(IConfiguration configuration)
 {
     public GraphServiceClient CreateClient()
