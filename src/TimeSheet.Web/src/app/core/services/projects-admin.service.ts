@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { PaymentModel, Project } from '../models/project.models';
+import { PaymentModel, Project, ProjectType } from '../models/project.models';
 
 export interface CreateProjectRequest {
   clientId: number;
@@ -10,6 +10,7 @@ export interface CreateProjectRequest {
   code: string;
   description: string | null;
   paymentModel: PaymentModel;
+  projectType: ProjectType;
   canInvoice: boolean | null;
   currencyOverride: string | null;
   startDate: string;
@@ -17,11 +18,13 @@ export interface CreateProjectRequest {
   budgetHours: number | null;
   fixedFeeAmount: number | null;
   budgetAlertThresholdPercent: number;
+  projectManagerUserId: number | null;
 }
 
 export interface UpdateProjectRequest {
   name: string;
   description: string | null;
+  projectType: ProjectType;
   canInvoice: boolean | null;
   currencyOverride: string | null;
   endDate: string | null;
@@ -29,6 +32,7 @@ export interface UpdateProjectRequest {
   fixedFeeAmount: number | null;
   budgetAlertThresholdPercent: number;
   isActive: boolean;
+  projectManagerUserId: number | null;
 }
 
 @Injectable({ providedIn: 'root' })

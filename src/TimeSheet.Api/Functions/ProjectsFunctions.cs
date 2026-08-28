@@ -13,6 +13,7 @@ namespace TimeSheet.Api.Functions;
 public class ProjectsFunctions(
     IProjectRepository projects,
     IClientRepository clients,
+    IUserRepository users,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -93,6 +94,13 @@ public class ProjectsFunctions(
         {
             return new BadRequestObjectResult(new { error = "Invalid PaymentModel." });
         }
+        if (!Enum.TryParse<ProjectType>(body.ProjectType, out var projectType))
+        {
+            return new BadRequestObjectResult(new { error = "Invalid ProjectType." });
+        }
+
+        var manager = await ResolveProjectManagerAsync(body.ProjectManagerUserId, ct);
+        if (manager.Error is { } managerError) return managerError;
 
         var project = new Project
         {
@@ -101,6 +109,7 @@ public class ProjectsFunctions(
             Code = body.Code,
             Description = body.Description,
             PaymentModel = paymentModel,
+            ProjectType = projectType,
             CanInvoice = body.CanInvoice,
             CurrencyOverride = body.CurrencyOverride,
             StartDate = body.StartDate,
@@ -109,12 +118,13 @@ public class ProjectsFunctions(
             FixedFeeAmount = body.FixedFeeAmount,
             BudgetAlertThresholdPercent = body.BudgetAlertThresholdPercent,
             IsActive = true,
+            ProjectManagerUserId = manager.User?.Id,
             CreatedUtc = DateTimeOffset.UtcNow,
             CreatedByUserId = currentUser.RequireUser().UserId,
         };
         await projects.AddAsync(project, ct);
         await uow.SaveChangesAsync(ct);
-        return new CreatedResult($"/api/projects/{project.Id}", ToDto(project, client.Name));
+        return new CreatedResult($"/api/projects/{project.Id}", ToDto(project, client.Name, manager.User?.DisplayName));
     }
 
     [Function("Projects_Update")]
@@ -129,8 +139,17 @@ public class ProjectsFunctions(
         var body = await req.ReadFromJsonAsync<UpdateProjectRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        if (!Enum.TryParse<ProjectType>(body.ProjectType, out var projectType))
+        {
+            return new BadRequestObjectResult(new { error = "Invalid ProjectType." });
+        }
+
+        var manager = await ResolveProjectManagerAsync(body.ProjectManagerUserId, ct);
+        if (manager.Error is { } managerError) return managerError;
+
         project.Name = body.Name;
         project.Description = body.Description;
+        project.ProjectType = projectType;
         project.CanInvoice = body.CanInvoice;
         project.CurrencyOverride = body.CurrencyOverride;
         project.EndDate = body.EndDate;
@@ -138,17 +157,29 @@ public class ProjectsFunctions(
         project.FixedFeeAmount = body.FixedFeeAmount;
         project.BudgetAlertThresholdPercent = body.BudgetAlertThresholdPercent;
         project.IsActive = body.IsActive;
+        project.ProjectManagerUserId = manager.User?.Id;
         project.ModifiedUtc = DateTimeOffset.UtcNow;
 
         projects.Update(project);
         await uow.SaveChangesAsync(ct);
 
         var client = await clients.GetByIdAsync(project.ClientId, ct);
-        return new OkObjectResult(ToDto(project, client?.Name ?? ""));
+        return new OkObjectResult(ToDto(project, client?.Name ?? "", manager.User?.DisplayName));
     }
 
-    private static ProjectDto ToDto(Project p, string clientName) => new(
+    /// <summary>Null userId means "no manager" (valid). A non-null userId must resolve to an existing user, or
+    /// this returns the 404 to surface back to the caller.</summary>
+    private async Task<(User? User, IActionResult? Error)> ResolveProjectManagerAsync(int? userId, CancellationToken ct)
+    {
+        if (userId is null) return (null, null);
+        var user = await users.GetByIdAsync(userId.Value, ct);
+        if (user is null) return (null, new NotFoundObjectResult(new { error = "Project manager user not found." }));
+        return (user, null);
+    }
+
+    private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
-        p.PaymentModel.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
-        p.BudgetHours, p.FixedFeeAmount, p.BudgetAlertThresholdPercent, p.IsActive);
+        p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
+        p.BudgetHours, p.FixedFeeAmount, p.BudgetAlertThresholdPercent, p.IsActive,
+        p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName);
 }

@@ -33,6 +33,24 @@
     </label>
 
     <label class="field">
+      <span class="field-label">Project Type</span>
+      <select class="input" [ngModel]="projectType()" (ngModelChange)="projectType.set($event)">
+        <option value="Development">Development</option>
+        <option value="Support">Support</option>
+        <option value="Contract">Contract</option>
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">Project Manager</span>
+      <select class="input" [ngModel]="projectManagerUserId()" (ngModelChange)="projectManagerUserId.set($event)">
+        <option [ngValue]="null">(none)</option>
+        @for (u of users(); track u.id) {
+          <option [ngValue]="u.id">{{ u.displayName }}</option>
+        }
+      </select>
+    </label>
+
+    <label class="field">
       <span class="field-label">Start Date</span>
       <input type="date" class="input" [disabled]="isEditMode" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
     </label>

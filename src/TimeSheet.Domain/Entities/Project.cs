@@ -20,8 +20,19 @@ public class Project
 
     public PaymentModel PaymentModel { get; set; }
 
+    /// <summary>FDD: Development/Support/Contract - orthogonal to PaymentModel. Gates whether a Contract
+    /// EntryType may be configured against this project - see EntryType.</summary>
+    public ProjectType ProjectType { get; set; }
+
     /// <summary>Legacy [Projects].CanInvoice - present for schema fidelity, not yet wired to any invoicing logic.</summary>
     public bool? CanInvoice { get; set; }
+
+    /// <summary>FDD: "A project manager is nominated against each project." Null until an admin sets one.
+    /// Grants extra (non-admin) visibility: querying/clearing this project's EntryFlags, viewing this
+    /// project's lines on a staged invoice, and seeing this project's EstimatedCost/Profit - see
+    /// AuthorizationExtensions.RequireAdminOrProjectManager.</summary>
+    public int? ProjectManagerUserId { get; set; }
+    public User? ProjectManager { get; set; }
 
     /// <summary>Project-level currency override. When null, the project inherits Client.ReportingCurrencyCode.</summary>
     public string? CurrencyOverride { get; set; }

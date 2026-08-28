@@ -8,11 +8,11 @@ namespace TimeSheet.Infrastructure.Repositories;
 public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
 {
     public Task<Project?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.Projects.Include(p => p.Client).FirstOrDefaultAsync(p => p.Id == id, ct);
+        db.Projects.Include(p => p.Client).Include(p => p.ProjectManager).FirstOrDefaultAsync(p => p.Id == id, ct);
 
     public async Task<IReadOnlyList<Project>> GetByClientIdAsync(int clientId, bool includeInactive, CancellationToken ct)
     {
-        var query = db.Projects.Where(p => p.ClientId == clientId);
+        var query = db.Projects.Include(p => p.ProjectManager).Where(p => p.ClientId == clientId);
         if (!includeInactive) query = query.Where(p => p.IsActive);
         return await query.OrderBy(p => p.Name).ToListAsync(ct);
     }
@@ -20,6 +20,7 @@ public class ProjectRepository(TimesheetDbContext db) : IProjectRepository
     public async Task<IReadOnlyList<Project>> GetAssignedToUserAsync(int userId, DateOnly onDate, CancellationToken ct) =>
         await db.Projects
             .Include(p => p.Client)
+            .Include(p => p.ProjectManager)
             .Where(p => p.Assignments.Any(a => a.StaffId == userId && a.IsActive
                         && a.StartDate <= onDate && (a.EndDate == null || a.EndDate >= onDate)))
             .ToListAsync(ct);

@@ -21,6 +21,7 @@ export interface Client {
 }
 
 export type PaymentModel = 'TimeAndMaterials' | 'FixedProjectCost';
+export type ProjectType = 'Development' | 'Support' | 'Contract';
 
 export interface Project {
   id: number;
@@ -30,6 +31,7 @@ export interface Project {
   code: string;
   description: string | null;
   paymentModel: PaymentModel;
+  projectType: ProjectType;
   canInvoice: boolean | null;
   currencyOverride: string | null;
   startDate: string;
@@ -38,4 +40,6 @@ export interface Project {
   fixedFeeAmount: number | null;
   budgetAlertThresholdPercent: number;
   isActive: boolean;
+  projectManagerUserId: number | null;
+  projectManagerName: string | null;
 }

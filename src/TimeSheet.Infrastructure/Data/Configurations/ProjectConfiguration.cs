@@ -24,6 +24,7 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
         builder.Property(p => p.CurrencyOverride).HasMaxLength(3);
         builder.Property(p => p.BudgetHours).HasPrecision(18, 2);
         builder.Property(p => p.FixedFeeAmount).HasPrecision(18, 2);
+        builder.Property(p => p.ProjectType).HasConversion<string>().HasMaxLength(20);
 
         // Code is unique per-client, not globally.
         builder.HasIndex(p => new { p.ClientId, p.Code }).IsUnique();
@@ -32,6 +33,13 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .WithOne(a => a.Project)
             .HasForeignKey(a => a.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Restrict, not Cascade: removing a user who happens to be a PM must not silently delete the project -
+        // the admin has to reassign the PM first (same reasoning as every other staff FK on this entity).
+        builder.HasOne(p => p.ProjectManager)
+            .WithMany()
+            .HasForeignKey(p => p.ProjectManagerUserId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // LatestHealthAssessmentId is a plain denormalized pointer (no navigation property), so EF maps it
         // as an ordinary nullable column with no inferred FK/cascade relationship to ProjectHealthAssessment.

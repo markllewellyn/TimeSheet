@@ -12,6 +12,16 @@ public enum PaymentModel
     FixedProjectCost
 }
 
+/// <summary>FDD: "Projects are split by type: Development, Support and Contract" - a different axis from
+/// PaymentModel (which controls how a project is billed, not what kind of work it is). Only a Contract-type
+/// project may have a Contract EntryType configured against it - see EntryType.</summary>
+public enum ProjectType
+{
+    Development,
+    Support,
+    Contract
+}
+
 public enum AssignmentStatus
 {
     Active,

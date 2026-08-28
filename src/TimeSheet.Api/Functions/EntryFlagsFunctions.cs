@@ -10,10 +10,12 @@ using TimeSheet.Domain.Services;
 namespace TimeSheet.Api.Functions;
 
 /// <summary>A flag is a prompt to query an entry, never a gate (FDD) - the entry it's raised against is saved
-/// and counts normally throughout. System-raised (budget/allocation exceeded) or manually raised by an admin/PM
-/// (PM-level access deferred until ProjectManager exists). Admin-only throughout for now.</summary>
+/// and counts normally throughout. System-raised (budget/allocation exceeded) or manually raised by an
+/// admin/PM. An admin sees/acts on every flag; a PM is scoped to flags raised against their own project(s) -
+/// see AuthorizationExtensions.RequireAdminOrProjectManager.</summary>
 public class EntryFlagsFunctions(
     IEntryFlagRepository flags,
+    ITimesheetEntryRepository entries,
     IEntryFlagService entryFlagService,
     IAuditLogService auditLog,
     IUnitOfWork uow,
@@ -23,9 +25,12 @@ public class EntryFlagsFunctions(
     public async Task<IActionResult> Open(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "entry-flags/open")] HttpRequest req, CancellationToken ct)
     {
-        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
-
+        var user = currentUser.RequireUser();
         var open = await flags.GetOpenAsync(ct);
+        if (!user.IsAdmin)
+        {
+            open = open.Where(f => f.Project?.ProjectManagerUserId == user.UserId).ToList();
+        }
         return new OkObjectResult(open.Select(ToDto));
     }
 
@@ -33,10 +38,12 @@ public class EntryFlagsFunctions(
     public async Task<IActionResult> RaiseManual(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "entry-flags/raise")] HttpRequest req, CancellationToken ct)
     {
-        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
-
         var body = await req.ReadFromJsonAsync<RaiseEntryFlagRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
+
+        var entry = await entries.GetByIdAsync(body.TimesheetEntryId, ct);
+        if (entry is null) return new NotFoundObjectResult(new { error = "Timesheet entry not found." });
+        if (currentUser.RequireAdminOrProjectManager(entry.Project!) is { } forbidden) return forbidden;
 
         var admin = currentUser.RequireUser();
         var flag = await entryFlagService.RaiseManualAsync(body.TimesheetEntryId, admin.UserId, body.Notes, ct);
@@ -51,7 +58,9 @@ public class EntryFlagsFunctions(
     public async Task<IActionResult> Clear(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "entry-flags/{id:int}/clear")] HttpRequest req, int id, CancellationToken ct)
     {
-        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var existing = await flags.GetByIdAsync(id, ct);
+        if (existing is null) return new NotFoundResult();
+        if (currentUser.RequireAdminOrProjectManager(existing.Project!) is { } forbidden) return forbidden;
 
         var body = await req.ReadFromJsonAsync<ClearEntryFlagRequest>(ct);
         var admin = currentUser.RequireUser();
@@ -65,7 +74,9 @@ public class EntryFlagsFunctions(
     public async Task<IActionResult> NotifyStaff(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "entry-flags/{id:int}/notify-staff")] HttpRequest req, int id, CancellationToken ct)
     {
-        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var existing = await flags.GetByIdAsync(id, ct);
+        if (existing is null) return new NotFoundResult();
+        if (currentUser.RequireAdminOrProjectManager(existing.Project!) is { } forbidden) return forbidden;
 
         await entryFlagService.NotifyStaffAsync(id, ct);
         return new OkResult();

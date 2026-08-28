@@ -2,7 +2,9 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
-import { PaymentModel } from '../../../../core/models/project.models';
+import { UsersAdminService } from '../../../../core/services/users-admin.service';
+import { PaymentModel, ProjectType } from '../../../../core/models/project.models';
+import { AppUser } from '../../../../core/models/user.models';
 
 @Component({
   selector: 'app-project-edit-page',
@@ -12,6 +14,7 @@ import { PaymentModel } from '../../../../core/models/project.models';
 })
 export class ProjectEditPage {
   private readonly projectsAdmin = inject(ProjectsAdminService);
+  private readonly usersAdmin = inject(UsersAdminService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -24,6 +27,9 @@ export class ProjectEditPage {
   protected readonly code = signal('');
   protected readonly description = signal('');
   protected readonly paymentModel = signal<PaymentModel>('TimeAndMaterials');
+  protected readonly projectType = signal<ProjectType>('Development');
+  protected readonly projectManagerUserId = signal<number | null>(null);
+  protected readonly users = signal<AppUser[]>([]);
   protected readonly canInvoice = signal(true);
   protected readonly currencyOverride = signal('');
   protected readonly startDate = signal(new Date().toISOString().slice(0, 10));
@@ -36,6 +42,8 @@ export class ProjectEditPage {
   protected readonly saving = signal(false);
 
   constructor() {
+    this.usersAdmin.list(false).subscribe((users) => this.users.set(users));
+
     if (this.editId) {
       const id = Number(this.editId);
       this.projectsAdmin.getById(id).subscribe((p) => {
@@ -44,6 +52,8 @@ export class ProjectEditPage {
         this.code.set(p.code);
         this.description.set(p.description ?? '');
         this.paymentModel.set(p.paymentModel);
+        this.projectType.set(p.projectType);
+        this.projectManagerUserId.set(p.projectManagerUserId);
         // Null and false both mean "not invoiceable" everywhere else this field is read (the Contract-expense
         // picker/gate use `canInvoice !== true`) - defaulting an ambiguous null to true here would silently
         // flip a project's invoicing eligibility as a side effect of an unrelated edit.
@@ -67,6 +77,7 @@ export class ProjectEditPage {
         .update(Number(this.editId), {
           name: this.name(),
           description: this.description() || null,
+          projectType: this.projectType(),
           canInvoice: this.canInvoice(),
           currencyOverride: this.currencyOverride() || null,
           endDate: this.endDate() || null,
@@ -74,6 +85,7 @@ export class ProjectEditPage {
           fixedFeeAmount: this.fixedFeeAmount(),
           budgetAlertThresholdPercent: this.budgetAlertThresholdPercent(),
           isActive: this.isActive(),
+          projectManagerUserId: this.projectManagerUserId(),
         })
         .subscribe({
           next: () => this.router.navigate(['/admin/clients', this.projectClientId(), 'projects']),
@@ -92,6 +104,7 @@ export class ProjectEditPage {
         code: this.code(),
         description: this.description() || null,
         paymentModel: this.paymentModel(),
+        projectType: this.projectType(),
         canInvoice: this.canInvoice(),
         currencyOverride: this.currencyOverride() || null,
         startDate: this.startDate(),
@@ -99,6 +112,7 @@ export class ProjectEditPage {
         budgetHours: this.budgetHours(),
         fixedFeeAmount: this.fixedFeeAmount(),
         budgetAlertThresholdPercent: this.budgetAlertThresholdPercent(),
+        projectManagerUserId: this.projectManagerUserId(),
       })
       .subscribe({
         next: () => this.router.navigate(['/admin/clients', this.clientIdFromRoute, 'projects']),
