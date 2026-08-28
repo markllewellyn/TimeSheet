@@ -14,9 +14,26 @@ public class ProjectsFunctions(
     IProjectRepository projects,
     IClientRepository clients,
     IUserRepository users,
+    IProjectEstimateService estimateService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
+    [Function("Projects_Estimate")]
+    public async Task<IActionResult> Estimate(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{id:int}/estimate")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var project = await projects.GetByIdAsync(id, ct);
+        if (project is null) return new NotFoundResult();
+        if (currentUser.RequireAdminOrProjectManager(project) is { } forbidden) return forbidden;
+
+        var estimate = await estimateService.EstimateAsync(id, ct);
+        return new OkObjectResult(new ProjectEstimateDto(
+            estimate.ProjectId, estimate.BudgetHours, estimate.EstimatedCost, estimate.EstimatedRevenue, estimate.EstimatedProfit,
+            estimate.Lines.Select(l => new ProjectEstimateLineDto(
+                l.UserId, l.UserName, l.RoleId, l.RoleName, l.AllocatedHours,
+                l.HourlyCost, l.CustomerRate, l.EstimatedCost, l.EstimatedRevenue, l.EstimatedProfit, l.Warning)).ToList()));
+    }
+
     [Function("Projects_ListByClient")]
     public async Task<IActionResult> ListByClient(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "clients/{clientId:int}/projects")] HttpRequest req, int clientId, CancellationToken ct)

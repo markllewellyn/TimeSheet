@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { PaymentModel, Project, ProjectType } from '../models/project.models';
+import { PaymentModel, Project, ProjectEstimate, ProjectType } from '../models/project.models';
 
 export interface CreateProjectRequest {
   clientId: number;
@@ -54,5 +54,9 @@ export class ProjectsAdminService {
 
   update(id: number, request: UpdateProjectRequest): Observable<Project> {
     return this.http.put<Project>(`${this.baseUrl}/projects/${id}`, request);
+  }
+
+  getEstimate(id: number): Observable<ProjectEstimate> {
+    return this.http.get<ProjectEstimate>(`${this.baseUrl}/projects/${id}/estimate`);
   }
 }

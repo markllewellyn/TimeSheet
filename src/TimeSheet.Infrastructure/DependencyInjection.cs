@@ -43,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IProjectHealthAssessmentRepository, ProjectHealthAssessmentRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
+        services.AddScoped<IProjectEstimateService, ProjectEstimateService>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
         services.AddScoped<IFileStorageService, LocalFileStorageService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();

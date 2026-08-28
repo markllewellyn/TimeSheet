@@ -97,4 +97,49 @@
     <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save' }}</button>
     <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
   </div>
+
+  @if (isEditMode && estimate(); as e) {
+    <div class="card-padded mt-6">
+      <h2 class="mb-1 text-sm font-semibold text-foreground">Estimated Cost / Profit</h2>
+      @if (e.budgetHours === null) {
+        <p class="text-sm text-muted-foreground">Set Budget Hours above to see an estimate.</p>
+      } @else if (e.lines.length === 0) {
+        <p class="text-sm text-muted-foreground">No staff assigned to this project yet.</p>
+      } @else {
+        <div class="mb-3 flex gap-6 text-sm">
+          <span>Estimated Cost: <strong>{{ e.estimatedCost | number: '1.2-2' }}</strong></span>
+          <span>Estimated Revenue: <strong>{{ e.estimatedRevenue | number: '1.2-2' }}</strong></span>
+          <span>Estimated Profit: <strong>{{ e.estimatedProfit | number: '1.2-2' }}</strong></span>
+        </div>
+        <table class="table-clean">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Est. Hours</th>
+              <th>Cost</th>
+              <th>Revenue</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of e.lines; track line.userId) {
+              <tr>
+                <td class="font-medium text-foreground">{{ line.userName }}</td>
+                <td class="text-muted-foreground">{{ line.roleName ?? '-' }}</td>
+                <td class="text-muted-foreground">{{ line.allocatedHours | number: '1.1-1' }}</td>
+                @if (line.warning) {
+                  <td colspan="3" class="text-xs text-[var(--destructive)]">{{ line.warning }}</td>
+                } @else {
+                  <td class="text-muted-foreground">{{ line.estimatedCost | number: '1.2-2' }}</td>
+                  <td class="text-muted-foreground">{{ line.estimatedRevenue | number: '1.2-2' }}</td>
+                  <td class="text-muted-foreground">{{ line.estimatedProfit | number: '1.2-2' }}</td>
+                }
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
 </div>

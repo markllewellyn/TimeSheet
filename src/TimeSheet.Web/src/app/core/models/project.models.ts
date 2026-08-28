@@ -43,3 +43,26 @@ export interface Project {
   projectManagerUserId: number | null;
   projectManagerName: string | null;
 }
+
+export interface ProjectEstimateLine {
+  userId: number;
+  userName: string;
+  roleId: number | null;
+  roleName: string | null;
+  allocatedHours: number;
+  hourlyCost: number | null;
+  customerRate: number | null;
+  estimatedCost: number;
+  estimatedRevenue: number;
+  estimatedProfit: number;
+  warning: string | null;
+}
+
+export interface ProjectEstimate {
+  projectId: number;
+  budgetHours: number | null;
+  estimatedCost: number;
+  estimatedRevenue: number;
+  estimatedProfit: number;
+  lines: ProjectEstimateLine[];
+}

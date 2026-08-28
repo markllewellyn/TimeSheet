@@ -1,15 +1,16 @@
+import { DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
-import { PaymentModel, ProjectType } from '../../../../core/models/project.models';
+import { PaymentModel, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
 import { AppUser } from '../../../../core/models/user.models';
 
 @Component({
   selector: 'app-project-edit-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, DecimalPipe],
   templateUrl: './project-edit-page.html',
 })
 export class ProjectEditPage {
@@ -41,11 +42,14 @@ export class ProjectEditPage {
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
 
+  protected readonly estimate = signal<ProjectEstimate | null>(null);
+
   constructor() {
     this.usersAdmin.list(false).subscribe((users) => this.users.set(users));
 
     if (this.editId) {
       const id = Number(this.editId);
+      this.projectsAdmin.getEstimate(id).subscribe((e) => this.estimate.set(e));
       this.projectsAdmin.getById(id).subscribe((p) => {
         this.projectClientId.set(p.clientId);
         this.name.set(p.name);
