@@ -6,6 +6,15 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
 
 ## Done this session (commits, newest first)
 
+- `e053f6f` — Export filters/presets, opened up to all users: the CSV export endpoint (previously
+  admin-only, date-range-only) is now reachable by any signed-in user at a new top-level `/export`
+  route. A non-admin always gets only their own entries (optionally narrowed to one of their own
+  assigned projects) — enforced server-side, not just hidden in the UI. Admins additionally get
+  Client/Project Manager/specific-User filters; "project manager basis" resolves a PM to their
+  managed projects via the existing `IProjectRepository.GetManagedByUserAsync`. Date presets (last
+  7 days / last calendar month) are frontend-only convenience over the existing from/to params.
+  **Verified live** — see commit message for the exact scenarios (401/scoping/each filter/PM
+  resolution all checked against the running dev API).
 - `d247f03` — Configurable project consumption notification thresholds: replaced the old
   per-project `Project.BudgetAlertThresholdPercent` (single value, default 80 — didn't match the
   FDD) with firm-wide `AppSettings.ProjectBudgetWarningThresholdPercent`/`AlertThresholdPercent`
@@ -40,10 +49,12 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
 
 Prior session's commits (`80e86fe` and earlier) are unchanged — see git log.
 
-All committed to `master`. Backend builds clean, 18/18 tests pass (was 11/11 before this pass —
-added 7 for `BudgetMonitoringService`'s two-stage threshold logic; the Graph search method still
-has no unit test since it's a thin wrapper over a live external call with no local fake/emulator
-equivalent, consistent with `GraphEmailSender`/`ForcePasswordResetAsync` also being untested).
+All committed to `master`. Backend builds clean, 18/18 tests pass (added 7 earlier this session for
+`BudgetMonitoringService`'s two-stage threshold logic; the export filter changes and the Graph
+search method have no new unit tests — export was instead verified live end-to-end against the
+real dev API/DB, and Graph search is a thin wrapper over a live external call with no local
+fake/emulator equivalent, consistent with `GraphEmailSender`/`ForcePasswordResetAsync` also being
+untested).
 Angular builds clean (`node node_modules/@angular/cli/bin/ng.js build` — `ng`/`npx tsc` aren't directly runnable in this environment, `node_modules/typescript` has no `bin/` folder for some reason; the Angular CLI's own bundler works fine and was used for every build check this session).
 
 Local dev servers were left running this session: API on `http://localhost:7071` (`func start`
@@ -79,9 +90,8 @@ three local demo Users at password `Demo123!` each: `sarah.chen@svgit.co.uk`,
 
 In rough priority order:
 
-1. **Export presets/filters** — CSV export by client/project/PM, all-or-specific users, last-7-days/last-calendar-month/custom-range presets.
-2. **Billing/payroll timers** — timer-triggered Functions for monthly recurring billing/roll-forward and out-of-hours payroll aggregation (some of this may already partly exist via `TimesheetReminderFunction`/`NightlyProjectHealthAssessment` — needs checking against the FDD's exact spec). Note: FDD also says "Out of hours work must be approved by project managers or administrators" — the existing `ApprovedPayroll`/`ApprovedByStaffId` fields on `TimesheetEntry` are still Admin-only-implied (not wired to `RequireAdminOrProjectManager` this session) - worth revisiting alongside this item.
-3. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in dev/prod before this is planned.
+1. **Billing/payroll timers** — timer-triggered Functions for monthly recurring billing/roll-forward and out-of-hours payroll aggregation (some of this may already partly exist via `TimesheetReminderFunction`/`NightlyProjectHealthAssessment` — needs checking against the FDD's exact spec). Note: FDD also says "Out of hours work must be approved by project managers or administrators" — the existing `ApprovedPayroll`/`ApprovedByStaffId` fields on `TimesheetEntry` are still Admin-only-implied (not wired to `RequireAdminOrProjectManager` this session) - worth revisiting alongside this item.
+2. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in dev/prod before this is planned.
 
 ## Known loose ends / flags already raised, not yet actioned
 
@@ -89,12 +99,13 @@ In rough priority order:
 - `ProjectsAdminService.listByClient` (frontend) has a pre-existing bug using backslashes instead of forward slashes in its URL template — noted, not fixed, out of scope of everything done so far.
 - Newly-added `EntryFlagsFunctions.RaiseManual` UI (entry-flags-page) takes a raw Timesheet Entry Id typed in by hand rather than a picker — a reasonable follow-up would be adding a "Flag" button to the relevant per-entry rows in Approvals/Reports instead.
 - No projects have `EntryType` rows yet (brand new this session) — the "Entry Type" picker on the Add Entry page only appears once an admin adds at least one via a project's new "Entry Types" page.
-- No projects have `ProjectManagerUserId` set yet — the new PM-only surfaces (My Invoices, EntryFlags scoping, EstimatedCost visibility) will show nothing/403 until an admin nominates a PM on each project's edit page.
+- No projects had `ProjectManagerUserId` set as of the session that added it — the new PM-only surfaces (My Invoices, EntryFlags scoping, EstimatedCost visibility) show nothing/403 until an admin nominates a PM on each project's edit page. (Update: one now does, as a side effect of later testing — see below.)
 - The local dev API host logs repeated `NightlyProjectHealthAssessment`/`DailyTimesheetReminder` timer-function storage-connection warnings on startup (`AzureWebJobsStorage=UseDevelopmentStorage=true` with no Azurite/storage emulator actually running). Pre-existing, harmless to HTTP endpoints, not investigated or fixed this session.
 - Tenant directory search (`AdminUsers_SearchTenantDirectory`) will 500/error until `User.Read.All` is Entra-admin-consented on the `GraphAdmin` app registration — see `GraphClientFactory.cs`'s doc comment for the full list of permissions that registration now needs (`User-PasswordProfile.ReadWrite.All`, `Mail.Send`, `User.Read.All`).
 - Noticed in passing, not touched: `AdminUsersFunctions.ResetPassword` only logs password resets via `ILogger`, not the `AuditLog`/`IAuditLogService` this session's earlier work (and last session's `80e86fe`) added — its own doc comment still says "A dedicated AuditLog table would be a natural future enhancement," which is no longer true, it just hasn't been wired up here yet.
 - `Project.BudgetAlertThresholdPercent` is gone (migration `AddProjectBudgetNotificationSettings` drops it) — replaced by the firm-wide `AppSettings` thresholds above. If any other branch/PR still references the old field, it'll need the same fix applied to the three test files and `tools/SeedDemoData/Program.cs` that this migration required.
 - Live-verified the new notification threshold logic against the actual dev DB (see the `d247f03` commit message for the exact steps) using the seeded `sarah.chen@svgit.co.uk` demo account, temporarily promoted to Admin and reverted back to User afterward — her role is confirmed back to `User` and settings are confirmed back to 50/75. Leftover artifacts from that verification remain by design (this app never hard-deletes, only deactivates): an inactive test project "Notif Threshold Test (verification - can be deleted)" (client Acme Manufacturing GmbH, project id 9) with 3 timesheet entries, one still-open `EntryFlag` on it, and one unread `BudgetWarning` notification on `sarah.chen`'s account — all clearly labelled, safe to ignore or manually remove if you'd rather not have them in the demo data.
+- Same pattern for the export filters' live verification: `sarah.chen@svgit.co.uk` was again briefly promoted to Admin and reverted back to `User` afterward (confirmed). As part of testing the "project manager basis" filter, **project 3 ("ERP Migration Phase 2", Acme Manufacturing GmbH) now has `sarah.chen` nominated as its real Project Manager** — this wasn't reverted, since it's a legitimate, harmless piece of demo data (every project's `ProjectManagerUserId` was null before this session per the very first loose-end note above) and doubles as a working demonstration of the PM features built earlier this session (My Invoices, EntryFlag scoping, EstimatedCost visibility). Remove or reassign it from the Staff/Project screens if you'd rather it stay unset.
 
 ## How to resume
 
