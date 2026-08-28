@@ -1,0 +1,50 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">My Invoices</h1>
+  <p class="text-sm text-muted-foreground">
+    Invoices covering a project you manage. Only your own project's lines are shown - other projects on the
+    same invoice are not.
+  </p>
+
+  @if (loaded() && invoices().length === 0) {
+    <div class="empty-state">You aren't the project manager for any project with invoiced work yet.</div>
+  }
+
+  @for (invoice of invoices(); track invoice.id) {
+    <div class="card-padded">
+      <div class="mb-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="font-semibold text-foreground">{{ invoice.clientName }}</span>
+          <span class="text-sm text-muted-foreground">{{ invoice.periodStart }} – {{ invoice.periodEnd }}</span>
+          <span [class]="invoice.status === 'Finalized' ? 'badge-success' : 'badge-warning'">
+            {{ invoice.status }}
+          </span>
+          @if (invoice.invoiceNumber) {
+            <span class="text-sm text-muted-foreground">#{{ invoice.invoiceNumber }}</span>
+          }
+        </div>
+        <div class="text-lg font-semibold tracking-tight">{{ invoice.myTotalAmount | number: '1.2-2' }} {{ invoice.reportingCurrency }}</div>
+      </div>
+
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Project</th>
+            <th>Description</th>
+            <th>Hours</th>
+            <th>Amount</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (line of invoice.lineItems; track line.id) {
+            <tr>
+              <td>{{ line.projectName }}</td>
+              <td>{{ line.description }}</td>
+              <td class="text-muted-foreground">{{ line.hours ?? '-' }}</td>
+              <td class="text-muted-foreground">{{ line.amount | number: '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

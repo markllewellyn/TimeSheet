@@ -10,6 +10,9 @@
         <a routerLink="/timesheet" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">Log Time</a>
         <a routerLink="/timesheet/calendar" routerLinkActive="nav-link-active" class="nav-link">Calendar</a>
         <a routerLink="/timesheet/my-overview" routerLinkActive="nav-link-active" class="nav-link">Your Overview</a>
+        @if (!currentUser.isAdmin()) {
+          <a routerLink="/my-invoices" routerLinkActive="nav-link-active" class="nav-link">My Invoices</a>
+        }
         @if (currentUser.isAdmin()) {
           <a routerLink="/admin/clients" routerLinkActive="nav-link-active" class="nav-link">Clients</a>
           <a routerLink="/admin/projects" routerLinkActive="nav-link-active" class="nav-link">Projects</a>

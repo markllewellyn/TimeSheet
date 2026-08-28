@@ -9,9 +9,39 @@ using TimeSheet.Domain.Services;
 
 namespace TimeSheet.Api.Functions;
 
-/// <summary>Invoicing is Admin-only throughout - generating/finalizing a client invoice is a billing action.</summary>
-public class InvoicesFunctions(IInvoiceRepository invoiceRepository, IInvoicingService invoicing, ICurrentUserAccessor currentUser)
+/// <summary>Generating/finalizing/browsing-by-client is Admin-only - a billing action. The one exception is
+/// Invoices_ListForProjectManager, a read-only view scoped to a project manager's own project(s) - see
+/// AuthorizationExtensions.RequireAdminOrProjectManager and the FDD's "project managers can view the staged
+/// invoice for their projects".</summary>
+public class InvoicesFunctions(
+    IInvoiceRepository invoiceRepository,
+    IProjectRepository projectRepository,
+    IInvoicingService invoicing,
+    ICurrentUserAccessor currentUser)
 {
+    [Function("Invoices_ListForProjectManager")]
+    public async Task<IActionResult> ListForProjectManager(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/for-project-manager")] HttpRequest req, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var managedProjects = await projectRepository.GetManagedByUserAsync(user.UserId, ct);
+        if (managedProjects.Count == 0) return new OkObjectResult(Array.Empty<ProjectManagerInvoiceDto>());
+
+        var managedProjectIds = managedProjects.Select(p => p.Id).ToHashSet();
+        var invoices = await invoiceRepository.GetByProjectIdsAsync(managedProjectIds, ct);
+
+        var result = invoices.Select(i =>
+        {
+            var myLines = i.LineItems.Where(l => managedProjectIds.Contains(l.ProjectId)).ToList();
+            return new ProjectManagerInvoiceDto(
+                i.Id, i.ClientId, i.Client?.Name ?? "", i.PeriodStart, i.PeriodEnd,
+                i.ReportingCurrency, i.Status.ToString(), i.InvoiceNumber, myLines.Sum(l => l.Amount),
+                i.GeneratedAtUtc, i.FinalizedAtUtc,
+                myLines.Select(l => new InvoiceLineItemDto(l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.Amount, l.Type.ToString())).ToList());
+        });
+        return new OkObjectResult(result);
+    }
+
     [Function("Invoices_ListByClient")]
     public async Task<IActionResult> ListByClient(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "clients/{clientId:int}/invoices")] HttpRequest req, int clientId, CancellationToken ct)

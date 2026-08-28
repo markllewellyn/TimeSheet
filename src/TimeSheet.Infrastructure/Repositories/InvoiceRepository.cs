@@ -24,6 +24,13 @@ public class InvoiceRepository(TimesheetDbContext db) : IInvoiceRepository
             .Include(i => i.LineItems).ThenInclude(l => l.Project)
             .Where(i => i.ClientId == clientId).OrderByDescending(i => i.PeriodStart).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<Invoice>> GetByProjectIdsAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct) =>
+        await db.Invoices
+            .Include(i => i.Client)
+            .Include(i => i.LineItems).ThenInclude(l => l.Project)
+            .Where(i => i.LineItems.Any(l => projectIds.Contains(l.ProjectId)))
+            .OrderByDescending(i => i.PeriodStart).ToListAsync(ct);
+
     public Task<bool> InvoiceNumberInUseAsync(int clientId, string invoiceNumber, CancellationToken ct) =>
         db.Invoices.AnyAsync(i => i.ClientId == clientId && i.InvoiceNumber == invoiceNumber && i.Status == InvoiceStatus.Finalized, ct);
 

@@ -29,6 +29,23 @@ export interface Invoice {
   lineItems: InvoiceLineItem[];
 }
 
+/// A project manager's own-project view of an invoice - lineItems and myTotalAmount are already filtered/summed
+/// to just the projects they manage, never the invoice's full (possibly broader) total.
+export interface ProjectManagerInvoice {
+  id: number;
+  clientId: number;
+  clientName: string;
+  periodStart: string;
+  periodEnd: string;
+  reportingCurrency: string;
+  status: 'Draft' | 'Finalized';
+  invoiceNumber: string | null;
+  myTotalAmount: number;
+  generatedAtUtc: string;
+  finalizedAtUtc: string | null;
+  lineItems: InvoiceLineItem[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class InvoicesService {
   private readonly http = inject(HttpClient);
@@ -36,6 +53,10 @@ export class InvoicesService {
 
   listByClient(clientId: number): Observable<Invoice[]> {
     return this.http.get<Invoice[]>(`${this.baseUrl}/clients/${clientId}/invoices`);
+  }
+
+  listForProjectManager(): Observable<ProjectManagerInvoice[]> {
+    return this.http.get<ProjectManagerInvoice[]>(`${this.baseUrl}/invoices/for-project-manager`);
   }
 
   generateDraft(clientId: number, periodStart: string, periodEnd: string, manualExchangeRate?: number): Observable<Invoice> {

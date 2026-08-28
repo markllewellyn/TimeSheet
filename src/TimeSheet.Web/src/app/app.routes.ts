@@ -43,6 +43,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/timesheet/my-overview-page/my-overview-page').then((m) => m.MyOverviewPage),
   },
   {
+    // Any signed-in user, not just admins - the endpoint itself scopes results to projects the caller
+    // manages, returning an empty list for everyone else (see Invoices_ListForProjectManager).
+    path: 'my-invoices',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/invoicing/my-invoices-page/my-invoices-page').then((m) => m.MyInvoicesPage),
+  },
+  {
     path: 'timesheet/calendar',
     canActivate: [authGuard],
     loadComponent: () => import('./features/timesheet/calendar-page/calendar-page').then((m) => m.CalendarPage),

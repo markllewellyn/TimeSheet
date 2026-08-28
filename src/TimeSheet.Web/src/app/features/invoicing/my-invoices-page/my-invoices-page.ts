@@ -1,0 +1,29 @@
+import { DecimalPipe } from '@angular/common';
+import { Component, inject, signal } from '@angular/core';
+import { InvoicesService, ProjectManagerInvoice } from '../../../core/services/invoices.service';
+
+/**
+ * FDD: "Project managers can view the staged invoice for their projects." Read-only - a PM never generates,
+ * amends or finalizes an invoice, so this deliberately has none of admin/invoicing's write actions. Shows
+ * nothing but line items already scoped server-side to the caller's own managed project(s) - see
+ * Invoices_ListForProjectManager.
+ */
+@Component({
+  selector: 'app-my-invoices-page',
+  standalone: true,
+  imports: [DecimalPipe],
+  templateUrl: './my-invoices-page.html',
+})
+export class MyInvoicesPage {
+  private readonly invoicesService = inject(InvoicesService);
+
+  protected readonly invoices = signal<ProjectManagerInvoice[]>([]);
+  protected readonly loaded = signal(false);
+
+  constructor() {
+    this.invoicesService.listForProjectManager().subscribe((invoices) => {
+      this.invoices.set(invoices);
+      this.loaded.set(true);
+    });
+  }
+}
