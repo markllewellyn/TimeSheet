@@ -1,25 +1,79 @@
 <div class="mx-auto max-w-2xl">
   <h1 class="page-title mb-2">Export</h1>
   <p class="mb-6 text-sm text-muted-foreground">
-    Download a master list of every logged timesheet entry, across all staff, as a CSV file. Leave the dates
-    blank to export everything.
+    @if (currentUser.isAdmin()) {
+      Download logged timesheet entries as a CSV file. Leave a filter on its default to include everything for
+      that dimension.
+    } @else {
+      Download your own logged timesheet entries as a CSV file.
+    }
   </p>
 
   @if (error(); as e) {
     <div class="banner-error">{{ e }}</div>
   }
 
-  <div class="card-padded flex flex-wrap items-end gap-4">
-    <label class="field">
-      <span class="field-label">Start Date</span>
-      <input type="date" class="input" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
-    </label>
-    <label class="field">
-      <span class="field-label">End Date</span>
-      <input type="date" class="input" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
-    </label>
-    <button class="btn-primary" [disabled]="downloading()" (click)="download()">
-      {{ downloading() ? 'Preparing…' : 'Download CSV' }}
-    </button>
+  <div class="card-padded flex flex-col gap-4">
+    <div class="flex flex-wrap items-end gap-4">
+      <label class="field">
+        <span class="field-label">Start Date</span>
+        <input type="date" class="input" [ngModel]="startDate()" (ngModelChange)="startDate.set($event)" />
+      </label>
+      <label class="field">
+        <span class="field-label">End Date</span>
+        <input type="date" class="input" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
+      </label>
+      <button class="btn-secondary" (click)="applyPreset('last7Days')">Last 7 Days</button>
+      <button class="btn-secondary" (click)="applyPreset('lastCalendarMonth')">Last Calendar Month</button>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-4 border-t border-border pt-4">
+      @if (currentUser.isAdmin()) {
+        <label class="field">
+          <span class="field-label">Client</span>
+          <select class="input" [ngModel]="clientId()" (ngModelChange)="clientId.set($event)">
+            <option [ngValue]="null">(all clients)</option>
+            @for (c of clients(); track c.id) {
+              <option [ngValue]="c.id">{{ c.name }}</option>
+            }
+          </select>
+        </label>
+      }
+      <label class="field">
+        <span class="field-label">Project</span>
+        <select class="input" [ngModel]="projectId()" (ngModelChange)="projectId.set($event)">
+          <option [ngValue]="null">(all projects)</option>
+          @for (p of projects(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }}</option>
+          }
+        </select>
+      </label>
+      @if (currentUser.isAdmin()) {
+        <label class="field">
+          <span class="field-label">Project Manager</span>
+          <select class="input" [ngModel]="projectManagerUserId()" (ngModelChange)="projectManagerUserId.set($event)">
+            <option [ngValue]="null">(any)</option>
+            @for (u of users(); track u.id) {
+              <option [ngValue]="u.id">{{ u.displayName }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="field-label">User</span>
+          <select class="input" [ngModel]="userId()" (ngModelChange)="userId.set($event)">
+            <option [ngValue]="null">(all users)</option>
+            @for (u of users(); track u.id) {
+              <option [ngValue]="u.id">{{ u.displayName }}</option>
+            }
+          </select>
+        </label>
+      }
+    </div>
+
+    <div>
+      <button class="btn-primary" [disabled]="downloading()" (click)="download()">
+        {{ downloading() ? 'Preparing…' : 'Download CSV' }}
+      </button>
+    </div>
   </div>
 </div>

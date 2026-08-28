@@ -11,9 +11,14 @@ public interface ITimesheetEntryRepository
     /// Time" grid's search box.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetForUserAsync(int userId, string? searchText, DateOnly? from, DateOnly? to, CancellationToken ct);
 
-    /// <summary>Admin-wide - every entry across every staff member within the date range (open-ended on either
-    /// side when null). Powers the master-list CSV export.</summary>
-    Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(DateOnly? from, DateOnly? to, CancellationToken ct);
+    /// <summary>Powers the CSV export - every entry within the date range (open-ended on either side when
+    /// null), optionally further narrowed by client/project/specific-project-set/user (all null = everything
+    /// the caller is allowed to see; the Function layer enforces that a non-admin caller always has userId
+    /// forced to themselves, never left null). projectIds is how "on a project manager basis" is expressed -
+    /// the Function layer resolves a PM to their managed project ids first (see
+    /// IProjectRepository.GetManagedByUserAsync) and passes them here.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(
+        DateOnly? from, DateOnly? to, int? clientId, int? projectId, IReadOnlyCollection<int>? projectIds, int? userId, CancellationToken ct);
 
     /// <summary>Every entry for a project within a date range, across all users - used by invoicing (billing is
     /// per-project, not per-user) and reporting. Entries are never excluded here - an EntryFlag is a prompt to

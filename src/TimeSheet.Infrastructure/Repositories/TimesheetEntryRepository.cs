@@ -51,11 +51,16 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         return await query.OrderByDescending(e => e.Date).ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(DateOnly? from, DateOnly? to, CancellationToken ct)
+    public async Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(
+        DateOnly? from, DateOnly? to, int? clientId, int? projectId, IReadOnlyCollection<int>? projectIds, int? userId, CancellationToken ct)
     {
         var query = db.TimesheetEntries.Include(e => e.User).Include(e => e.Client).Include(e => e.Project).AsQueryable();
         if (from is not null) query = query.Where(e => e.Date >= from);
         if (to is not null) query = query.Where(e => e.Date <= to);
+        if (clientId is not null) query = query.Where(e => e.ClientId == clientId);
+        if (projectId is not null) query = query.Where(e => e.ProjectId == projectId);
+        if (projectIds is not null) query = query.Where(e => projectIds.Contains(e.ProjectId));
+        if (userId is not null) query = query.Where(e => e.UserId == userId);
         return await query.OrderBy(e => e.Date).ToListAsync(ct);
     }
 

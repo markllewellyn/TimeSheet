@@ -3,17 +3,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
-using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 
 namespace TimeSheet.Api.Functions;
 
-/// <summary>Master-list CSV export for finance/payroll - a flat, row-level dump of every timesheet entry
-/// across every staff member (not scoped to one client/project, unlike Reports, which is aggregate). No
-/// legacy equivalent existed to port from (the Power App export was searched for Export/CSV/Excel/SaveData and
-/// none was found) - built fresh, same column set as the Approvals/Overview screens use.</summary>
-public class AdminExportFunctions(ITimesheetEntryRepository entries, ICurrentUserAccessor currentUser)
+/// <summary>CSV export of timesheet entries - FDD: "Entries can be exported to CSV. The export is available
+/// from the settings page for both users and administrators. Data can be exported on a client, project or
+/// project manager basis, for all users or for specific users." A non-admin can only ever export their own
+/// entries (optionally narrowed further by project) - clientId/userId/projectManagerUserId are silently
+/// ignored for a non-admin caller, enforced here rather than only hidden in the UI. Date-range presets (last 7
+/// days / last calendar month / custom) are a frontend-only concern - the API just takes from/to.</summary>
+public class AdminExportFunctions(ITimesheetEntryRepository entries, IProjectRepository projects, ICurrentUserAccessor currentUser)
 {
     [Function("Admin_ExportTimesheetEntries")]
     public async Task<IActionResult> ExportTimesheetEntries(
@@ -22,12 +23,29 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, ICurrentUse
         // Users_ResetPassword in UsersFunctions.cs).
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "exports/timesheet-entries")] HttpRequest req, CancellationToken ct)
     {
-        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var user = currentUser.RequireUser();
 
-        var from = req.Query.TryGetValue("from", out var f) && DateOnly.TryParse(f, out var fd) ? fd : (DateOnly?)null;
-        var to = req.Query.TryGetValue("to", out var t) && DateOnly.TryParse(t, out var td) ? td : (DateOnly?)null;
+        var from = ParseDate(req, "from");
+        var to = ParseDate(req, "to");
+        var projectId = ParseInt(req, "projectId");
 
-        var rows = await entries.GetAllInRangeAsync(from, to, ct);
+        int? clientId = null;
+        int? userId = user.UserId;
+        IReadOnlyCollection<int>? projectIds = null;
+
+        if (user.IsAdmin)
+        {
+            clientId = ParseInt(req, "clientId");
+            userId = ParseInt(req, "userId"); // null (not this admin's own id) means "all users"
+
+            if (ParseInt(req, "projectManagerUserId") is { } pmUserId)
+            {
+                var managed = await projects.GetManagedByUserAsync(pmUserId, ct);
+                projectIds = managed.Select(p => p.Id).ToList();
+            }
+        }
+
+        var rows = await entries.GetAllInRangeAsync(from, to, clientId, projectId, projectIds, userId, ct);
 
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(',', [
@@ -56,6 +74,12 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, ICurrentUse
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();
         return new FileContentResult(bytes, "text/csv") { FileDownloadName = $"timesheet-export-{DateTime.UtcNow:yyyyMMdd}.csv" };
     }
+
+    private static DateOnly? ParseDate(HttpRequest req, string key) =>
+        req.Query.TryGetValue(key, out var v) && DateOnly.TryParse(v, out var d) ? d : null;
+
+    private static int? ParseInt(HttpRequest req, string key) =>
+        req.Query.TryGetValue(key, out var v) && int.TryParse(v, out var i) ? i : null;
 
     /// <summary>Wraps in quotes and escapes embedded quotes whenever the value could otherwise break CSV
     /// parsing (contains a comma, quote, or newline) - descriptions are free text and can contain any of these.</summary>

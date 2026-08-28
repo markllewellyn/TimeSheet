@@ -151,8 +151,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/approvals/approvals-page/approvals-page').then((m) => m.ApprovalsPage),
   },
   {
-    path: 'admin/export',
-    canActivate: [authGuard, adminGuard],
+    // Any signed-in user, not just admins - FDD: export "is available... for both users and
+    // administrators." The page itself hides admin-only filters (Client/Project Manager/User) for
+    // a non-admin, and the API enforces the same restriction server-side regardless.
+    path: 'export',
+    canActivate: [authGuard],
     loadComponent: () => import('./features/admin/export/export-page/export-page').then((m) => m.ExportPage),
   },
   {
