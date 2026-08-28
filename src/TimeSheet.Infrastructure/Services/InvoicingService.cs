@@ -38,6 +38,33 @@ public class InvoicingService(
         return freshDraft;
     }
 
+    public async Task<Invoice> ApplyLineItemDiscountAsync(int invoiceId, int lineItemId, decimal? discountPercent, CancellationToken ct)
+    {
+        if (discountPercent is { } discount && (discount < 0 || discount > 100))
+        {
+            throw new InvalidOperationException("Discount must be between 0 and 100.");
+        }
+
+        var invoice = await invoices.GetByIdAsync(invoiceId, ct)
+            ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
+
+        if (invoice.Status != InvoiceStatus.Draft)
+        {
+            throw new InvalidOperationException("A line item discount can only be applied while the invoice is a Draft.");
+        }
+
+        var line = invoice.LineItems.FirstOrDefault(l => l.Id == lineItemId)
+            ?? throw new InvalidOperationException($"Line item {lineItemId} not found on this invoice.");
+
+        line.DiscountPercent = discountPercent;
+        line.Amount = discountPercent is { } d ? Math.Round(line.GrossAmount * (1 - d / 100m), 2) : line.GrossAmount;
+        invoice.TotalAmount = Math.Round(invoice.LineItems.Sum(l => l.Amount), 2);
+
+        invoices.Update(invoice);
+        await uow.SaveChangesAsync(ct);
+        return invoice;
+    }
+
     public async Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(invoiceNumber))

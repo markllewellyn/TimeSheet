@@ -62,6 +62,10 @@ public class RateCardsFunctions(
         {
             return new BadRequestObjectResult(new { error = "Rate must be a positive number." });
         }
+        if (body.DiscountPercent is { } discount && (discount < 0 || discount > 100))
+        {
+            return new BadRequestObjectResult(new { error = "Discount must be between 0 and 100." });
+        }
 
         Role? role = null;
         User? staff = null;
@@ -101,6 +105,7 @@ public class RateCardsFunctions(
             ClientId = body.ClientId,
             ProjectId = body.ProjectId,
             Rate = body.Rate,
+            DiscountPercent = body.DiscountPercent,
             EffectiveFrom = body.EffectiveFrom,
             CreatedUtc = DateTimeOffset.UtcNow,
             CreatedByUserId = currentUser.RequireUser().UserId,
@@ -114,10 +119,10 @@ public class RateCardsFunctions(
     private static RateCardDto ToDto(RateCard rc) => new(
         rc.Id, rc.RoleId, rc.Role?.Name, rc.StaffId, rc.Staff?.DisplayName,
         rc.ClientId, rc.Client?.Name, rc.ProjectId, rc.Project?.Name,
-        rc.Rate, rc.EffectiveFrom, rc.CreatedUtc);
+        rc.Rate, rc.DiscountPercent, rc.EffectiveFrom, rc.CreatedUtc);
 
     private static RateCardDto ToDtoWith(RateCard rc, Role? role, User? staff, Client? client, Project? project) => new(
         rc.Id, rc.RoleId, role?.Name, rc.StaffId, staff?.DisplayName,
         rc.ClientId, client?.Name, rc.ProjectId, project?.Name,
-        rc.Rate, rc.EffectiveFrom, rc.CreatedUtc);
+        rc.Rate, rc.DiscountPercent, rc.EffectiveFrom, rc.CreatedUtc);
 }

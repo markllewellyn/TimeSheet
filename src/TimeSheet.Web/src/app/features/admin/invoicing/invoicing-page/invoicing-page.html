@@ -78,6 +78,9 @@
               <tr>
                 <th>Description</th>
                 <th>Hours</th>
+                @if (invoice.status === 'Draft') {
+                  <th>Discount %</th>
+                }
                 <th>Amount</th>
               </tr>
             </thead>
@@ -86,7 +89,25 @@
                 <tr>
                   <td>{{ line.description }}</td>
                   <td class="text-muted-foreground">{{ line.hours ?? '-' }}</td>
-                  <td class="text-muted-foreground">{{ line.amount | number: '1.2-2' }}</td>
+                  @if (invoice.status === 'Draft') {
+                    <td>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        class="input w-20"
+                        [ngModel]="line.discountPercent"
+                        (change)="applyLineItemDiscount(invoice, line, $any($event.target).value)"
+                      />
+                    </td>
+                  }
+                  <td class="text-muted-foreground">
+                    @if (line.discountPercent) {
+                      <span class="mr-1 text-xs line-through">{{ line.grossAmount | number: '1.2-2' }}</span>
+                    }
+                    {{ line.amount | number: '1.2-2' }}
+                  </td>
                 </tr>
               }
             </tbody>

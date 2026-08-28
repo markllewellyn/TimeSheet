@@ -30,6 +30,7 @@ export class RateCardsPage {
   protected readonly scopeClientId = signal<number | null>(null);
   protected readonly scopeProjectId = signal<number | null>(null);
   protected readonly rate = signal<number | null>(null);
+  protected readonly discountPercent = signal<number | null>(null);
   protected readonly effectiveFrom = signal(new Date().toISOString().slice(0, 10));
 
   protected readonly error = signal<string | null>(null);
@@ -73,6 +74,7 @@ export class RateCardsPage {
         clientId: this.scopeType() === 'client' ? this.scopeClientId() : null,
         projectId: this.scopeType() === 'project' ? this.scopeProjectId() : null,
         rate: this.rate()!,
+        discountPercent: this.discountPercent(),
         effectiveFrom: this.effectiveFrom(),
       })
       .subscribe({
@@ -80,6 +82,7 @@ export class RateCardsPage {
           this.saving.set(false);
           this.error.set(null);
           this.rate.set(null);
+          this.discountPercent.set(null);
           this.onRoleChange(roleId);
         },
         error: (err) => {

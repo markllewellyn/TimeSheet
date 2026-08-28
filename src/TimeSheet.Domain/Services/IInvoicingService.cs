@@ -13,6 +13,11 @@ public interface IInvoicingService
 {
     Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct);
 
+    /// <summary>FDD: "A discount can be applied... against an individual invoice line while the invoice is
+    /// being staged." Only while the invoice is Draft - throws otherwise. Recomputes the line's Amount from its
+    /// frozen GrossAmount and the invoice's TotalAmount from all lines. Passing null clears any discount.</summary>
+    Task<Invoice> ApplyLineItemDiscountAsync(int invoiceId, int lineItemId, decimal? discountPercent, CancellationToken ct);
+
     /// <summary>Requires a non-empty, unique (per client) invoice number. Renders the PDF at this point (so the
     /// invoice number appears on the document) and freezes the record - no further edits possible after.</summary>
     Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct);

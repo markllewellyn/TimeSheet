@@ -23,6 +23,12 @@ public class RateCard
     public Project? Project { get; set; }
 
     public decimal Rate { get; set; }
+
+    /// <summary>FDD: "A discount can be applied... against a rate card before the invoice is produced." 0-100,
+    /// null = no discount. Applied by IRateResolver at resolution time (baked into the CustomerRate it
+    /// returns), never re-applied later at invoice time - see RateResolver.ResolveAsync.</summary>
+    public decimal? DiscountPercent { get; set; }
+
     public DateOnly EffectiveFrom { get; set; }
 
     public DateTimeOffset CreatedUtc { get; set; }

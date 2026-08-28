@@ -64,6 +64,10 @@
         <input type="number" min="0" step="0.01" class="input w-32" [ngModel]="rate()" (ngModelChange)="rate.set($event)" />
       </label>
       <label class="field">
+        <span class="field-label">Discount %</span>
+        <input type="number" min="0" max="100" step="0.1" placeholder="(none)" class="input w-28" [ngModel]="discountPercent()" (ngModelChange)="discountPercent.set($event)" />
+      </label>
+      <label class="field">
         <span class="field-label">Effective From</span>
         <input type="date" class="input" [ngModel]="effectiveFrom()" (ngModelChange)="effectiveFrom.set($event)" />
       </label>
@@ -79,6 +83,7 @@
             <th>Client</th>
             <th>Project</th>
             <th>Rate</th>
+            <th>Discount %</th>
             <th>Effective From</th>
           </tr>
         </thead>
@@ -88,11 +93,12 @@
               <td class="text-muted-foreground">{{ c.clientName ?? '-' }}</td>
               <td class="text-muted-foreground">{{ c.projectName ?? '-' }}</td>
               <td>{{ c.rate }}</td>
+              <td class="text-muted-foreground">{{ c.discountPercent ?? '-' }}</td>
               <td class="text-muted-foreground">{{ c.effectiveFrom }}</td>
             </tr>
           } @empty {
             <tr>
-              <td colspan="4" class="text-center text-sm text-muted-foreground">No rates set for this role yet.</td>
+              <td colspan="5" class="text-center text-sm text-muted-foreground">No rates set for this role yet.</td>
             </tr>
           }
         </tbody>

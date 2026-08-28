@@ -14,6 +14,7 @@ export interface RateCard {
   projectId: number | null;
   projectName: string | null;
   rate: number;
+  discountPercent: number | null;
   effectiveFrom: string;
   createdUtc: string;
 }
@@ -33,6 +34,7 @@ export interface CreateRateCardRequest {
   clientId?: number | null;
   projectId?: number | null;
   rate: number;
+  discountPercent?: number | null;
   effectiveFrom: string;
 }
 

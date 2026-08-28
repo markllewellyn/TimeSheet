@@ -103,6 +103,22 @@ public class RateResolverTests
     }
 
     [Fact]
+    public async Task ResolveAsync_RateCardWithDiscount_ReducesCustomerRateButNotCost()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedClientProjectUserAsync(db);
+
+        db.StaffCosts.Add(new StaffCost { StaffId = user.Id, HourlyCost = 40m, OutOfHoursCost = 5m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
+        db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 100m, DiscountPercent = 10m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None);
+
+        Assert.Equal(90m, resolution.CustomerRate);
+        Assert.Equal(40m, resolution.HourlyCost);
+    }
+
+    [Fact]
     public async Task ResolveAsync_FutureDatedRateCard_IsNotPickedForAPastDate()
     {
         await using var db = CreateInMemoryDb();

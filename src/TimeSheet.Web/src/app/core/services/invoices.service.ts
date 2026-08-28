@@ -9,6 +9,8 @@ export interface InvoiceLineItem {
   projectName: string;
   description: string;
   hours: number | null;
+  grossAmount: number;
+  discountPercent: number | null;
   amount: number;
   type: string;
 }
@@ -69,6 +71,10 @@ export class InvoicesService {
 
   finalize(invoiceId: number, invoiceNumber: string): Observable<Invoice> {
     return this.http.post<Invoice>(`${this.baseUrl}/invoices/${invoiceId}/finalize`, { invoiceNumber });
+  }
+
+  applyLineItemDiscount(invoiceId: number, lineItemId: number, discountPercent: number | null): Observable<Invoice> {
+    return this.http.put<Invoice>(`${this.baseUrl}/invoices/${invoiceId}/line-items/${lineItemId}/discount`, { discountPercent });
   }
 
   downloadPdf(invoiceId: number): Observable<Blob> {

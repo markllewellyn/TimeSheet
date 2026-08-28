@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ClientsService } from '../../../../core/services/clients.service';
-import { Invoice, InvoicesService } from '../../../../core/services/invoices.service';
+import { Invoice, InvoiceLineItem, InvoicesService } from '../../../../core/services/invoices.service';
 import { Client } from '../../../../core/models/project.models';
 
 @Component({
@@ -98,6 +98,23 @@ export class InvoicingPage {
         this.successMessage.set(null);
         this.error.set(err?.error?.error ?? 'Could not finalize the invoice.');
       },
+    });
+  }
+
+  protected applyLineItemDiscount(invoice: Invoice, line: InvoiceLineItem, discountPercentInput: string): void {
+    const trimmed = discountPercentInput.trim();
+    const discountPercent = trimmed === '' ? null : Number(trimmed);
+    if (discountPercent !== null && (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100)) {
+      this.error.set('Discount must be between 0 and 100.');
+      return;
+    }
+
+    this.invoicesService.applyLineItemDiscount(invoice.id, line.id, discountPercent).subscribe({
+      next: () => {
+        this.error.set(null);
+        this.refresh(invoice.clientId);
+      },
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not apply the discount.'),
     });
   }
 

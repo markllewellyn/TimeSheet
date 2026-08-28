@@ -71,6 +71,7 @@ public class InvoiceGenerationService(
                         ProjectId = project.Id,
                         Description = project.Name,
                         Hours = totalHours,
+                        GrossAmount = amount,
                         Amount = amount,
                         Type = InvoiceLineItemType.TimeAndMaterials,
                     });
@@ -86,6 +87,7 @@ public class InvoiceGenerationService(
                         ProjectId = project.Id,
                         Description = $"{project.Name} (Fixed Fee)",
                         Hours = null,
+                        GrossAmount = amount,
                         Amount = amount,
                         Type = InvoiceLineItemType.FixedFee,
                     });
@@ -106,6 +108,7 @@ public class InvoiceGenerationService(
                     ProjectId = project.Id,
                     Description = $"{project.Name} - Expenses",
                     Hours = null,
+                    GrossAmount = Math.Round(expenseTotal, 2),
                     Amount = Math.Round(expenseTotal, 2),
                     Type = InvoiceLineItemType.Expense,
                 });

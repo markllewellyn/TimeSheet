@@ -1,6 +1,6 @@
 namespace TimeSheet.Contracts;
 
-public record InvoiceLineItemDto(int Id, int ProjectId, string ProjectName, string Description, decimal? Hours, decimal Amount, string Type);
+public record InvoiceLineItemDto(int Id, int ProjectId, string ProjectName, string Description, decimal? Hours, decimal GrossAmount, decimal? DiscountPercent, decimal Amount, string Type);
 
 public record InvoiceDto(
     int Id, int ClientId, string ClientName, DateOnly PeriodStart, DateOnly PeriodEnd,
@@ -11,6 +11,8 @@ public record InvoiceDto(
 public record GenerateDraftInvoiceRequest(DateOnly PeriodStart, DateOnly PeriodEnd, decimal? ManualExchangeRate = null);
 
 public record FinalizeInvoiceRequest(string InvoiceNumber);
+
+public record ApplyLineItemDiscountRequest(decimal? DiscountPercent);
 
 /// <summary>FDD: "Project managers can view the staged invoice for their projects" - a read-only view scoped
 /// to just the caller's own managed project(s). LineItems here are already filtered down to those projects,

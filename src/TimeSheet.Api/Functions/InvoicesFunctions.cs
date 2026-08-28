@@ -37,7 +37,7 @@ public class InvoicesFunctions(
                 i.Id, i.ClientId, i.Client?.Name ?? "", i.PeriodStart, i.PeriodEnd,
                 i.ReportingCurrency, i.Status.ToString(), i.InvoiceNumber, myLines.Sum(l => l.Amount),
                 i.GeneratedAtUtc, i.FinalizedAtUtc,
-                myLines.Select(l => new InvoiceLineItemDto(l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.Amount, l.Type.ToString())).ToList());
+                myLines.Select(ToLineItemDto).ToList());
         });
         return new OkObjectResult(result);
     }
@@ -94,6 +94,27 @@ public class InvoicesFunctions(
         }
     }
 
+    [Function("Invoices_ApplyLineItemDiscount")]
+    public async Task<IActionResult> ApplyLineItemDiscount(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "invoices/{id:int}/line-items/{lineItemId:int}/discount")] HttpRequest req, int id, int lineItemId, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var body = await req.ReadFromJsonAsync<ApplyLineItemDiscountRequest>(ct)
+            ?? throw new BadHttpRequestException("Missing request body.");
+
+        try
+        {
+            var invoice = await invoicing.ApplyLineItemDiscountAsync(id, lineItemId, body.DiscountPercent, ct);
+            var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
+            return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
+    }
+
     [Function("Invoices_Pdf")]
     public async Task<IActionResult> Pdf(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/{id:int}/pdf")] HttpRequest req, int id, CancellationToken ct)
@@ -114,5 +135,8 @@ public class InvoicesFunctions(
     private static InvoiceDto ToDto(Invoice i, string clientName) => new(
         i.Id, i.ClientId, clientName, i.PeriodStart, i.PeriodEnd, i.ReportingCurrency, i.ExchangeRate, i.Status.ToString(),
         i.InvoiceNumber, i.TotalAmount, i.GeneratedAtUtc, i.FinalizedAtUtc,
-        i.LineItems.Select(l => new InvoiceLineItemDto(l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.Amount, l.Type.ToString())).ToList());
+        i.LineItems.Select(ToLineItemDto).ToList());
+
+    private static InvoiceLineItemDto ToLineItemDto(InvoiceLineItem l) => new(
+        l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.GrossAmount, l.DiscountPercent, l.Amount, l.Type.ToString());
 }

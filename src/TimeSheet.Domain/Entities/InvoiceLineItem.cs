@@ -15,7 +15,17 @@ public class InvoiceLineItem
     /// <summary>Null for Fixed Fee lines.</summary>
     public decimal? Hours { get; set; }
 
-    /// <summary>Frozen, in Invoice.ReportingCurrency.</summary>
+    /// <summary>The amount InvoiceGenerationService computed, before any staging-time discount - frozen the
+    /// same way Amount is, in Invoice.ReportingCurrency. Equal to Amount until a discount is applied.</summary>
+    public decimal GrossAmount { get; set; }
+
+    /// <summary>FDD: "A discount can be applied... against an individual invoice line while the invoice is
+    /// being staged." 0-100, null = no discount. Only settable while the invoice is Draft - see
+    /// IInvoicingService.ApplyLineItemDiscountAsync. Wiped if the Draft is regenerated (GenerateDraftInvoiceAsync
+    /// clears and rebuilds LineItems from scratch) - a known, acceptable limitation, not a bug.</summary>
+    public decimal? DiscountPercent { get; set; }
+
+    /// <summary>Frozen, in Invoice.ReportingCurrency. Equal to GrossAmount, less DiscountPercent if one is set.</summary>
     public decimal Amount { get; set; }
 
     public InvoiceLineItemType Type { get; set; }
