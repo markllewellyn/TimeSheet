@@ -25,7 +25,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
 
     public Task<TimesheetEntry?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.TimesheetEntries.Include(e => e.Attachments).Include(e => e.Client).Include(e => e.Project)
+        db.TimesheetEntries.Include(e => e.Attachments).Include(e => e.Client).Include(e => e.Project).Include(e => e.EntryType)
             .FirstOrDefaultAsync(e => e.Id == id, ct);
 
     public async Task<IReadOnlyList<TimesheetEntry>> GetForUserAsync(int userId, string? searchText, DateOnly? from, DateOnly? to, CancellationToken ct)
@@ -34,6 +34,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Include(e => e.Client)
             .Include(e => e.Project)
             .Include(e => e.Attachments)
+            .Include(e => e.EntryType)
             .Where(e => e.UserId == userId);
 
         if (from is not null) query = query.Where(e => e.Date >= from);

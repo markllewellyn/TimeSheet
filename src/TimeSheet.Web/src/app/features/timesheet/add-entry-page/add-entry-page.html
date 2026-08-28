@@ -39,7 +39,7 @@
         class="input"
         [disabled]="isEditMode"
         [ngModel]="selectedProjectId()"
-        (ngModelChange)="selectedProjectId.set($event)"
+        (ngModelChange)="onProjectChange($event)"
       >
         <option [ngValue]="null" disabled>Select a project</option>
         @for (p of projectsForClient(); track p.id) {
@@ -47,6 +47,18 @@
         }
       </select>
     </label>
+
+    @if (entryTypes().length > 0) {
+      <label class="field">
+        <span class="field-label">Entry Type</span>
+        <select class="input" [ngModel]="selectedEntryTypeId()" (ngModelChange)="selectedEntryTypeId.set($event)">
+          <option [ngValue]="null">(none)</option>
+          @for (t of entryTypes(); track t.id) {
+            <option [ngValue]="t.id">{{ t.name }}</option>
+          }
+        </select>
+      </label>
+    }
 
     <label class="field">
       <span class="field-label">Date</span>

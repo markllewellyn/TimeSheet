@@ -98,6 +98,12 @@ export const routes: Routes = [
       import('./features/admin/assignments/project-assignments-page/project-assignments-page').then((m) => m.ProjectAssignmentsPage),
   },
   {
+    path: 'admin/projects/:id/entry-types',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin/entry-types/project-entry-types-page/project-entry-types-page').then((m) => m.ProjectEntryTypesPage),
+  },
+  {
     path: 'admin/users',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin/users/users-list-page/users-list-page').then((m) => m.UsersListPage),

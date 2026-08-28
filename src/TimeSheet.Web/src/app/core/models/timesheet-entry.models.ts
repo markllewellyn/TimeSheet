@@ -22,6 +22,8 @@ export interface TimesheetEntry {
   approvedPayroll: boolean;
   sentToPayroll: boolean;
   attachments: Attachment[];
+  entryTypeId: number | null;
+  entryTypeName: string | null;
 }
 
 export interface TimesheetEntrySummary {
@@ -44,6 +46,7 @@ export interface CreateTimesheetEntryRequest {
   description: string | null;
   adminSendToPayroll?: boolean | null;
   onBehalfOfUserId?: number | null;
+  entryTypeId?: number | null;
 }
 
 export type UpdateTimesheetEntryRequest = Omit<CreateTimesheetEntryRequest, 'projectId'>;

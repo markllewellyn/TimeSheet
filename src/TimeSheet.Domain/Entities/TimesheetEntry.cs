@@ -24,6 +24,12 @@ public class TimesheetEntry
     public decimal OutOfHoursHours { get; set; }
     public required string Description { get; set; }
 
+    /// <summary>FDD: "selecting the entry type" - constrained to one of the EntryTypes configured against
+    /// this entry's own Project. Nullable for entries predating this feature (and for any project with no
+    /// EntryTypes configured yet) - see TimesheetEntriesFunctions for the belongs-to-project/active validation.</summary>
+    public int? EntryTypeId { get; set; }
+    public EntryType? EntryType { get; set; }
+
     /// <summary>Precomputed monetary amounts (legacy [RecordedTimes].ToPayroll/ToCompany), computed at write
     /// time from the resolved rate/cost below - see TimesheetEntriesFunctions.ComputePayrollAmountsAsync.</summary>
     public decimal ToPayroll { get; set; }

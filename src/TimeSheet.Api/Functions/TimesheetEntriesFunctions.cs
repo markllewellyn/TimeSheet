@@ -18,6 +18,7 @@ public class TimesheetEntriesFunctions(
     IStaffProjectRepository assignments,
     IProjectRepository projects,
     IClientRepository clients,
+    IEntryTypeRepository entryTypes,
     IRateResolver rateResolver,
     IBudgetMonitoringService budgetMonitoring,
     IEntryFlagService entryFlagService,
@@ -97,6 +98,9 @@ public class TimesheetEntriesFunctions(
         var valuesError = await ValidateEntryValuesAsync(project!.ClientId, effectiveUserId, body.Date, body.WorkHours, body.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
 
+        var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, body.ProjectId, project.ProjectType, ct);
+        if (entryTypeError is not null) return entryTypeError;
+
         var (payrollError, amounts) = await ComputePayrollAmountsAsync(effectiveUserId, project!.ClientId, body.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
         if (payrollError is not null) return payrollError;
 
@@ -109,6 +113,7 @@ public class TimesheetEntriesFunctions(
             WorkHours = body.WorkHours,
             OutOfHoursHours = body.OutOfHoursHours,
             Description = body.Description,
+            EntryTypeId = body.EntryTypeId,
             ToPayroll = amounts!.ToPayroll,
             ToCompany = amounts.ToCompany,
             ResolvedCustomerRate = amounts.ResolvedCustomerRate,
@@ -193,6 +198,9 @@ public class TimesheetEntriesFunctions(
         var valuesError = await ValidateEntryValuesAsync(entry.ClientId, entry.UserId, body.Date, body.WorkHours, body.OutOfHoursHours, excludeEntryId: entry.Id, ct);
         if (valuesError is not null) return valuesError;
 
+        var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, entry.ProjectId, entry.Project!.ProjectType, ct);
+        if (entryTypeError is not null) return entryTypeError;
+
         var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
         if (payrollError is not null) return payrollError;
 
@@ -200,6 +208,7 @@ public class TimesheetEntriesFunctions(
         entry.WorkHours = body.WorkHours;
         entry.OutOfHoursHours = body.OutOfHoursHours;
         entry.Description = body.Description;
+        entry.EntryTypeId = body.EntryTypeId;
         entry.ToPayroll = amounts!.ToPayroll;
         entry.ToCompany = amounts.ToCompany;
         entry.ResolvedCustomerRate = amounts.ResolvedCustomerRate;
@@ -272,6 +281,7 @@ public class TimesheetEntriesFunctions(
             WorkHours = source.WorkHours,
             OutOfHoursHours = source.OutOfHoursHours,
             Description = source.Description,
+            EntryTypeId = source.EntryTypeId,
             ToPayroll = amounts!.ToPayroll,
             ToCompany = amounts.ToCompany,
             ResolvedCustomerRate = amounts.ResolvedCustomerRate,
@@ -357,6 +367,26 @@ public class TimesheetEntriesFunctions(
             return new BadRequestObjectResult(new { error = "Hours must be entered in half-hour increments." });
         }
 
+        return null;
+    }
+
+    /// <summary>EntryTypeId is optional (many projects have no EntryTypes configured yet), but when supplied
+    /// must belong to this entry's own Project and be active - and, defense-in-depth alongside
+    /// EntryTypesFunctions.Create's own check, a Contract EntryType may only be used on a Contract-type
+    /// Project (FDD: "Only projects of type Contract accept contract entries").</summary>
+    private async Task<IActionResult?> ValidateEntryTypeAsync(int? entryTypeId, int projectId, ProjectType projectType, CancellationToken ct)
+    {
+        if (entryTypeId is null) return null;
+
+        var entryType = await entryTypes.GetByIdAsync(entryTypeId.Value, ct);
+        if (entryType is null || entryType.ProjectId != projectId || !entryType.IsActive)
+        {
+            return new BadRequestObjectResult(new { error = "Entry type is not valid for this project." });
+        }
+        if (entryType.IsContractType && projectType != ProjectType.Contract)
+        {
+            return new BadRequestObjectResult(new { error = "Only a Contract-type project can use a Contract entry type." });
+        }
         return null;
     }
 
@@ -448,7 +478,8 @@ public class TimesheetEntriesFunctions(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.ClientId, e.Client?.Name ?? e.Project?.Client?.Name ?? "",
         e.Date, e.WorkHours, e.OutOfHoursHours, e.Description,
         e.ToPayroll, e.ApprovedPayroll, e.SentToPayroll,
-        e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList());
+        e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList(),
+        e.EntryTypeId, e.EntryType?.Name);
 }
 
 public record DuplicateTimesheetEntryRequest(DateOnly? Date, int? OnBehalfOfUserId = null);

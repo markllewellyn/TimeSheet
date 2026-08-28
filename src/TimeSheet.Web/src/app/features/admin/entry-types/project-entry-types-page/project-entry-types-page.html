@@ -1,0 +1,48 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Entry Types</h1>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="card overflow-hidden px-4">
+    <table class="table-clean">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Contract</th>
+          <th>Status</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of entryTypes(); track t.id) {
+          <tr>
+            <td class="font-medium text-foreground">{{ t.name }}</td>
+            <td class="text-muted-foreground">{{ t.isContractType ? 'Yes' : '-' }}</td>
+            <td>
+              <span [class]="t.isActive ? 'badge-success' : 'badge-neutral'">{{ t.isActive ? 'Active' : 'Inactive' }}</span>
+            </td>
+            <td class="text-right">
+              <button class="btn-link" (click)="toggleActive(t)">{{ t.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-padded grid grid-cols-3 gap-3">
+    <label class="field">
+      <span class="field-label">Name</span>
+      <input class="input" [ngModel]="newName()" (ngModelChange)="newName.set($event)" />
+    </label>
+    @if (isContractProject()) {
+      <label class="flex items-center gap-2 self-end pb-2 text-sm">
+        <input type="checkbox" [ngModel]="newIsContractType()" (ngModelChange)="newIsContractType.set($event)" />
+        Contract entry type
+      </label>
+    }
+    <button class="btn-primary mt-6 h-fit" [disabled]="saving()" (click)="addEntryType()">{{ saving() ? 'Adding…' : 'Add' }}</button>
+  </div>
+</div>

@@ -1,8 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { ProjectsService } from '../../../core/services/projects.service';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
+import { EntryTypesService, EntryType } from '../../../core/services/entry-types.service';
 import { Project } from '../../../core/models/project.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
@@ -16,6 +17,7 @@ import { ImpersonationService } from '../../../core/services/impersonation.servi
 export class AddEntryPage {
   private readonly projectsService = inject(ProjectsService);
   private readonly timesheetEntries = inject(TimesheetEntriesService);
+  private readonly entryTypesService = inject(EntryTypesService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly currentUser = inject(CurrentUserService);
@@ -47,6 +49,11 @@ export class AddEntryPage {
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
 
+  // Only ever populated for projects with EntryTypes configured against them - most projects have none yet,
+  // in which case the picker simply doesn't appear (EntryTypeId stays optional server-side too).
+  protected readonly entryTypes = signal<EntryType[]>([]);
+  protected readonly selectedEntryTypeId = signal<number | null>(null);
+
   constructor() {
     // Impersonation applies to both logging a brand-new entry and editing an existing one - an Admin can
     // impersonate a user and edit that user's timesheet entries while impersonating (FDD). Enforced
@@ -56,6 +63,15 @@ export class AddEntryPage {
       this.projects.set(projects);
       this.projectsLoaded.set(true);
       if (this.editId) this.loadExisting(Number(this.editId));
+    });
+
+    effect(() => {
+      const projectId = this.selectedProjectId();
+      if (!projectId) {
+        this.entryTypes.set([]);
+        return;
+      }
+      this.entryTypesService.listByProject(projectId, false).subscribe((entryTypes) => this.entryTypes.set(entryTypes));
     });
   }
 
@@ -67,12 +83,19 @@ export class AddEntryPage {
       this.workHours.set(entry.workHours);
       this.outOfHoursHours.set(entry.outOfHoursHours);
       this.description.set(entry.description ?? '');
+      this.selectedEntryTypeId.set(entry.entryTypeId);
     });
   }
 
   protected onClientChange(clientId: number): void {
     this.selectedClientId.set(clientId);
     this.selectedProjectId.set(null);
+    this.selectedEntryTypeId.set(null);
+  }
+
+  protected onProjectChange(projectId: number): void {
+    this.selectedProjectId.set(projectId);
+    this.selectedEntryTypeId.set(null);
   }
 
   protected save(): void {
@@ -112,6 +135,7 @@ export class AddEntryPage {
       outOfHoursHours: this.outOfHoursHours(),
       description: this.description() || null,
       onBehalfOfUserId: this.impersonation.actingAs()?.id ?? null,
+      entryTypeId: this.selectedEntryTypeId(),
     };
 
     const save$ = this.isEditMode

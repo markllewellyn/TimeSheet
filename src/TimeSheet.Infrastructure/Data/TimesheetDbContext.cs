@@ -17,6 +17,7 @@ public class TimesheetDbContext(DbContextOptions<TimesheetDbContext> options) : 
     public DbSet<Role> Roles => Set<Role>();
     public DbSet<RateCard> RateCards => Set<RateCard>();
     public DbSet<StaffProject> StaffProjects => Set<StaffProject>();
+    public DbSet<EntryType> EntryTypes => Set<EntryType>();
     public DbSet<TimesheetEntry> TimesheetEntries => Set<TimesheetEntry>();
     public DbSet<RecordedTimeArchive> RecordedTimeArchives => Set<RecordedTimeArchive>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
