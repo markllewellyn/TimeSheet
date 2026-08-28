@@ -4,8 +4,13 @@
 
   <div class="card-padded flex flex-wrap items-end gap-3">
     <label class="field">
-      <span class="field-label">User Id</span>
-      <input type="number" min="1" class="input w-32" [ngModel]="userIdFilter()" (ngModelChange)="userIdFilter.set($event)" />
+      <span class="field-label">User</span>
+      <select class="input" [ngModel]="userIdFilter()" (ngModelChange)="userIdFilter.set($event)">
+        <option [ngValue]="null">(all users)</option>
+        @for (u of users(); track u.id) {
+          <option [ngValue]="u.id">{{ u.displayName }}</option>
+        }
+      </select>
     </label>
     <label class="field">
       <span class="field-label">From</span>
