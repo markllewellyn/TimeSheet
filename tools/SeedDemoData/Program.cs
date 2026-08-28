@@ -167,7 +167,6 @@ Project MakeProject(
         EndDate = end,
         BudgetHours = budgetHours,
         FixedFeeAmount = fixedFee,
-        BudgetAlertThresholdPercent = 80,
         CanInvoice = true,
         IsActive = true,
         CreatedUtc = now,

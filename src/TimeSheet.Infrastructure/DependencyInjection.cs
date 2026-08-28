@@ -41,6 +41,7 @@ public static class DependencyInjection
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IReportingRepository, ReportingRepository>();
         services.AddScoped<IProjectHealthAssessmentRepository, ProjectHealthAssessmentRepository>();
+        services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IProjectEstimateService, ProjectEstimateService>();

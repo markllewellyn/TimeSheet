@@ -48,8 +48,11 @@ public class Project
     /// <summary>Only meaningful when PaymentModel == FixedProjectCost.</summary>
     public decimal? FixedFeeAmount { get; set; }
 
-    /// <summary>Percentage of BudgetHours consumed that triggers a non-blocking "approaching budget" warning.</summary>
-    public int BudgetAlertThresholdPercent { get; set; } = 80;
+    /// <summary>The highest of AppSettings' two firm-wide notification thresholds (50/75 by default) already
+    /// notified-for on this project, so a notification fires once per newly-crossed threshold rather than on
+    /// every subsequent entry once past it - null until the first threshold is crossed. See
+    /// BudgetMonitoringService.</summary>
+    public int? HighestBudgetNotificationPercent { get; set; }
 
     public bool IsActive { get; set; } = true;
 

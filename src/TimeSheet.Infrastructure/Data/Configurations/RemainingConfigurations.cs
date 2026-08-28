@@ -170,6 +170,13 @@ public class AppSettingsConfiguration : IEntityTypeConfiguration<AppSettings>
     public void Configure(EntityTypeBuilder<AppSettings> builder)
     {
         builder.Property(s => s.BaseReportingCurrency).HasMaxLength(3).IsRequired();
-        builder.HasData(new AppSettings { Id = 1, BaseReportingCurrency = "GBP", DefaultInvoiceMonthEndDay = 31 });
+        builder.HasData(new AppSettings
+        {
+            Id = 1,
+            BaseReportingCurrency = "GBP",
+            DefaultInvoiceMonthEndDay = 31,
+            ProjectBudgetWarningThresholdPercent = 50,
+            ProjectBudgetAlertThresholdPercent = 75,
+        });
     }
 }

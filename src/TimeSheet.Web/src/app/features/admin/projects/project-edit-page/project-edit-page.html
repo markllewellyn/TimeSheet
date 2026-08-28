@@ -63,10 +63,6 @@
       <span class="field-label">Budget Hours</span>
       <input type="number" min="0" class="input" [ngModel]="budgetHours()" (ngModelChange)="budgetHours.set($event)" />
     </label>
-    <label class="field">
-      <span class="field-label">Budget Alert Threshold (%)</span>
-      <input type="number" min="1" max="100" class="input" [ngModel]="budgetAlertThresholdPercent()" (ngModelChange)="budgetAlertThresholdPercent.set($event)" />
-    </label>
 
     @if (paymentModel() === 'FixedProjectCost') {
       <label class="field">
@@ -91,6 +87,10 @@
   <p class="mt-4 text-xs text-muted-foreground">
     Billing rates are set per staff member on the client's Staff Costs section, not per project - a person
     assigned to this project must have a rate configured for {{ isEditMode ? "this project's client" : "the client" }} first.
+  </p>
+  <p class="mt-1 text-xs text-muted-foreground">
+    Consumption notifications for this project's Budget Hours fire at firm-wide percentages set on the
+    <a routerLink="/admin/settings" class="btn-link">Settings</a> page, not per project.
   </p>
 
   <div class="mt-6 flex gap-3">

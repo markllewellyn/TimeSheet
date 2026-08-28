@@ -35,7 +35,7 @@ public class ReportingServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 8, 1), BudgetAlertThresholdPercent = 80, IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();

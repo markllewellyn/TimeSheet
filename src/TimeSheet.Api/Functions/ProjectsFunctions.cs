@@ -145,7 +145,6 @@ public class ProjectsFunctions(
             EndDate = body.EndDate,
             BudgetHours = body.BudgetHours,
             FixedFeeAmount = body.FixedFeeAmount,
-            BudgetAlertThresholdPercent = body.BudgetAlertThresholdPercent,
             IsActive = true,
             ProjectManagerUserId = manager.User?.Id,
             CreatedUtc = DateTimeOffset.UtcNow,
@@ -184,7 +183,6 @@ public class ProjectsFunctions(
         project.EndDate = body.EndDate;
         project.BudgetHours = body.BudgetHours;
         project.FixedFeeAmount = body.FixedFeeAmount;
-        project.BudgetAlertThresholdPercent = body.BudgetAlertThresholdPercent;
         project.IsActive = body.IsActive;
         project.ProjectManagerUserId = manager.User?.Id;
         project.ModifiedUtc = DateTimeOffset.UtcNow;
@@ -209,6 +207,6 @@ public class ProjectsFunctions(
     private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
         p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
-        p.BudgetHours, p.FixedFeeAmount, p.BudgetAlertThresholdPercent, p.IsActive,
+        p.BudgetHours, p.FixedFeeAmount, p.IsActive,
         p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName);
 }

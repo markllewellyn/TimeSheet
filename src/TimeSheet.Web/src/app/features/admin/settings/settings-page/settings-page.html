@@ -1,0 +1,43 @@
+<div class="mx-auto max-w-2xl">
+  <h1 class="page-title mb-6">Settings</h1>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+  @if (savedMessage(); as m) {
+    <div class="banner-success">{{ m }}</div>
+  }
+
+  @if (loaded()) {
+    <div class="card-padded grid grid-cols-2 gap-4">
+      <label class="field">
+        <span class="field-label">Base Reporting Currency</span>
+        <input maxlength="3" class="input uppercase" [ngModel]="baseReportingCurrency()" (ngModelChange)="baseReportingCurrency.set($event)" />
+      </label>
+      <label class="field">
+        <span class="field-label">Default Invoice Month-End Day</span>
+        <input type="number" min="1" max="31" class="input" [ngModel]="defaultInvoiceMonthEndDay()" (ngModelChange)="defaultInvoiceMonthEndDay.set($event)" />
+      </label>
+
+      <div class="col-span-2 mt-2 border-t border-border pt-4">
+        <h2 class="mb-1 text-sm font-semibold text-foreground">Project Consumption Notifications</h2>
+        <p class="mb-3 text-xs text-muted-foreground">
+          Notifications are raised to admins the first time a project's logged hours cross either
+          percentage of its Budget Hours. Each fires once per project, not on every subsequent entry.
+        </p>
+      </div>
+      <label class="field">
+        <span class="field-label">Warning Threshold (%)</span>
+        <input type="number" min="1" max="99" class="input" [ngModel]="projectBudgetWarningThresholdPercent()" (ngModelChange)="projectBudgetWarningThresholdPercent.set($event)" />
+      </label>
+      <label class="field">
+        <span class="field-label">Alert Threshold (%)</span>
+        <input type="number" min="2" max="100" class="input" [ngModel]="projectBudgetAlertThresholdPercent()" (ngModelChange)="projectBudgetAlertThresholdPercent.set($event)" />
+      </label>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+      <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Save' }}</button>
+    </div>
+  }
+</div>

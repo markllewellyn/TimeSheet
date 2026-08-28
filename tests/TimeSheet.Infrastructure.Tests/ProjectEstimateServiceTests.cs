@@ -34,7 +34,7 @@ public class ProjectEstimateServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "Project A", Code = "A", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 1, 1), BudgetAlertThresholdPercent = 80, IsActive = true,
+            StartDate = new DateOnly(2026, 1, 1), IsActive = true,
             BudgetHours = budgetHours, CreatedUtc = DateTimeOffset.UtcNow,
         };
         db.Projects.Add(project);

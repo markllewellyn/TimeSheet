@@ -38,7 +38,6 @@ export interface Project {
   endDate: string | null;
   budgetHours: number | null;
   fixedFeeAmount: number | null;
-  budgetAlertThresholdPercent: number;
   isActive: boolean;
   projectManagerUserId: number | null;
   projectManagerName: string | null;

@@ -160,11 +160,17 @@ public class TimesheetEntriesFunctions(
         {
             await entryFlagService.RaiseSystemAsync(entry, EntryFlagReason.ProjectBudgetExceeded, budgetCheck.Limit!.Value, budgetCheck.CumulativeValue, ct);
         }
-        else if (budgetCheck.IsWarningOnly)
+        else if (budgetCheck.NewlyCrossedNotificationThresholdPercent is { } crossedPercent)
         {
+            // Persist the crossing so the next entry on this project doesn't re-notify for the same
+            // threshold - project is already tracked by this request's DbContext (loaded in
+            // ValidateAssignmentAsync above), and RaiseToAdminsAsync's own SaveChangesAsync below flushes
+            // this change too, so no separate save call is needed here.
+            project!.HighestBudgetNotificationPercent = crossedPercent;
+            projects.Update(project);
             await notificationService.RaiseToAdminsAsync(
                 NotificationType.BudgetWarning,
-                $"Project {body.ProjectId} is approaching its budget ({budgetCheck.CumulativeValue}/{budgetCheck.Limit} hours).",
+                $"Project {project.Name} has reached {crossedPercent}% of its allotted {budgetCheck.Limit} hours ({budgetCheck.CumulativeValue}/{budgetCheck.Limit}).",
                 NotificationChannel.InAppOnly, body.ProjectId, entry.Id, ct);
         }
 

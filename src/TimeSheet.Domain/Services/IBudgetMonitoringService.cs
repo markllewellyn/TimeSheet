@@ -2,7 +2,12 @@ using TimeSheet.Domain.Entities;
 
 namespace TimeSheet.Domain.Services;
 
-public record BudgetCheckResult(bool RequiresEscalation, bool IsWarningOnly, decimal CumulativeValue, decimal? Limit);
+/// <summary>NewlyCrossedNotificationThresholdPercent is set only when this entry pushes cumulative consumption
+/// past a firm-wide threshold (AppSettings.ProjectBudgetWarningThresholdPercent/AlertThresholdPercent) that
+/// hadn't already been notified-for on this project - null on every subsequent entry once notified, and null
+/// entirely once RequiresEscalation (the entry is flagged instead - flagging and notification are mutually
+/// exclusive outcomes of the same entry).</summary>
+public record BudgetCheckResult(bool RequiresEscalation, decimal CumulativeValue, decimal? Limit, int? NewlyCrossedNotificationThresholdPercent);
 
 /// <summary>
 /// Detection is synchronous, called from the timesheet-entry creation/update service before final commit - a

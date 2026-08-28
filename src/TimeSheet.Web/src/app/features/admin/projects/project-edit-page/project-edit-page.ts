@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { PaymentModel, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
@@ -10,7 +10,7 @@ import { AppUser } from '../../../../core/models/user.models';
 @Component({
   selector: 'app-project-edit-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, RouterLink],
   templateUrl: './project-edit-page.html',
 })
 export class ProjectEditPage {
@@ -37,7 +37,6 @@ export class ProjectEditPage {
   protected readonly endDate = signal('');
   protected readonly budgetHours = signal<number | null>(null);
   protected readonly fixedFeeAmount = signal<number | null>(null);
-  protected readonly budgetAlertThresholdPercent = signal(80);
   protected readonly isActive = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
@@ -67,7 +66,6 @@ export class ProjectEditPage {
         this.endDate.set(p.endDate ?? '');
         this.budgetHours.set(p.budgetHours);
         this.fixedFeeAmount.set(p.fixedFeeAmount);
-        this.budgetAlertThresholdPercent.set(p.budgetAlertThresholdPercent);
         this.isActive.set(p.isActive);
       });
     }
@@ -87,7 +85,6 @@ export class ProjectEditPage {
           endDate: this.endDate() || null,
           budgetHours: this.budgetHours(),
           fixedFeeAmount: this.fixedFeeAmount(),
-          budgetAlertThresholdPercent: this.budgetAlertThresholdPercent(),
           isActive: this.isActive(),
           projectManagerUserId: this.projectManagerUserId(),
         })
@@ -115,7 +112,6 @@ export class ProjectEditPage {
         endDate: this.endDate() || null,
         budgetHours: this.budgetHours(),
         fixedFeeAmount: this.fixedFeeAmount(),
-        budgetAlertThresholdPercent: this.budgetAlertThresholdPercent(),
         projectManagerUserId: this.projectManagerUserId(),
       })
       .subscribe({

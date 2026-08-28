@@ -17,7 +17,6 @@ export interface CreateProjectRequest {
   endDate: string | null;
   budgetHours: number | null;
   fixedFeeAmount: number | null;
-  budgetAlertThresholdPercent: number;
   projectManagerUserId: number | null;
 }
 
@@ -30,7 +29,6 @@ export interface UpdateProjectRequest {
   endDate: string | null;
   budgetHours: number | null;
   fixedFeeAmount: number | null;
-  budgetAlertThresholdPercent: number;
   isActive: boolean;
   projectManagerUserId: number | null;
 }

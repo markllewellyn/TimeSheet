@@ -155,4 +155,9 @@ export const routes: Routes = [
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin/export/export-page/export-page').then((m) => m.ExportPage),
   },
+  {
+    path: 'admin/settings',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/settings/settings-page/settings-page').then((m) => m.SettingsPage),
+  },
 ];

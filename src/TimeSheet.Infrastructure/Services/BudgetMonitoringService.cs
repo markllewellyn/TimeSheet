@@ -9,24 +9,44 @@ namespace TimeSheet.Infrastructure.Services;
 /// hours" (which naturally excludes the not-yet-saved pending entry) gives a correct before/after comparison
 /// without double-counting. Editing an already-saved entry's hours is out of scope for this check for now.
 /// </summary>
-public class BudgetMonitoringService(IProjectRepository projects, ITimesheetEntryRepository entries) : IBudgetMonitoringService
+public class BudgetMonitoringService(IProjectRepository projects, ITimesheetEntryRepository entries, IAppSettingsRepository appSettings) : IBudgetMonitoringService
 {
     public async Task<BudgetCheckResult> EvaluateAsync(TimesheetEntry pendingEntry, CancellationToken ct)
     {
         var project = await projects.GetByIdAsync(pendingEntry.ProjectId, ct);
-        if (project?.BudgetHours is null)
+        if (project?.BudgetHours is null || project.BudgetHours.Value <= 0)
         {
-            return new BudgetCheckResult(RequiresEscalation: false, IsWarningOnly: false, CumulativeValue: 0, Limit: null);
+            return new BudgetCheckResult(RequiresEscalation: false, CumulativeValue: 0, Limit: null, NewlyCrossedNotificationThresholdPercent: null);
         }
 
         var existingHours = await entries.GetTotalCountedHoursForProjectAsync(pendingEntry.ProjectId, ct);
         var cumulative = existingHours + pendingEntry.WorkHours + pendingEntry.OutOfHoursHours;
         var limit = project.BudgetHours.Value;
-        var warningThreshold = limit * project.BudgetAlertThresholdPercent / 100m;
-
         var requiresEscalation = cumulative > limit;
-        var isWarningOnly = !requiresEscalation && cumulative >= warningThreshold;
 
-        return new BudgetCheckResult(requiresEscalation, isWarningOnly, cumulative, limit);
+        // FDD: "Project feedback notifications are raised at 50% and 75% of the time allotted to a project...
+        // The percentages are held in settings and can be changed by management." Notify once per
+        // newly-crossed threshold only (never repeat one already fired) - same "don't repeat an alert that's
+        // already fired" principle as ProjectHealthService's notify-on-worsening-only. Flagging (over 100%,
+        // above) and this notification are mutually exclusive outcomes - an over-budget entry is flagged
+        // instead, per FDD's flagging model, never both.
+        int? newlyCrossed = null;
+        if (!requiresEscalation)
+        {
+            var settings = await appSettings.GetAsync(ct);
+            var percentConsumed = cumulative / limit * 100m;
+            var alreadyNotified = project.HighestBudgetNotificationPercent ?? 0;
+
+            if (percentConsumed >= settings.ProjectBudgetAlertThresholdPercent && alreadyNotified < settings.ProjectBudgetAlertThresholdPercent)
+            {
+                newlyCrossed = settings.ProjectBudgetAlertThresholdPercent;
+            }
+            else if (percentConsumed >= settings.ProjectBudgetWarningThresholdPercent && alreadyNotified < settings.ProjectBudgetWarningThresholdPercent)
+            {
+                newlyCrossed = settings.ProjectBudgetWarningThresholdPercent;
+            }
+        }
+
+        return new BudgetCheckResult(requiresEscalation, cumulative, limit, newlyCrossed);
     }
 }
