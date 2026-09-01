@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 
 namespace TimeSheet.Infrastructure.Data.Configurations;
@@ -32,6 +33,8 @@ public class ClientConfiguration : IEntityTypeConfiguration<Client>
         builder.Property(c => c.PrimaryContactEmail).HasMaxLength(320);
         builder.Property(c => c.PrimaryContactPhone).HasMaxLength(50);
         builder.Property(c => c.Notes).HasMaxLength(2000);
+
+        builder.Property(c => c.BillingPeriod).HasConversion<string>().HasMaxLength(20).IsRequired().HasDefaultValue(BillingPeriod.OneOff);
 
         builder.HasIndex(c => c.AccountCode).IsUnique();
         builder.HasOne(c => c.Currency).WithMany().HasForeignKey(c => c.CurrencyId).OnDelete(DeleteBehavior.SetNull);

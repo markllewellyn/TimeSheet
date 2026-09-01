@@ -18,9 +18,13 @@ export interface Client {
   invoicingMonthEndDay: number | null;
   notes: string | null;
   isActive: boolean;
+  billingPeriod: BillingPeriod;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
 }
 
 export type PaymentModel = 'TimeAndMaterials' | 'FixedProjectCost';
+export type BillingPeriod = 'OneOff' | 'Monthly';
 export type ProjectType = 'Development' | 'Support' | 'Contract';
 
 export interface Project {

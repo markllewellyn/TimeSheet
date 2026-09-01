@@ -42,6 +42,7 @@ public static class DependencyInjection
         services.AddScoped<IReportingRepository, ReportingRepository>();
         services.AddScoped<IProjectHealthAssessmentRepository, ProjectHealthAssessmentRepository>();
         services.AddScoped<IAppSettingsRepository, AppSettingsRepository>();
+        services.AddScoped<IPayrollPeriodRepository, PayrollPeriodRepository>();
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IProjectEstimateService, ProjectEstimateService>();
@@ -62,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<IReportingService, ReportingService>();
         services.AddScoped<IProjectHealthAssessor, ProjectHealthAssessor>();
         services.AddScoped<IProjectHealthService, ProjectHealthService>();
+        services.AddScoped<IPayrollAggregationService, PayrollAggregationService>();
+        services.AddScoped<IBillingRollForwardService, BillingRollForwardService>();
 
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddScoped<ILocalAuthService, LocalAuthService>();

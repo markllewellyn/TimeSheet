@@ -35,6 +35,15 @@ public class Client
     /// <summary>Day of month the invoicing period ends on for this client. Null = calendar month end.</summary>
     public int? InvoicingMonthEndDay { get; set; }
 
+    /// <summary>FDD Key Entities: "A client, with... the billing period." OneOff (default, preserves every
+    /// existing client's behavior) = an admin generates invoices manually as today. Monthly = the
+    /// MonthlyBillingRollForward timer auto-generates a Draft for CurrentPeriodStart/End once it has closed,
+    /// then advances the window - see IBillingRollForwardService. CurrentPeriodStart/End are only meaningful
+    /// when BillingPeriod is Monthly.</summary>
+    public BillingPeriod BillingPeriod { get; set; } = BillingPeriod.OneOff;
+    public DateOnly? CurrentPeriodStart { get; set; }
+    public DateOnly? CurrentPeriodEnd { get; set; }
+
     public string? Notes { get; set; }
     public bool IsActive { get; set; } = true;
 

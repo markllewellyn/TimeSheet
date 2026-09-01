@@ -32,6 +32,8 @@ public class TimesheetDbContext(DbContextOptions<TimesheetDbContext> options) : 
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<ProjectHealthAssessment> ProjectHealthAssessments => Set<ProjectHealthAssessment>();
     public DbSet<AppSettings> AppSettings => Set<AppSettings>();
+    public DbSet<PayrollPeriod> PayrollPeriods => Set<PayrollPeriod>();
+    public DbSet<PayrollPeriodLine> PayrollPeriodLines => Set<PayrollPeriodLine>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

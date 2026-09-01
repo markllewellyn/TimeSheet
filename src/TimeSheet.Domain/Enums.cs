@@ -12,6 +12,16 @@ public enum PaymentModel
     FixedProjectCost
 }
 
+/// <summary>FDD Key Entities: "A client, with... the billing period." OneOff = an admin generates invoices
+/// manually as today (default, preserves existing behavior for every client). Monthly = the
+/// MonthlyBillingRollForward timer auto-generates a Draft invoice once Client.CurrentPeriodEnd has closed, then
+/// advances the window - see IBillingRollForwardService.</summary>
+public enum BillingPeriod
+{
+    OneOff,
+    Monthly
+}
+
 /// <summary>FDD: "Projects are split by type: Development, Support and Contract" - a different axis from
 /// PaymentModel (which controls how a project is billed, not what kind of work it is). Only a Contract-type
 /// project may have a Contract EntryType configured against it - see EntryType.</summary>
@@ -54,7 +64,8 @@ public enum NotificationType
     InvoiceGenerated,
     ProjectHealthDeclined,
     FlagRaised,
-    FlagCleared
+    FlagCleared,
+    PayrollPeriodReady
 }
 
 public enum NotificationChannel

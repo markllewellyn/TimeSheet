@@ -7,6 +7,7 @@ import { CurrenciesService, Currency } from '../../../../core/services/currencie
 import { RateCardsService, RateCard } from '../../../../core/services/rate-cards.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { AppUser } from '../../../../core/models/user.models';
+import { BillingPeriod } from '../../../../core/models/project.models';
 
 @Component({
   selector: 'app-client-edit-page',
@@ -37,6 +38,9 @@ export class ClientEditPage {
   protected readonly currencyId = signal<number | null>(null);
   protected readonly invoicingMonthEndDay = signal<number | null>(null);
   protected readonly notes = signal('');
+  protected readonly billingPeriod = signal<BillingPeriod>('OneOff');
+  protected readonly currentPeriodStart = signal<string | null>(null);
+  protected readonly currentPeriodEnd = signal<string | null>(null);
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
 
@@ -70,6 +74,9 @@ export class ClientEditPage {
         this.currencyId.set(c.currencyId);
         this.invoicingMonthEndDay.set(c.invoicingMonthEndDay);
         this.notes.set(c.notes ?? '');
+        this.billingPeriod.set(c.billingPeriod);
+        this.currentPeriodStart.set(c.currentPeriodStart);
+        this.currentPeriodEnd.set(c.currentPeriodEnd);
       });
       this.refreshRateCards(id);
       this.usersAdmin.list(false).subscribe((users) => this.staff.set(users));
@@ -96,6 +103,9 @@ export class ClientEditPage {
       currencyId: this.currencyId(),
       invoicingMonthEndDay: this.invoicingMonthEndDay(),
       notes: this.notes() || null,
+      billingPeriod: this.billingPeriod(),
+      currentPeriodStart: this.billingPeriod() === 'Monthly' ? this.currentPeriodStart() : null,
+      currentPeriodEnd: this.billingPeriod() === 'Monthly' ? this.currentPeriodEnd() : null,
     };
 
     const save$ = this.isEditMode

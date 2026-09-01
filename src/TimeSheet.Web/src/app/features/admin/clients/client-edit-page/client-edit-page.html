@@ -61,6 +61,24 @@
       <input type="number" min="1" max="31" class="input" [ngModel]="invoicingMonthEndDay()" (ngModelChange)="invoicingMonthEndDay.set($event)" />
     </label>
 
+    <label class="field">
+      <span class="field-label">Billing Period</span>
+      <select class="input" [ngModel]="billingPeriod()" (ngModelChange)="billingPeriod.set($event)">
+        <option value="OneOff">One-off (invoices generated manually)</option>
+        <option value="Monthly">Monthly (invoices auto-drafted each month)</option>
+      </select>
+    </label>
+    @if (billingPeriod() === 'Monthly') {
+      <label class="field">
+        <span class="field-label">Current Period Start</span>
+        <input type="date" class="input" [ngModel]="currentPeriodStart()" (ngModelChange)="currentPeriodStart.set($event)" />
+      </label>
+      <label class="field">
+        <span class="field-label">Current Period End</span>
+        <input type="date" class="input" [ngModel]="currentPeriodEnd()" (ngModelChange)="currentPeriodEnd.set($event)" />
+      </label>
+    }
+
     <label class="field col-span-2">
       <span class="field-label">Notes</span>
       <textarea class="input" rows="3" [ngModel]="notes()" (ngModelChange)="notes.set($event)"></textarea>

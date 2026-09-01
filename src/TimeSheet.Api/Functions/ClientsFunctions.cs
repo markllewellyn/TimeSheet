@@ -4,6 +4,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using TimeSheet.Api.Auth;
 using TimeSheet.Contracts;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
@@ -53,6 +54,8 @@ public class ClientsFunctions(
             return new ConflictObjectResult(new { error = $"Account code '{body.AccountCode}' is already in use." });
         }
 
+        var (billingPeriod, periodStart, periodEnd) = ResolveBillingPeriod(body);
+
         var client = new Client
         {
             Name = body.Name,
@@ -69,6 +72,9 @@ public class ClientsFunctions(
             CurrencyId = body.CurrencyId,
             InvoicingMonthEndDay = body.InvoicingMonthEndDay,
             Notes = body.Notes,
+            BillingPeriod = billingPeriod,
+            CurrentPeriodStart = periodStart,
+            CurrentPeriodEnd = periodEnd,
             CreatedUtc = DateTimeOffset.UtcNow,
             CreatedByUserId = currentUser.RequireUser().UserId,
         };
@@ -117,6 +123,12 @@ public class ClientsFunctions(
         client.CurrencyId = body.CurrencyId;
         client.InvoicingMonthEndDay = body.InvoicingMonthEndDay;
         client.Notes = body.Notes;
+
+        var (billingPeriod, periodStart, periodEnd) = ResolveBillingPeriod(body);
+        client.BillingPeriod = billingPeriod;
+        client.CurrentPeriodStart = periodStart;
+        client.CurrentPeriodEnd = periodEnd;
+
         client.ModifiedUtc = DateTimeOffset.UtcNow;
         client.ModifiedByUserId = currentUser.RequireUser().UserId;
 
@@ -174,9 +186,33 @@ public class ClientsFunctions(
         return null;
     }
 
+    /// <summary>Defaults BillingPeriod to OneOff when omitted/unrecognized (preserves today's manual-invoicing
+    /// behavior for every existing client). Switching to Monthly with no period supplied defaults to the current
+    /// calendar month rather than erroring - an admin flipping the flag shouldn't have to hand-compute a month
+    /// boundary. Switching to (or staying) OneOff always clears both period fields, so no stale window lingers
+    /// if a client is switched back later.</summary>
+    private static (BillingPeriod BillingPeriod, DateOnly? PeriodStart, DateOnly? PeriodEnd) ResolveBillingPeriod(UpsertClientRequest body)
+    {
+        if (!Enum.TryParse<BillingPeriod>(body.BillingPeriod, out var billingPeriod) || billingPeriod != BillingPeriod.Monthly)
+        {
+            return (BillingPeriod.OneOff, null, null);
+        }
+
+        if (body.CurrentPeriodStart is { } start && body.CurrentPeriodEnd is { } end)
+        {
+            return (BillingPeriod.Monthly, start, end);
+        }
+
+        var today = DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date);
+        var monthStart = new DateOnly(today.Year, today.Month, 1);
+        var monthEnd = new DateOnly(today.Year, today.Month, DateTime.DaysInMonth(today.Year, today.Month));
+        return (BillingPeriod.Monthly, monthStart, monthEnd);
+    }
+
     private static ClientDto ToDto(Client c) => new(
         c.Id, c.Name, c.AccountCode, c.StartDate,
         c.BillingAddressLine1, c.BillingAddressLine2, c.BillingCity, c.BillingPostalCode, c.BillingCountryCode,
         c.PrimaryContactName, c.PrimaryContactEmail, c.PrimaryContactPhone,
-        c.CurrencyId, c.ReportingCurrencyCode, c.InvoicingMonthEndDay, c.Notes, c.IsActive);
+        c.CurrencyId, c.ReportingCurrencyCode, c.InvoicingMonthEndDay, c.Notes, c.IsActive,
+        c.BillingPeriod.ToString(), c.CurrentPeriodStart, c.CurrentPeriodEnd);
 }

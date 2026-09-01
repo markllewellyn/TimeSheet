@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Client } from '../models/project.models';
+import { BillingPeriod, Client } from '../models/project.models';
 
 export interface UpsertClientRequest {
   name: string;
@@ -19,6 +19,9 @@ export interface UpsertClientRequest {
   currencyId: number | null;
   invoicingMonthEndDay: number | null;
   notes: string | null;
+  billingPeriod?: BillingPeriod;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
 }
 
 @Injectable({ providedIn: 'root' })
