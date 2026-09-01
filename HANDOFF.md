@@ -24,6 +24,12 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
   live-testing item 1 above: the Approvals page didn't refresh the "Ready for Payroll" tab's
   count/rows after approving entries in the "Pending" tab, if the Ready tab had already been
   visited earlier in the session — it just went stale until a manual page reload.
+- `f906359` — `PayrollPeriod` read UI: a new Admin-only `/admin/payroll-periods` page listing
+  generated periods (month, staff count, total OOH hours/pay, generated-at) with a per-staff
+  breakdown on selecting one. Closes the "no read UI this session" scope decision from the
+  `cf03094` payroll-aggregation work below — that decision held for the length of one commit, not
+  the whole session. Admin-only throughout (no PM variant) since `PayrollPeriod` has no project
+  dimension to scope a PM against. No new tests (flat query/DTO mapping, no branching).
 
 **Local Azurite storage emulator installed** (no app code change, not a commit): the two new timer
 Functions' *listeners* couldn't even start locally — `local.settings.json` already had the correct
@@ -102,9 +108,8 @@ it cleanly on this session's `func start`.
    it to the current billing period or to the next billing period." No field for this exists on
    `TimesheetEntry`; this session's billing roll-forward timer only handles the *client-level*
    cadence/roll-forward, not this per-entry choice. New, smaller scope than item 1 above.
-3. **`PayrollPeriod` read UI** — a list/detail view of generated payroll periods for admins; the
-   aggregation itself is done (this session), just nothing shows it yet beyond the notification
-   text and the underlying (unexposed) entries.
+
+(The `PayrollPeriod` read UI that used to be item 3 here is done — see `f906359` above.)
 
 ## Known loose ends / flags already raised, not yet actioned
 
@@ -128,11 +133,12 @@ it cleanly on this session's `func start`.
     approved (posting batch `OOH-TIMER-VERIFY`) specifically to give the payroll aggregation timer
     real data to aggregate. A `PayrollPeriod` row for August 2026 (1 staff, 3.0h) now exists because
     of it.
-  - One client was switched to `BillingPeriod = Monthly` with `CurrentPeriodEnd` set in the past
-    (done via the browser, by you) so `MonthlyBillingRollForward` had something to act on — it
-    generated a real Draft invoice and advanced that client's period to the following month. Check
-    Admin → Clients to see which one and decide whether to leave it on Monthly billing or switch it
-    back to OneOff; check Admin → Invoicing for the Draft it produced.
+  - **Everlast** (client id 4) was switched to `BillingPeriod = Monthly` with `CurrentPeriodEnd` in
+    the past (done via the browser, by you) so `MonthlyBillingRollForward` had something to act on
+    — it generated **Invoice #10**, a real Draft for the 2026-08-01..08-31 period, $3,800.00 USD,
+    and advanced Everlast's window to September. Decide whether to leave Everlast on Monthly
+    billing (it'll keep auto-generating Drafts each month once the timer actually runs on schedule)
+    or switch it back to OneOff; check Admin → Invoicing → Everlast for the Draft.
   - None of the above block anything — all clearly attributable and reversible, same pattern as
     prior sessions' verification leftovers below.
 - Everything below is unchanged from last session:
