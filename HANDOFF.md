@@ -17,8 +17,30 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
   on the 1st) adds `Client.BillingPeriod` (OneOff/Monthly) + `CurrentPeriodStart`/`CurrentPeriodEnd`
   (editable via the existing Clients admin page); for every Monthly client whose period has
   closed, it generates a Draft invoice via the existing `GenerateDraftInvoiceAsync` and advances
-  the window — an admin still reviews/finalizes manually. 13 new unit tests. **Not live-verified
-  end-to-end** — see loose ends below for why.
+  the window — an admin still reviews/finalizes manually. 13 new unit tests. **Now fully
+  live-verified end-to-end** — see the Azurite note directly below (not yet true at the time of
+  this commit itself; the verification happened in a later round of the same session).
+- `1f91f41` — Fixed a real (pre-existing, not introduced this session) frontend bug found while
+  live-testing item 1 above: the Approvals page didn't refresh the "Ready for Payroll" tab's
+  count/rows after approving entries in the "Pending" tab, if the Ready tab had already been
+  visited earlier in the session — it just went stale until a manual page reload.
+
+**Local Azurite storage emulator installed** (no app code change, not a commit): the two new timer
+Functions' *listeners* couldn't even start locally — `local.settings.json` already had the correct
+`AzureWebJobsStorage=UseDevelopmentStorage=true`, but nothing was listening on Azurite's default
+ports, so the func host logged `The listener for function '...' was unable to start` for all four
+timers (the two new ones and the two pre-existing ones — this was never new-code-specific).
+Installed globally via `npm install -g azurite`, given a persistent data directory at
+`C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\` (same convention as the dev SQLite DB
+and Attachments folder), and started with:
+```
+azurite --silent --location "C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite" --debug "C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\debug.log"
+```
+**Azurite must be running before `func start`** for any timer-triggered Function to actually fire
+(scheduled or via `POST /admin/functions/{name}`) — otherwise you'll see 202-with-no-effect or the
+listener-startup error above. With it running, both new timers were manually triggered and
+confirmed to have real effects (see the `cf03094` entry above and the loose-ends note that used to
+flag this as unverified — now resolved).
 - `5a79f83` — Project-manager scoping on payroll approvals: the approve/send-to-payroll workflow
   (`TimesheetApprovalFunctions`) was Admin-only; a PM can now additionally see/approve/send
   entries on projects they manage (FDD: "out of hours work must be approved by project managers or
@@ -36,7 +58,10 @@ Angular builds clean (`node node_modules/@angular/cli/bin/ng.js build`).
 
 Local dev servers were left running this session: API on `http://localhost:7071` (`func start`
 from `src/TimeSheet.Api`), Angular on `http://localhost:3000` (`npm start` from
-`src/TimeSheet.Web`). Same dev SQLite file as before
+`src/TimeSheet.Web`), **and now also Azurite** (see above — install once with
+`npm install -g azurite`, then start it before `func start` every session; the func host was
+restarted mid-session once Azurite came up, which is why its process/log is newer than the
+Angular one). Same dev SQLite file as before
 (`C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\timesheet.db`); the new migration applied to
 it cleanly on this session's `func start`.
 
@@ -83,37 +108,33 @@ it cleanly on this session's `func start`.
 
 ## Known loose ends / flags already raised, not yet actioned
 
-- **The two new timer Functions were not live-exercised end-to-end this session.** The local func
-  host has no Azurite/storage-emulator instance running (`AzureWebJobsStorage=UseDevelopmentStorage=true`
-  with nothing listening on `127.0.0.1:10000`) — this is the exact pre-existing gap HANDOFF already
-  noted against the two older timers, now also blocking `MonthlyPayrollAggregation`/
-  `MonthlyBillingRollForward`'s timer *listener* from starting (confirmed via the func host's
-  startup log: `The listener for function 'Functions.MonthlyPayrollAggregation' was unable to
-  start`). Manually invoking via the Functions admin endpoint (`POST /admin/functions/{name}`)
-  returns 202 but doesn't actually run without a working listener. Both new services
-  (`PayrollAggregationService`, `BillingRollForwardService`) are instead covered by 13 unit tests
-  against an in-memory SQLite DB, which is as close to "prove the logic is correct" as this
-  environment allows without Azurite. Installing/running Azurite (or Azure Storage Emulator) would
-  unblock live end-to-end verification of all four timers, not just the two new ones.
-- **The Clients admin API's new `BillingPeriod`/`CurrentPeriodStart`/`CurrentPeriodEnd` fields were
-  not live-verified against the running dev API.** `Clients_Create`/`Clients_Update` are Admin-only,
-  and this session didn't have the seeded Admin's actual password (per the existing loose-end note
-  below — it's this machine's own, not a seed default) to log in as Admin. Covered by the
-  `ClientsFunctions.ResolveBillingPeriod` logic being straightforward and by the Angular build
-  passing, but not exercised live. A future session with Admin access should flip a demo client to
-  Monthly and confirm the create/update round-trip.
+- **The Clients admin API's new `BillingPeriod`/`CurrentPeriodStart`/`CurrentPeriodEnd` fields**
+  were live-verified indirectly (you set a real client to Monthly with a past period end via the
+  browser, and `MonthlyBillingRollForward` picked it up correctly), but not the raw
+  `Clients_Create`/`Clients_Update` request/response shape directly against the API — low risk
+  given how thin `ClientsFunctions.ResolveBillingPeriod` is, and the roll-forward timer's success
+  implicitly proves the save path worked.
 - **The batch-rejection path for PM-scoped Approve/SendToPayroll (mixing in an entry outside the
   PM's managed projects → 400) was verified by code review, not live.** Exercising it live would
   need a second project managed by someone else with a pending entry, which wasn't available
-  without Admin access this session (see above). The list-scoping and same-project cross-staff
-  approval paths (the more commonly hit cases) *were* live-verified — see the `5a79f83` commit
-  message.
-- **Left-over demo-data artifact from this session's live verification**: entry id 23 on project 3
-  ("ERP Migration Phase 2") was approved for payroll by `sarah.chen@svgit.co.uk` (acting as that
-  project's PM) into a posting batch literally named `PM-VERIFY-BATCH (verification - can be
-  reverted by admin if desired)`, confirming a PM can approve a teammate's entry on their managed
-  project. Clearly labelled, safe to leave or revert (there's no "un-approve" endpoint — reverting
-  would need a direct DB edit).
+  without full Admin access this session. The list-scoping and same-project cross-staff approval
+  paths (the more commonly hit cases) *were* live-verified — see the `5a79f83` commit message.
+- **Left-over demo-data artifacts from this session's live verification**:
+  - Entry id 23 on project 3 ("ERP Migration Phase 2") was approved for payroll by
+    `sarah.chen@svgit.co.uk` (acting as that project's PM) into a posting batch literally named
+    `PM-VERIFY-BATCH (verification - can be reverted by admin if desired)`.
+  - Entry id 119, a 3-hour out-of-hours entry on project 3 dated 2026-08-15, description "OOH
+    verification entry for MonthlyPayrollAggregation timer test (safe to delete)" — created and
+    approved (posting batch `OOH-TIMER-VERIFY`) specifically to give the payroll aggregation timer
+    real data to aggregate. A `PayrollPeriod` row for August 2026 (1 staff, 3.0h) now exists because
+    of it.
+  - One client was switched to `BillingPeriod = Monthly` with `CurrentPeriodEnd` set in the past
+    (done via the browser, by you) so `MonthlyBillingRollForward` had something to act on — it
+    generated a real Draft invoice and advanced that client's period to the following month. Check
+    Admin → Clients to see which one and decide whether to leave it on Monthly billing or switch it
+    back to OneOff; check Admin → Invoicing for the Draft it produced.
+  - None of the above block anything — all clearly attributable and reversible, same pattern as
+    prior sessions' verification leftovers below.
 - Everything below is unchanged from last session:
   - The Roles created earlier (Director, Senior Consultant, Consultant) have **no default RateCard
     rows** — role-based fallback resolution will fail for any staff/client/project combo not
