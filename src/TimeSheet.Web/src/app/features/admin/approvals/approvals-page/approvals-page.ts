@@ -103,6 +103,9 @@ export class ApprovalsPage {
         this.newPostingBatchName.set('');
         this.postingBatchChoice.set('');
         this.refreshPending();
+        // Approving moves entries into the "ready" queue - keep its tab badge/list in sync
+        // immediately rather than leaving it stale until the user switches tabs or reloads.
+        if (this.readyLoaded()) this.refreshReady();
       },
       error: (err) => {
         this.approving.set(false);
