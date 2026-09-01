@@ -6,6 +6,10 @@
     the Approvals screen.
   </p>
 
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
   <div class="card overflow-hidden px-4">
     <table class="table-clean">
       <thead>

@@ -15,14 +15,21 @@ export class PayrollPeriodsPage {
   protected readonly periods = signal<PayrollPeriod[]>([]);
   protected readonly selectedPeriod = signal<PayrollPeriodDetail | null>(null);
   protected readonly selectedPeriodId = signal<number | null>(null);
+  protected readonly error = signal<string | null>(null);
 
   constructor() {
-    this.payrollPeriodsService.list().subscribe((periods) => this.periods.set(periods));
+    this.payrollPeriodsService.list().subscribe({
+      next: (periods) => this.periods.set(periods),
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not load payroll periods.'),
+    });
   }
 
   protected select(period: PayrollPeriod): void {
     this.selectedPeriodId.set(period.id);
     this.selectedPeriod.set(null);
-    this.payrollPeriodsService.getById(period.id).subscribe((detail) => this.selectedPeriod.set(detail));
+    this.payrollPeriodsService.getById(period.id).subscribe({
+      next: (detail) => this.selectedPeriod.set(detail),
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not load that payroll period.'),
+    });
   }
 }
