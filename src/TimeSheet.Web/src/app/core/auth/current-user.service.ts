@@ -27,6 +27,7 @@ export class CurrentUserService {
   private readonly meSignal = signal<Me | null>(null);
   readonly me = this.meSignal.asReadonly();
   readonly isAdmin = computed(() => this.meSignal()?.role === 'Admin');
+  readonly isProjectManager = computed(() => this.meSignal()?.isProjectManager === true);
   readonly isSignedIn = computed(() => this.msal.instance.getAllAccounts().length > 0 || this.localAuth.isSignedIn());
 
   // True once a signed-in account has no matching app User row yet (a fresh database, or an account an Admin

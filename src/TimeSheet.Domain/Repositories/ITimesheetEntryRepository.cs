@@ -34,17 +34,25 @@ public interface ITimesheetEntryRepository
     /// hours are still persisted at validation time).</summary>
     Task<decimal> GetTotalHoursForUserDateAsync(int userId, DateOnly date, int? excludeEntryId, CancellationToken ct);
 
-    /// <summary>Entries not yet approved for payroll, across all users - the Admin Approvals queue. Filtered by
-    /// a free-text search over staff/customer/project name, matching the legacy Approval tab's search box.</summary>
-    Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, CancellationToken ct);
+    /// <summary>Entries not yet approved for payroll - the Approvals queue. Filtered by a free-text search over
+    /// staff/customer/project name, matching the legacy Approval tab's search box. projectIds restricts to a
+    /// project manager's own managed project(s) when the caller isn't Admin - null means no restriction.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, IReadOnlyCollection<int>? projectIds, CancellationToken ct);
 
-    /// <summary>Approved but not yet sent to payroll - the Admin "Ready for Payroll" queue.</summary>
-    Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(CancellationToken ct);
+    /// <summary>Approved but not yet sent to payroll - the "Ready for Payroll" queue. Same projectIds scoping as
+    /// GetPendingApprovalAsync.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct);
+
+    /// <summary>Out-of-hours entries already approved for payroll but not yet sent, within a period - powers
+    /// IPayrollAggregationService's monthly rollup.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetOutOfHoursApprovedNotSentAsync(DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
 
     /// <summary>Distinct non-empty PostingBatch values ever used, for the "existing batch" picker on approve.</summary>
     Task<IReadOnlyList<string>> GetDistinctPostingBatchesAsync(CancellationToken ct);
 
-    /// <summary>Bulk fetch for the Approve / Send-to-Payroll actions, which mutate many entries in one call.</summary>
+    /// <summary>Bulk fetch for the Approve / Send-to-Payroll actions, which mutate many entries in one call.
+    /// Includes Project so a project-manager caller can be checked against entry.Project.ProjectManagerUserId
+    /// without a second round trip.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken ct);
 
     Task AddAsync(TimesheetEntry entry, CancellationToken ct);

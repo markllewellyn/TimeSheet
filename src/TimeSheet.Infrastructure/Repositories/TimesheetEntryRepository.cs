@@ -64,13 +64,15 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         return await query.OrderBy(e => e.Date).ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, CancellationToken ct)
+    public async Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, IReadOnlyCollection<int>? projectIds, CancellationToken ct)
     {
         var query = db.TimesheetEntries
             .Include(e => e.User)
             .Include(e => e.Client)
             .Include(e => e.Project)
             .Where(e => !e.ApprovedPayroll);
+
+        if (projectIds is not null) query = query.Where(e => projectIds.Contains(e.ProjectId));
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
@@ -84,13 +86,23 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         return await query.OrderBy(e => e.Date).ToListAsync(ct);
     }
 
-    public async Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(CancellationToken ct) =>
-        await db.TimesheetEntries
+    public async Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct)
+    {
+        var query = db.TimesheetEntries
             .Include(e => e.User)
             .Include(e => e.Client)
             .Include(e => e.Project)
-            .Where(e => e.ApprovedPayroll && !e.SentToPayroll)
-            .OrderBy(e => e.Date)
+            .Where(e => e.ApprovedPayroll && !e.SentToPayroll);
+
+        if (projectIds is not null) query = query.Where(e => projectIds.Contains(e.ProjectId));
+
+        return await query.OrderBy(e => e.Date).ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<TimesheetEntry>> GetOutOfHoursApprovedNotSentAsync(DateOnly periodStart, DateOnly periodEnd, CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Include(e => e.User)
+            .Where(e => e.OutOfHoursHours > 0 && e.ApprovedPayroll && !e.SentToPayroll && e.Date >= periodStart && e.Date <= periodEnd)
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<string>> GetDistinctPostingBatchesAsync(CancellationToken ct) =>
@@ -101,7 +113,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .ToListAsync(ct);
 
     public async Task<IReadOnlyList<TimesheetEntry>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken ct) =>
-        await db.TimesheetEntries.Where(e => ids.Contains(e.Id)).ToListAsync(ct);
+        await db.TimesheetEntries.Include(e => e.Project).Where(e => ids.Contains(e.Id)).ToListAsync(ct);
 
     public async Task AddAsync(TimesheetEntry entry, CancellationToken ct) => await db.TimesheetEntries.AddAsync(entry, ct);
 

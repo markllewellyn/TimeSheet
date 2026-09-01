@@ -14,4 +14,4 @@ public record InviteUserResponse(UserDto User, string? TemporaryPassword);
 
 public record UpdateUserRequest(string DisplayName, string Role, int? JobRoleId, bool IsActive, string PayrollNumber);
 
-public record MeDto(int Id, string DisplayName, string Email, string Role);
+public record MeDto(int Id, string DisplayName, string Email, string Role, bool IsProjectManager);

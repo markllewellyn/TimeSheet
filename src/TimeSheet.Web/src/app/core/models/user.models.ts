@@ -5,6 +5,7 @@ export interface Me {
   displayName: string;
   email: string;
   role: 'Admin' | 'User';
+  isProjectManager: boolean;
 }
 
 export interface AppUser {

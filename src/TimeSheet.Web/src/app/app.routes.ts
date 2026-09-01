@@ -146,8 +146,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/project-health/project-health-page/project-health-page').then((m) => m.ProjectHealthPage),
   },
   {
+    // Admin or project manager (of at least one project) - FDD: "out of hours work must be approved
+    // by project managers or administrators." The backend scopes the list/actions to the PM's own
+    // managed project(s); this page has no adminGuard so a PM with nothing to manage just sees an
+    // empty queue rather than being blocked from the route entirely.
     path: 'admin/approvals',
-    canActivate: [authGuard, adminGuard],
+    canActivate: [authGuard],
     loadComponent: () => import('./features/admin/approvals/approvals-page/approvals-page').then((m) => m.ApprovalsPage),
   },
   {
