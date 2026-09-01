@@ -1,13 +1,28 @@
 <div class="flex flex-col gap-4">
-  <h1 class="page-title">Payroll Periods</h1>
-  <p class="-mt-2 text-xs text-muted-foreground">
-    Out-of-hours pay aggregated per staff member for each month, generated automatically by the monthly payroll
-    aggregation job. This is a read-only summary - approving and sending entries to payroll still happens on
-    the Approvals screen.
-  </p>
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Payroll Periods</h1>
+      <p class="page-subtitle">
+        Out-of-hours pay aggregated per staff member for each month, generated automatically by the monthly
+        payroll aggregation job. This is a read-only summary - approving and sending entries to payroll still
+        happens on the Approvals screen.
+      </p>
+    </div>
+    <button
+      class="btn-secondary"
+      [disabled]="running()"
+      (click)="runNow()"
+      title="Manually runs the same monthly out-of-hours payroll aggregation job that normally happens automatically on the 1st of each month - aggregates approved-but-not-yet-sent out-of-hours entries from last calendar month per staff member."
+    >
+      {{ running() ? 'Running…' : 'Run Now' }}
+    </button>
+  </div>
 
   @if (error(); as e) {
     <div class="banner-error">{{ e }}</div>
+  }
+  @if (successMessage(); as s) {
+    <div class="banner-success">{{ s }}</div>
   }
 
   <div class="card overflow-hidden px-4">

@@ -16,4 +16,8 @@ export class PayrollPeriodsService {
   getById(id: number): Observable<PayrollPeriodDetail> {
     return this.http.get<PayrollPeriodDetail>(`${this.baseUrl}/${id}`);
   }
+
+  runNow(): Observable<PayrollPeriod> {
+    return this.http.post<PayrollPeriod>(`${this.baseUrl}/run-now`, {});
+  }
 }

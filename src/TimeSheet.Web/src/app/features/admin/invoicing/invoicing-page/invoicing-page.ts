@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { Invoice, InvoiceLineItem, InvoicesService } from '../../../../core/services/invoices.service';
+import { BillingRollForwardService } from '../../../../core/services/billing-roll-forward.service';
 import { Client } from '../../../../core/models/project.models';
 
 @Component({
@@ -14,10 +15,12 @@ import { Client } from '../../../../core/models/project.models';
 export class InvoicingPage {
   private readonly clientsService = inject(ClientsService);
   private readonly invoicesService = inject(InvoicesService);
+  private readonly billingRollForwardService = inject(BillingRollForwardService);
 
   protected readonly clients = signal<Client[]>([]);
   protected readonly selectedClientId = signal<number | null>(null);
   protected readonly invoices = signal<Invoice[]>([]);
+  protected readonly runningRollForward = signal(false);
 
   protected readonly periodStart = signal(this.firstOfMonth());
   protected readonly periodEnd = signal(new Date().toISOString().slice(0, 10));
@@ -78,6 +81,26 @@ export class InvoicingPage {
       error: (err) => {
         this.successMessage.set(null);
         this.error.set(err?.error?.error ?? 'Could not generate the draft invoice.');
+      },
+    });
+  }
+
+  protected runBillingRollForward(): void {
+    this.runningRollForward.set(true);
+    this.billingRollForwardService.runNow().subscribe({
+      next: (result) => {
+        this.runningRollForward.set(false);
+        this.error.set(null);
+        this.successMessage.set(
+          `Billing roll-forward complete: ${result.clientsDue} due, ${result.invoicesGenerated} generated, ${result.failed} failed.`,
+        );
+        const clientId = this.selectedClientId();
+        if (clientId) this.refresh(clientId);
+      },
+      error: (err) => {
+        this.runningRollForward.set(false);
+        this.successMessage.set(null);
+        this.error.set(err?.error?.error ?? 'Could not run the billing roll-forward.');
       },
     });
   }
