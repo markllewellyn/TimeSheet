@@ -1,0 +1,76 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Payroll Periods</h1>
+  <p class="-mt-2 text-xs text-muted-foreground">
+    Out-of-hours pay aggregated per staff member for each month, generated automatically by the monthly payroll
+    aggregation job. This is a read-only summary - approving and sending entries to payroll still happens on
+    the Approvals screen.
+  </p>
+
+  <div class="card overflow-hidden px-4">
+    <table class="table-clean">
+      <thead>
+        <tr>
+          <th>Period</th>
+          <th>Staff</th>
+          <th>Total OOH Hours</th>
+          <th>Total OOH Pay</th>
+          <th>Generated</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (p of periods(); track p.id) {
+          <tr
+            class="cursor-pointer"
+            [class.bg-muted]="selectedPeriodId() === p.id"
+            (click)="select(p)"
+          >
+            <td class="font-medium text-foreground">{{ p.periodStart | date: 'MMMM yyyy' }}</td>
+            <td>{{ p.staffCount }}</td>
+            <td>{{ p.totalOutOfHoursHours | number: '1.1-1' }}</td>
+            <td>{{ p.totalOutOfHoursPay | number: '1.2-2' }}</td>
+            <td class="text-muted-foreground">{{ p.generatedAtUtc | date: 'short' }}</td>
+          </tr>
+        } @empty {
+          <tr>
+            <td colspan="5" class="text-center text-sm text-muted-foreground">No payroll periods have been generated yet.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  @if (selectedPeriodId(); as id) {
+    <div>
+      <h2 class="mb-3 text-lg font-semibold tracking-tight">{{ selectedPeriod()?.periodStart | date: 'MMMM yyyy' }} - Staff Breakdown</h2>
+
+      @if (selectedPeriod(); as detail) {
+        <div class="card overflow-hidden px-4">
+          <table class="table-clean">
+            <thead>
+              <tr>
+                <th>Staff</th>
+                <th>Out of Hours</th>
+                <th>Pay</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (l of detail.lines; track l.userId) {
+                <tr>
+                  <td class="font-medium text-foreground">{{ l.staffName }}</td>
+                  <td>{{ l.outOfHoursHours | number: '1.1-1' }}</td>
+                  <td>{{ l.outOfHoursPay | number: '1.2-2' }}</td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="3" class="text-center text-sm text-muted-foreground">No staff had out-of-hours pay this period.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="text-sm text-muted-foreground">Loading…</p>
+      }
+    </div>
+  }
+</div>

@@ -141,6 +141,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/invoicing/invoicing-page/invoicing-page').then((m) => m.InvoicingPage),
   },
   {
+    path: 'admin/payroll-periods',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () =>
+      import('./features/admin/payroll-periods/payroll-periods-page/payroll-periods-page').then((m) => m.PayrollPeriodsPage),
+  },
+  {
     path: 'admin/health',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin/project-health/project-health-page/project-health-page').then((m) => m.ProjectHealthPage),
