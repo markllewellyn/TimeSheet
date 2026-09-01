@@ -30,6 +30,15 @@ The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth f
   `cf03094` payroll-aggregation work below — that decision held for the length of one commit, not
   the whole session. Admin-only throughout (no PM variant) since `PayrollPeriod` has no project
   dimension to scope a PM against. No new tests (flat query/DTO mapping, no branching).
+- `00f3a94` — Payroll Periods page now shows a `banner-error` on a failed load instead of silently
+  looking empty — found via the exact 404 described two bullets down.
+- `ce61218` — Manual "Run Now" triggers for both monthly timers, so an Admin can demo them without
+  waiting for the 1st of the month or asking a developer to hit the Functions admin API by hand.
+  Two separate buttons with `title` tooltips: "Run Now" on Payroll Periods
+  (`PayrollPeriods_RunNow` → `IPayrollAggregationService.AggregateAsync`), "Run Billing
+  Roll-Forward Now" on Invoicing (`BillingRollForward_RunNow` → `IBillingRollForwardService
+  .RunAsync`). Each calls the exact same service method its scheduled timer calls, so behavior is
+  identical either way. Both Admin-only.
 
 **Local Azurite storage emulator installed** (no app code change, not a commit): the two new timer
 Functions' *listeners* couldn't even start locally — `local.settings.json` already had the correct
@@ -113,6 +122,12 @@ it cleanly on this session's `func start`.
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **`func start` does not hot-reload new Function definitions** — hit twice this session (once for
+  `PayrollPeriodsFunctions`, once for the "Run Now" endpoints). Adding a brand-new `[Function(...)]`
+  to a running `func start` process silently 404s on its route until the process is restarted;
+  editing an *existing* Function's body seems to work without a restart, but don't trust that
+  either — if a new/changed endpoint 404s or behaves stale, restart the API host first before
+  assuming there's a code bug.
 - **The Clients admin API's new `BillingPeriod`/`CurrentPeriodStart`/`CurrentPeriodEnd` fields**
   were live-verified indirectly (you set a real client to Monthly with a past period end via the
   browser, and `MonthlyBillingRollForward` picked it up correctly), but not the raw
