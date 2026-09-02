@@ -1,10 +1,63 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-01)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-02)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
-## Done this session (commits, newest first)
+## Done this session, 2026-09-02 (`2e96d28`)
+
+Per-entry billing-period choice (FDD: "When an entry is invoiced the user can choose to add it to the current
+billing period or to the next billing period") — this was open item 2 from the previous session's list below.
+
+- New `BillingPeriodChoice` enum on `TimesheetEntry` (`Current` default / `Next`), settable on Create/Update from
+  the Add/Edit Entry page (a new "Bill In" dropdown, shown only for Time & Materials projects — a Fixed Fee
+  project's invoiced amount doesn't derive from entries at all, so the picker would be inert there). Carried
+  over as-is on Duplicate, like every other non-approval field. New migration
+  `AddTimesheetEntryBillingPeriodChoice` (nullable-free, defaults existing rows to `Current`).
+- New `ITimesheetEntryRepository.GetCountedForInvoicingAsync`, used only by `InvoiceGenerationService.
+  BuildDraftAsync` (T&M line items) — NOT by `GetCountedForProjectAsync`, which `ProjectHealthAssessor` still
+  uses unmodified, since project-health tracking isn't about billing periods. Semantics: an entry dated inside
+  the period being invoiced counts normally unless it's `Next`-flagged, in which case it's excluded from *that*
+  period and instead counted in the period immediately following it (same length, ending the day before the
+  next period starts) — and only that one, so a deferred entry can't be swept up indefinitely by every
+  subsequent invoice run if generation is skipped for a while. This is a deliberate, narrower reading of "next
+  period" than "whenever the next draft happens to run" — see the "not yet decided" note below.
+- 5 new unit tests (`InvoiceGenerationServiceTests`) covering: normal same-period counting, a `Next`-flagged
+  entry excluded from its own period, a deferred entry correctly picked up by the immediately-following period,
+  a deferred entry from *two* periods back correctly NOT picked up (proves it doesn't linger), and a
+  `Current`-flagged entry from a previous period correctly NOT pulled forward.
+- Backend builds clean, 36/36 tests pass (31 pre-existing + 5 added). Angular builds clean.
+
+**Not live-verified in a browser this session** — Claude in Chrome was declined by the user, and there's no
+known local-account password to script the API via curl for a UI-shaped check either (the bootstrap-local-admin
+endpoint only ever works once, for the very first account, and this dev DB already has accounts from prior
+sessions). Verified instead via: 5 new targeted unit tests directly against the repository query's period-
+boundary logic (exercised through `InvoiceGenerationService.BuildDraftAsync`, not mocked), a clean backend
+build, and a clean Angular build. **The user has agreed to do a manual browser pass themselves** rather than
+have this session block on it: log in as any staff member, add/edit an entry on a Time & Materials project,
+confirm the new "Bill In" dropdown appears (and does NOT appear on a Fixed Fee project's entries), set it to
+"Next billing period", save, then generate a Draft invoice for that entry's own period (should NOT include it)
+and then for the following period (should). Not yet done as of this handoff - flag any issue found to the next
+session.
+
+Dev servers left running at the end of this session, same as last time: API on `http://localhost:7071`
+(`func start`), Angular on `http://localhost:3000` (`npm start`), and Azurite (started fresh this session with
+the same command as before — see below). Same dev SQLite file; this session's migration applied to it cleanly.
+
+## One thing worth deciding before treating this as fully done
+
+- **"Next period" is defined as "the very next invoicing run for this project's client, same length, no more"**
+  — not "whenever a draft next happens to be generated" and not tied to `Client.CurrentPeriodStart/End`
+  directly (those only exist for `Monthly` clients; T&M invoicing can also be triggered manually with arbitrary
+  date ranges for `OneOff` clients). If an admin skips generating an invoice for a period entirely, a
+  `Next`-flagged entry from the skipped period is **not** swept up by whichever period eventually gets
+  generated after that — it would need to be manually re-flagged. This was the simplest well-defined reading
+  that avoids needing a whole "mark entry as consumed once actually invoiced" locking mechanism (which the FDD's
+  "Finalizing an invoice locks the entries it was built from" line implies exists somewhere, but doesn't
+  currently — a separate, pre-existing gap, not touched this session). Flag if you'd rather have the "sweep up
+  whenever" behavior instead; it's a bigger change (needs the locking mechanism to avoid double-counting).
+
+## Done in the previous session (commits, newest first)
 
 - `cf03094` — Monthly payroll aggregation and billing roll-forward timers: the two remaining
   timer-triggered Functions the FDD calls for (only `DailyTimesheetReminder`/
@@ -112,13 +165,17 @@ it cleanly on this session's `func start`.
 
 1. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob
    Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in
-   dev/prod before this is planned. (Carried over, unchanged from last session.)
-2. **Per-entry billing-period choice** — FDD: "When an entry is invoiced the user can choose to add
-   it to the current billing period or to the next billing period." No field for this exists on
-   `TimesheetEntry`; this session's billing roll-forward timer only handles the *client-level*
-   cadence/roll-forward, not this per-entry choice. New, smaller scope than item 1 above.
+   dev/prod before this is planned. (Carried over, unchanged across sessions.)
+2. **Entries aren't actually locked when an invoice is finalized** — FDD: "Finalizing an invoice
+   locks the entries it was built from." `InvoicingService.FinalizeInvoiceAsync` never touches the
+   underlying `TimesheetEntry` rows at all today; nothing stops an already-invoiced entry from being
+   edited or deleted afterward (`Update`/`Delete`/`Duplicate` in `TimesheetEntriesFunctions` only
+   check `ApprovedPayroll`/`SentToPayroll`, an unrelated payroll-side lock). Noticed while building
+   this session's per-entry billing-period choice — see HANDOFF's "one thing worth deciding" note
+   above for how it relates.
 
-(The `PayrollPeriod` read UI that used to be item 3 here is done — see `f906359` above.)
+(The `PayrollPeriod` read UI that used to be item 3 here, and the per-entry billing-period choice
+that used to be item 2, are both done — see `f906359` and this session's entry above respectively.)
 
 ## Known loose ends / flags already raised, not yet actioned
 
