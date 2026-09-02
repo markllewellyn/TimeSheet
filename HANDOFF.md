@@ -28,17 +28,13 @@ billing period or to the next billing period") — this was open item 2 from the
   `Current`-flagged entry from a previous period correctly NOT pulled forward.
 - Backend builds clean, 36/36 tests pass (31 pre-existing + 5 added). Angular builds clean.
 
-**Not live-verified in a browser this session** — Claude in Chrome was declined by the user, and there's no
-known local-account password to script the API via curl for a UI-shaped check either (the bootstrap-local-admin
-endpoint only ever works once, for the very first account, and this dev DB already has accounts from prior
-sessions). Verified instead via: 5 new targeted unit tests directly against the repository query's period-
-boundary logic (exercised through `InvoiceGenerationService.BuildDraftAsync`, not mocked), a clean backend
-build, and a clean Angular build. **The user has agreed to do a manual browser pass themselves** rather than
-have this session block on it: log in as any staff member, add/edit an entry on a Time & Materials project,
-confirm the new "Bill In" dropdown appears (and does NOT appear on a Fixed Fee project's entries), set it to
-"Next billing period", save, then generate a Draft invoice for that entry's own period (should NOT include it)
-and then for the following period (should). Not yet done as of this handoff - flag any issue found to the next
-session.
+**Now live-verified in the browser by the user** (Claude in Chrome was declined this session, and there's no
+known local-account password to script the API via curl either, so the user ran the manual pass themselves
+rather than this session doing it): confirmed both that the "Bill In" picker shows for a Time & Materials
+project's entries and is hidden for a Fixed Fee project's, and that setting an entry to "Next billing period"
+correctly excludes it from that period's Draft invoice and correctly includes it on the following period's.
+Also backed by 5 targeted unit tests directly against the repository query's period-boundary logic (exercised
+through `InvoiceGenerationService.BuildDraftAsync`, not mocked), plus clean backend/Angular builds.
 
 Dev servers left running at the end of this session, same as last time: API on `http://localhost:7071`
 (`func start`), Angular on `http://localhost:3000` (`npm start`), and Azurite (started fresh this session with
