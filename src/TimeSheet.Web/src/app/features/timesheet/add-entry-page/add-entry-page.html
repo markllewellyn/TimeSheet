@@ -60,6 +60,16 @@
       </label>
     }
 
+    @if (showBillingPeriodChoice()) {
+      <label class="field">
+        <span class="field-label">Bill In</span>
+        <select class="input" [ngModel]="billingPeriodChoice()" (ngModelChange)="billingPeriodChoice.set($event)">
+          <option value="Current">Current billing period</option>
+          <option value="Next">Next billing period</option>
+        </select>
+      </label>
+    }
+
     <label class="field">
       <span class="field-label">Date</span>
       <input type="date" class="input" [max]="today" [ngModel]="date()" (ngModelChange)="date.set($event)" />

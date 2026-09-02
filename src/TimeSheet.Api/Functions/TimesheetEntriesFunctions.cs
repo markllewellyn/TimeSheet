@@ -122,6 +122,7 @@ public class TimesheetEntriesFunctions(
             RateCardId = amounts.RateCardId,
             StaffCostId = amounts.StaffCostId,
             Tier = amounts.Tier,
+            BillingPeriodChoice = ResolveBillingPeriodChoice(body.BillingPeriodChoice),
             CreatedByUserId = createdByUserId,
             CreatedUtc = DateTimeOffset.UtcNow,
         };
@@ -223,6 +224,7 @@ public class TimesheetEntriesFunctions(
         entry.RateCardId = amounts.RateCardId;
         entry.StaffCostId = amounts.StaffCostId;
         entry.Tier = amounts.Tier;
+        entry.BillingPeriodChoice = ResolveBillingPeriodChoice(body.BillingPeriodChoice);
         entry.ModifiedUtc = DateTimeOffset.UtcNow;
 
         entries.Update(entry);
@@ -296,6 +298,7 @@ public class TimesheetEntriesFunctions(
             RateCardId = amounts.RateCardId,
             StaffCostId = amounts.StaffCostId,
             Tier = amounts.Tier,
+            BillingPeriodChoice = source.BillingPeriodChoice,
             CreatedUtc = DateTimeOffset.UtcNow,
         };
         await entries.AddAsync(copy, ct);
@@ -480,12 +483,17 @@ public class TimesheetEntriesFunctions(
         return (false, null);
     }
 
+    /// <summary>Null or unrecognized (e.g. omitted by an older client) defaults to Current - the pre-existing
+    /// behavior for every entry predating this feature.</summary>
+    private static BillingPeriodChoice ResolveBillingPeriodChoice(string? value) =>
+        Enum.TryParse<BillingPeriodChoice>(value, out var parsed) ? parsed : BillingPeriodChoice.Current;
+
     private static TimesheetEntryDto ToDto(TimesheetEntry e) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.ClientId, e.Client?.Name ?? e.Project?.Client?.Name ?? "",
         e.Date, e.WorkHours, e.OutOfHoursHours, e.Description,
         e.ToPayroll, e.ApprovedPayroll, e.SentToPayroll,
         e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList(),
-        e.EntryTypeId, e.EntryType?.Name);
+        e.EntryTypeId, e.EntryType?.Name, e.BillingPeriodChoice.ToString());
 }
 
 public record DuplicateTimesheetEntryRequest(DateOnly? Date, int? OnBehalfOfUserId = null);

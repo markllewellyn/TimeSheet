@@ -49,6 +49,12 @@ public class TimesheetEntry
     public StaffCost? StaffCost { get; set; }
     public RateCardTier? Tier { get; set; }
 
+    /// <summary>FDD: "When an entry is invoiced the user can choose to add it to the current billing period or
+    /// to the next billing period." Defaults to Current (i.e. no override - use the entry's own Date, as
+    /// always) for every entry predating this feature. See ITimesheetEntryRepository.GetCountedForInvoicingAsync
+    /// for how this is applied at invoice-generation time.</summary>
+    public BillingPeriodChoice BillingPeriodChoice { get; set; } = BillingPeriodChoice.Current;
+
     public bool ApprovedPayroll { get; set; }
     public int? ApprovedByStaffId { get; set; }
     public string? ApprovedByName { get; set; }

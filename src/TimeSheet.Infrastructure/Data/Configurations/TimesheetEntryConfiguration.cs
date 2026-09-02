@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 
 namespace TimeSheet.Infrastructure.Data.Configurations;
@@ -35,6 +36,7 @@ public class TimesheetEntryConfiguration : IEntityTypeConfiguration<TimesheetEnt
         builder.Property(e => e.ResolvedHourlyCost).HasPrecision(18, 2);
         builder.Property(e => e.ResolvedOutOfHoursCost).HasPrecision(18, 2);
         builder.Property(e => e.Tier).HasConversion<string>().HasMaxLength(30);
+        builder.Property(e => e.BillingPeriodChoice).HasConversion<string>().HasMaxLength(10).HasDefaultValue(BillingPeriodChoice.Current);
 
         // Covering indexes for the reporting aggregation queries (Project,Date) and (User,Date).
         builder.HasIndex(e => new { e.ProjectId, e.Date });

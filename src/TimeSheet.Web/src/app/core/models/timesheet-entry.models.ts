@@ -8,6 +8,11 @@ export interface Attachment {
   uploadedAtUtc: string;
 }
 
+// FDD: "When an entry is invoiced the user can choose to add it to the current billing period or to the next
+// billing period." Next holds an entry out of its own natural (date-based) period and counts it toward the
+// immediately following period instead - see ITimesheetEntryRepository.GetCountedForInvoicingAsync (backend).
+export type BillingPeriodChoice = 'Current' | 'Next';
+
 export interface TimesheetEntry {
   id: number;
   projectId: number;
@@ -24,6 +29,7 @@ export interface TimesheetEntry {
   attachments: Attachment[];
   entryTypeId: number | null;
   entryTypeName: string | null;
+  billingPeriodChoice: BillingPeriodChoice;
 }
 
 export interface TimesheetEntrySummary {
@@ -47,6 +53,7 @@ export interface CreateTimesheetEntryRequest {
   adminSendToPayroll?: boolean | null;
   onBehalfOfUserId?: number | null;
   entryTypeId?: number | null;
+  billingPeriodChoice?: BillingPeriodChoice | null;
 }
 
 export type UpdateTimesheetEntryRequest = Omit<CreateTimesheetEntryRequest, 'projectId'>;

@@ -56,7 +56,7 @@ public class InvoiceGenerationService(
 
             if (project.PaymentModel == PaymentModel.TimeAndMaterials)
             {
-                var entries = await timesheetEntries.GetCountedForProjectAsync(project.Id, periodStart, periodEnd, ct);
+                var entries = await timesheetEntries.GetCountedForInvoicingAsync(project.Id, periodStart, periodEnd, ct);
                 if (entries.Count > 0)
                 {
                     // Summed from each entry's stamped ResolvedCustomerRate (see TimesheetEntry), not

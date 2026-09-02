@@ -25,6 +25,17 @@ public interface ITimesheetEntryRepository
     /// query an entry, not a gate, so a flagged entry still counts (FDD).</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct);
 
+    /// <summary>Invoicing's own view of "every entry for a project within a billing period" - like
+    /// GetCountedForProjectAsync but additionally honours TimesheetEntry.BillingPeriodChoice (FDD: "the user can
+    /// choose to add it to the current billing period or to the next billing period"): an entry dated in
+    /// [periodStart, periodEnd] with Choice=Current counts here as usual; an entry with Choice=Next is EXCLUDED
+    /// from its own natural period and instead counted here only when [periodStart, periodEnd] is the period
+    /// immediately following the one its own Date falls in (same length as the period being invoiced now,
+    /// ending the day before periodStart) - so a deferred entry is picked up by exactly the next invoice run,
+    /// never lingering indefinitely. Kept separate from GetCountedForProjectAsync, which other, non-invoicing
+    /// callers (e.g. ProjectHealthAssessor) still use unmodified.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetCountedForInvoicingAsync(int projectId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
+
     /// <summary>Sum of WorkHours+OutOfHoursHours for every entry against a project. Used by
     /// IBudgetMonitoringService to evaluate a new entry against Project.BudgetHours.</summary>
     Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct);

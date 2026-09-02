@@ -110,3 +110,14 @@ public enum RateCardTier
     RoleClient,
     RoleDefault
 }
+
+/// <summary>FDD: "When an entry is invoiced the user can choose to add it to the current billing period or to
+/// the next billing period." Current (default) = the entry counts toward whichever invoicing period its own
+/// Date naturally falls in, as always. Next = the entry is deliberately held out of that natural period and
+/// counted in the following one instead - see ITimesheetEntryRepository.GetCountedForInvoicingAsync for exactly
+/// how "the following one" is resolved.</summary>
+public enum BillingPeriodChoice
+{
+    Current,
+    Next
+}

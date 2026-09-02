@@ -14,6 +14,20 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<TimesheetEntry>> GetCountedForInvoicingAsync(int projectId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct)
+    {
+        var periodLengthDays = periodEnd.DayNumber - periodStart.DayNumber + 1;
+        var previousPeriodEnd = periodStart.AddDays(-1);
+        var previousPeriodStart = previousPeriodEnd.AddDays(-(periodLengthDays - 1));
+
+        return await db.TimesheetEntries
+            .Include(e => e.User)
+            .Where(e => e.ProjectId == projectId &&
+                ((e.Date >= periodStart && e.Date <= periodEnd && e.BillingPeriodChoice == BillingPeriodChoice.Current) ||
+                 (e.Date >= previousPeriodStart && e.Date <= previousPeriodEnd && e.BillingPeriodChoice == BillingPeriodChoice.Next)))
+            .ToListAsync(ct);
+    }
+
     public async Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct) =>
         await db.TimesheetEntries
             .Where(e => e.ProjectId == projectId)

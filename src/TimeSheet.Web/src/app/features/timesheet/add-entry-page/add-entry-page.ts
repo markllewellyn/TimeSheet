@@ -54,6 +54,13 @@ export class AddEntryPage {
   protected readonly entryTypes = signal<EntryType[]>([]);
   protected readonly selectedEntryTypeId = signal<number | null>(null);
 
+  // FDD: "the user can choose to add it to the current billing period or to the next billing period." Only
+  // meaningful for a Time & Materials project - a Fixed Fee project's invoiced amount doesn't derive from
+  // entries at all, so the picker is hidden rather than shown-but-inert there.
+  protected readonly selectedProject = computed(() => this.projects().find((p) => p.id === this.selectedProjectId()));
+  protected readonly showBillingPeriodChoice = computed(() => this.selectedProject()?.paymentModel === 'TimeAndMaterials');
+  protected readonly billingPeriodChoice = signal<'Current' | 'Next'>('Current');
+
   constructor() {
     // Impersonation applies to both logging a brand-new entry and editing an existing one - an Admin can
     // impersonate a user and edit that user's timesheet entries while impersonating (FDD). Enforced
@@ -84,6 +91,7 @@ export class AddEntryPage {
       this.outOfHoursHours.set(entry.outOfHoursHours);
       this.description.set(entry.description ?? '');
       this.selectedEntryTypeId.set(entry.entryTypeId);
+      this.billingPeriodChoice.set(entry.billingPeriodChoice);
     });
   }
 
@@ -136,6 +144,7 @@ export class AddEntryPage {
       description: this.description() || null,
       onBehalfOfUserId: this.impersonation.actingAs()?.id ?? null,
       entryTypeId: this.selectedEntryTypeId(),
+      billingPeriodChoice: this.billingPeriodChoice(),
     };
 
     const save$ = this.isEditMode
