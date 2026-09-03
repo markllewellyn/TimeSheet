@@ -14,6 +14,7 @@ public class ProjectsFunctions(
     IProjectRepository projects,
     IClientRepository clients,
     IUserRepository users,
+    IStaffProjectRepository assignments,
     IProjectEstimateService estimateService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -43,7 +44,8 @@ public class ProjectsFunctions(
         if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
 
         var result = await projects.GetAllActiveAsync(ct);
-        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "")));
+        var counts = await assignments.GetActiveAssignmentCountsAsync(result.Select(p => p.Id).ToList(), ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "", assignedStaffCount: counts.GetValueOrDefault(p.Id))));
     }
 
     [Function("Projects_ListByClient")]
@@ -57,7 +59,8 @@ public class ProjectsFunctions(
 
         var includeInactive = req.Query["includeInactive"] == "true";
         var result = await projects.GetByClientIdAsync(clientId, includeInactive, ct);
-        return new OkObjectResult(result.Select(p => ToDto(p, client.Name)));
+        var counts = await assignments.GetActiveAssignmentCountsAsync(result.Select(p => p.Id).ToList(), ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, client.Name, assignedStaffCount: counts.GetValueOrDefault(p.Id))));
     }
 
     [Function("Projects_ListAssignedToMe")]
@@ -99,7 +102,8 @@ public class ProjectsFunctions(
         }
 
         var client = await clients.GetByIdAsync(project.ClientId, ct);
-        return new OkObjectResult(ToDto(project, client?.Name ?? ""));
+        var activeAssignments = await assignments.GetByProjectIdAsync(project.Id, activeOnly: true, ct);
+        return new OkObjectResult(ToDto(project, client?.Name ?? "", assignedStaffCount: activeAssignments.Count));
     }
 
     [Function("Projects_Create")]
@@ -191,7 +195,8 @@ public class ProjectsFunctions(
         await uow.SaveChangesAsync(ct);
 
         var client = await clients.GetByIdAsync(project.ClientId, ct);
-        return new OkObjectResult(ToDto(project, client?.Name ?? "", manager.User?.DisplayName));
+        var activeAssignments = await assignments.GetByProjectIdAsync(project.Id, activeOnly: true, ct);
+        return new OkObjectResult(ToDto(project, client?.Name ?? "", manager.User?.DisplayName, activeAssignments.Count));
     }
 
     /// <summary>Null userId means "no manager" (valid). A non-null userId must resolve to an existing user, or
@@ -204,9 +209,9 @@ public class ProjectsFunctions(
         return (user, null);
     }
 
-    private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null) => new(
+    private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null, int assignedStaffCount = 0) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
         p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
         p.BudgetHours, p.FixedFeeAmount, p.IsActive,
-        p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName);
+        p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName, assignedStaffCount);
 }

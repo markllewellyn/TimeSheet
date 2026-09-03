@@ -48,6 +48,13 @@ public class StaffProjectRepository(TimesheetDbContext db) : IStaffProjectReposi
                         && sp.StartDate <= weekEnd && (sp.EndDate == null || sp.EndDate >= weekStart))
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyDictionary<int, int>> GetActiveAssignmentCountsAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct) =>
+        await db.StaffProjects
+            .Where(sp => projectIds.Contains(sp.ProjectId) && sp.IsActive)
+            .GroupBy(sp => sp.ProjectId)
+            .Select(g => new { ProjectId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.ProjectId, x => x.Count, ct);
+
     public async Task AddAsync(StaffProject assignment, CancellationToken ct) => await db.StaffProjects.AddAsync(assignment, ct);
 
     public void Update(StaffProject assignment) => db.StaffProjects.Update(assignment);

@@ -36,6 +36,7 @@
             <th>Name</th>
             <th>Payment Model</th>
             <th>Budget Hours</th>
+            <th>Staff</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -49,6 +50,7 @@
                 <span class="badge-neutral">{{ p.paymentModel === 'TimeAndMaterials' ? 'Time & Materials' : 'Fixed Cost' }}</span>
               </td>
               <td class="text-muted-foreground">{{ p.budgetHours ?? '-' }}</td>
+              <td class="text-muted-foreground">{{ p.assignedStaffCount }}</td>
               <td>
                 <span [class]="p.isActive ? 'badge-success' : 'badge-danger'">{{ p.isActive ? 'Active' : 'Inactive' }}</span>
               </td>

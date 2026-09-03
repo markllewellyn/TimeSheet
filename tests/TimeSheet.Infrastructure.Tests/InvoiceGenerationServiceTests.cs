@@ -136,6 +136,36 @@ public class InvoiceGenerationServiceTests
         Assert.Empty(invoice.LineItems);
     }
 
+    [Fact]
+    public async Task BuildDraftAsync_ProjectCanInvoiceFalse_ExcludedEntirely()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        project.CanInvoice = false;
+        db.Projects.Update(project);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var invoice = await CreateService(db).BuildDraftAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Empty(invoice.LineItems);
+    }
+
+    [Fact]
+    public async Task BuildDraftAsync_ProjectCanInvoiceNull_StillCounted()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        // CanInvoice defaults to null for every project predating this flag - must behave exactly like true.
+        Assert.Null(project.CanInvoice);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var invoice = await CreateService(db).BuildDraftAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Single(invoice.LineItems);
+    }
+
     private class ThrowingRateProvider : ICurrencyRateProvider
     {
         public Task<decimal?> FetchRateAsync(string baseCurrency, string quoteCurrency, DateOnly date, CancellationToken ct) =>

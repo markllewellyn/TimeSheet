@@ -4,7 +4,7 @@ public record ProjectDto(
     int Id, int ClientId, string ClientName, string Name, string Code, string? Description,
     string PaymentModel, string ProjectType, bool? CanInvoice, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, bool IsActive,
-    int? ProjectManagerUserId, string? ProjectManagerName);
+    int? ProjectManagerUserId, string? ProjectManagerName, int AssignedStaffCount);
 
 public record CreateProjectRequest(
     int ClientId, string Name, string Code, string? Description,

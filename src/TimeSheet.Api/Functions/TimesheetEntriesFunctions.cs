@@ -19,6 +19,7 @@ public class TimesheetEntriesFunctions(
     IProjectRepository projects,
     IClientRepository clients,
     IEntryTypeRepository entryTypes,
+    IUserRepository users,
     IRateResolver rateResolver,
     IBudgetMonitoringService budgetMonitoring,
     IEntryFlagService entryFlagService,
@@ -32,7 +33,7 @@ public class TimesheetEntriesFunctions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timesheet-entries")] HttpRequest req, CancellationToken ct)
     {
         var user = currentUser.RequireUser();
-        var (viewError, effectiveUserId) = ResolveViewTarget(user, ParseOnBehalfOfUserId(req));
+        var (viewError, effectiveUserId) = await ResolveViewTargetAsync(user, ParseOnBehalfOfUserId(req), ct);
         if (viewError is not null) return viewError;
 
         var search = req.Query["search"].ToString();
@@ -56,8 +57,9 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null) return new NotFoundResult();
-        var (authorized, _) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
+        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
         return new OkObjectResult(ToDto(entry));
     }
 
@@ -88,6 +90,7 @@ public class TimesheetEntriesFunctions(
                     StatusCode = StatusCodes.Status403Forbidden,
                 };
             }
+            if (await ValidateImpersonationTargetAsync(onBehalfOfUserId, ct) is { } impersonationError) return impersonationError;
             effectiveUserId = onBehalfOfUserId;
             createdByUserId = user.UserId;
         }
@@ -194,6 +197,7 @@ public class TimesheetEntriesFunctions(
 
         var (authorized, impersonatedUserId) = CheckOwnership(entry, user, body.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
 
         if (string.IsNullOrWhiteSpace(body.Description))
         {
@@ -244,6 +248,7 @@ public class TimesheetEntriesFunctions(
         if (entry is null) return new NotFoundResult();
         var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
         if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
@@ -266,6 +271,7 @@ public class TimesheetEntriesFunctions(
         var body = await req.ReadFromJsonAsync<DuplicateTimesheetEntryRequest>(ct);
         var (authorized, impersonatedUserId) = CheckOwnership(source, user, body?.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
         if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
         if (source.InvoiceId is not null) return InvoicedLockedResult();
 
@@ -465,9 +471,9 @@ public class TimesheetEntriesFunctions(
     private static int? ParseOnBehalfOfUserId(HttpRequest req) =>
         req.Query.TryGetValue("onBehalfOfUserId", out var v) && int.TryParse(v, out var id) ? id : null;
 
-    /// <summary>List/Get's "whose entries" gate - an Admin may view another user's entries by supplying their
+    /// <summary>List's "whose entries" gate - an Admin may view another user's entries by supplying their
     /// id; anyone else is confined to their own.</summary>
-    private static (IActionResult? Error, int EffectiveUserId) ResolveViewTarget(CurrentUserContext user, int? onBehalfOfUserId)
+    private async Task<(IActionResult? Error, int EffectiveUserId)> ResolveViewTargetAsync(CurrentUserContext user, int? onBehalfOfUserId, CancellationToken ct)
     {
         if (onBehalfOfUserId is { } id && id != user.UserId)
         {
@@ -478,9 +484,27 @@ public class TimesheetEntriesFunctions(
                     StatusCode = StatusCodes.Status403Forbidden,
                 }, 0);
             }
+            if (await ValidateImpersonationTargetAsync(id, ct) is { } impersonationError) return (impersonationError, 0);
             return (null, id);
         }
         return (null, user.UserId);
+    }
+
+    /// <summary>FDD: only an active user can be impersonated (logged-for, edited-for, or viewed-as-if) - checked
+    /// server-side here rather than only in the Angular impersonation picker's active-only filter, matching this
+    /// codebase's general "lock in the API, not only the UI" pattern (see SentToPayrollLockedResult/
+    /// InvoicedLockedResult for the same principle applied to entry immutability).</summary>
+    private async Task<IActionResult?> ValidateImpersonationTargetAsync(int onBehalfOfUserId, CancellationToken ct)
+    {
+        var target = await users.GetByIdAsync(onBehalfOfUserId, ct);
+        if (target is null || !target.IsActive)
+        {
+            return new ObjectResult(new { error = "Only an active user can be impersonated." })
+            {
+                StatusCode = StatusCodes.Status403Forbidden,
+            };
+        }
+        return null;
     }
 
     /// <summary>Get/Update/Delete/Duplicate's ownership gate - the caller owns the entry outright, or is an

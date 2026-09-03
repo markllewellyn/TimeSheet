@@ -45,6 +45,8 @@ export interface Project {
   isActive: boolean;
   projectManagerUserId: number | null;
   projectManagerName: string | null;
+  // FDD: "The project list shows a count of how many staff are assigned to each project." Active assignments only.
+  assignedStaffCount: number;
 }
 
 export interface ProjectEstimateLine {

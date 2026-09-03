@@ -19,6 +19,13 @@ public interface IStaffProjectRepository
     Task<bool> IsOverlappingAsync(int staffId, int projectId, DateOnly startDate, DateOnly? endDate, CancellationToken ct);
 
     Task<IReadOnlyList<StaffProject>> GetActiveForWeekAsync(int userId, DateOnly weekStart, DateOnly weekEnd, CancellationToken ct);
+
+    /// <summary>FDD: "The project list shows a count of how many staff are assigned to each project." One
+    /// grouped query for however many projects a list page is rendering, rather than N+1 per-project calls -
+    /// counts only IsActive assignments (an ended assignment doesn't count as "assigned"), and a project with
+    /// zero active assignments is simply absent from the result rather than present with a 0.</summary>
+    Task<IReadOnlyDictionary<int, int>> GetActiveAssignmentCountsAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct);
+
     Task AddAsync(StaffProject assignment, CancellationToken ct);
     void Update(StaffProject assignment);
 }
