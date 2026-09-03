@@ -4,6 +4,46 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later the same session, 2026-09-03 — project-level attachments ("Documents")
+
+Blob Storage itself stayed parked (still no Azure Storage account anywhere - confirmed again with the
+user), but item 2 from the backlog below (project-level attachments) doesn't actually need it: it
+reuses the same `IFileStorageService` abstraction the entry-attachment feature already uses (local
+disk today; a single-class swap to Blob Storage later, whenever that account exists).
+
+- New `ProjectAttachment` entity/table - a separate table from the entry-scoped `Attachment` (not a
+  nullable-FK polymorphic row on it), matching this codebase's existing one-table-per-concept style.
+  Adds an `UploadedBy` nav (entry attachments don't have this) since a project's documents are seen
+  by potentially several people - Admin and PM alike - not just the one owner an entry has. New
+  migration `AddProjectAttachments`.
+- New `ProjectAttachments_List`/`Upload`/`Download`/`Delete` Functions, gated
+  `RequireAdminOrProjectManager` (the same gate `Projects_Estimate` already uses) rather than the
+  entry-attachment's ownership check - a project has no single "owner" the way an entry does.
+- New "Documents" card on the project edit page (upload button, list with Download/Delete, shows
+  who uploaded and when) - Angular's entry-attachment feature had upload plumbing but literally zero
+  consuming UI anywhere, so there was no existing screen pattern to copy; this one was designed
+  fresh from the DTO shape and the invoice-PDF-download's `blob`/`createObjectURL` pattern.
+- **A real bug found via the user's own live test, not caught by the build or by review**:
+  `ProjectAttachmentRepository.GetByProjectAsync` ordered by `UploadedAtUtc` (a `DateTimeOffset`)
+  directly in the EF query - SQLite can't translate `ORDER BY` on that type, so every list call
+  500'd. Upload itself always succeeded (file saved, row created) but the immediate refresh-after-
+  upload, and every subsequent page load, silently failed - looked exactly like "nothing happened."
+  This exact SQLite limitation is already worked around elsewhere in this codebase
+  (`NotificationRepository`, `AuditLogRepository` both materialize to a list first, then sort
+  client-side) - missed applying the same pattern here on the first pass. Fixed, plus added a
+  missing error handler on the initial list-load call (it had none - a future failure there would
+  have gone silent the same way, only the upload-flow error handler existed before this fix).
+- No unit tests added - matches this codebase's established bar (thin CRUD Functions plus a trivial
+  repository, same category as the pre-existing `AttachmentsFunctions`/`AttachmentRepository`, which
+  also have none).
+- Backend builds clean, Angular builds clean. API host restarted twice this session for this feature
+  (once for the new endpoints/migration, once after the SQLite-ordering fix) - confirmed no startup
+  errors both times, migration confirmed applied via a direct DB check.
+
+**Live-verified in the browser by the user**: uploaded a document, hit the silent-failure bug above,
+then after the fix confirmed upload → list refresh → (implicitly available) download/delete all work
+without needing a manual page refresh.
+
 ## Done later the same session, 2026-09-03 — full FDD re-audit + 3 quick backlog fixes
 
 The user asked for a full re-check of the FDD against the app (not just a rollover of the prior session's
@@ -247,29 +287,25 @@ it cleanly on this session's `func start`.
 Built from a fresh, full FDD-vs-code re-audit done this session (2026-09-03) — not just a rollover
 of the previous single-item list. The user asked to double-check the app against the whole FDD
 document (not just areas prior sessions had already touched), on the assumption Blob Storage was
-the only remaining gap. It wasn't the only one; 7 gaps found in total. The first 3 (all small,
-self-contained fixes) are now done — see "Done later the same session" above — leaving these 4:
+the only remaining gap. It wasn't the only one; 7 gaps found in total. 3 (all small, self-contained
+fixes) plus project-level attachments are now done — see the two "Done" sections above — leaving:
 
-1. **Blob Storage — bigger than originally scoped.** Not implemented AT ALL, not just for invoice
-   PDFs: timesheet attachments also go to local disk (`LocalFileStorageService`, the only
-   `IFileStorageService` registered in `DependencyInjection.cs`), and invoice PDFs sit as a `byte[]`
-   in `Invoice.PdfContent` — directly against the FDD's "files are not stored in the database."
-   **No Azure Storage account exists anywhere yet** (confirmed with the user) — build against
-   Azurite (already running locally for the timer functions, and it emulates Blob Storage too) for
-   dev, and treat provisioning a real Azure account for prod as a separate later deployment task,
-   not a blocker for writing/testing this code now.
-2. **Project-level attachments/documents are missing entirely.** FDD: "Attachments and documents can
-   be held against a project." The `Attachment` entity only has `TimesheetEntryId` — no `ProjectId`,
-   no project-scoped upload/list/download endpoints at all (`AttachmentsFunctions.cs` is entirely
-   entry-scoped). Natural to build alongside/after item 1, since it'll want the same storage
-   abstraction rather than adding a second local-disk path.
-3. **No rate-preview screen.** FDD (Rate Cards section): "The screen shows, for any staff member,
+1. **Blob Storage — bigger than originally scoped, and deliberately parked.** Not implemented AT
+   ALL, not just for invoice PDFs: timesheet AND project attachments both go to local disk
+   (`LocalFileStorageService`, the only `IFileStorageService` registered in `DependencyInjection.cs`
+   — now used by two features, see the project-attachments entry above), and invoice PDFs sit as a
+   `byte[]` in `Invoice.PdfContent` — directly against the FDD's "files are not stored in the
+   database." **No Azure Storage account exists anywhere yet** (confirmed with the user, twice) —
+   parked rather than built against Azurite as originally suggested; pick this up whenever an actual
+   Azure Storage account exists to build/test against, or ask the user again if they want the
+   Azurite-emulator approach after all.
+2. **No rate-preview screen.** FDD (Rate Cards section): "The screen shows, for any staff member,
    the rate that will be applied on each project they are assigned to and whether that rate comes
    from their role or from an override." The actual 5-tier resolver (`RateResolver.cs`) is correct
    and already used at entry-save time — this is purely a missing read-only view surfacing what it
    would resolve to, ahead of time. Medium — likely a thin new endpoint over the existing resolver
    plus a new Angular page.
-4. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
+3. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
    and totals for projects and clients on a team, role and user basis." `IReportingService`'s six
    reports (Time/Cost/Profit × Project/Client) break down only by User or Project today — no
    entry-count metric anywhere, and no grouping by `Role` (a real, existing entity, just unused
@@ -295,6 +331,14 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **SQLite/EF can't translate `ORDER BY` on a `DateTimeOffset` column — hit again this session** for
+  `ProjectAttachmentRepository.GetByProjectAsync` (silently 500'd every list call; the fix is already
+  applied — see the project-attachments entry above). This is a *recurring* trap in this codebase,
+  not a one-off: `NotificationRepository`, `AuditLogRepository`, and now `ProjectAttachmentRepository`
+  all had to work around it the same way (materialize to a list via `ToListAsync()` first, then
+  `OrderBy`/`OrderByDescending` client-side in memory). **Any new repository query that orders by a
+  `DateTimeOffset` column needs this same two-step pattern from the start** - it's easy to miss
+  because it compiles fine and only fails at runtime.
 - **`func start` does not hot-reload new Function definitions** — hit twice this session (once for
   `PayrollPeriodsFunctions`, once for the "Run Now" endpoints). Adding a brand-new `[Function(...)]`
   to a running `func start` process silently 404s on its route until the process is restarted;
