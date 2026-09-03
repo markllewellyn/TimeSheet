@@ -4,7 +4,53 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
-## Done this session, 2026-09-03
+## Done later the same session, 2026-09-03 — full FDD re-audit + 3 quick backlog fixes
+
+The user asked for a full re-check of the FDD against the app (not just a rollover of the prior session's
+single-item backlog), on the assumption Blob Storage was the only remaining gap. A fresh, independent read of
+the whole FDD document plus cross-checking against actual code (not comments/docs) found 7 gaps total, not 1 —
+see the numbered list under "What's still open" below for the full list in priority order. Tackled the first 3
+(all small, self-contained, no external dependency) in this same session:
+
+1. **`Project.CanInvoice` wired up.** `InvoiceGenerationService.BuildDraftAsync` now `continue`s past any
+   project with `CanInvoice == false` before building ANY of its line items (T&M, Fixed Fee, or Expense alike) —
+   previously the flag existed on the entity/DTO/UI but was never read. `null` (every project predating this
+   flag) and `true` both still invoice as before — only an explicit `false` excludes a project. 2 new tests in
+   `InvoiceGenerationServiceTests.cs`.
+2. **Impersonation's "only active users" rule is now API-enforced, not just UI-filtered.** New
+   `TimesheetEntriesFunctions.ValidateImpersonationTargetAsync(onBehalfOfUserId, ct)` (403 if the target user is
+   missing or `!IsActive`), wired into every `OnBehalfOfUserId` path in that file: `List` (via a new
+   `ResolveViewTargetAsync`), `Get`, `Create`, `Update`, `Delete`, `Duplicate`. New `IUserRepository users`
+   constructor dependency. The Angular impersonation picker already only listed active users — this closes the
+   gap where the API itself didn't check, contradicting this app's own established "enforce in the API, not
+   only the UI" pattern (same principle as the entry-locking work above).
+3. **Staff count on project lists.** FDD: "The project list shows a count of how many staff are assigned to
+   each project." New `IStaffProjectRepository.GetActiveAssignmentCountsAsync` (one grouped query per list
+   call, not N+1), new `ProjectDto.AssignedStaffCount`, a "Staff" column added to both `/admin/projects` (the
+   flat all-clients list) and `/admin/clients/:clientId/projects` (the per-client list) - `projects-all-page`
+   and `projects-list-page` respectively. `Projects_Get`/`Projects_Update` also corrected to return the real
+   count instead of always 0 (they don't touch assignments, but the DTO field needs to be accurate regardless
+   of which endpoint returned it).
+- Backend builds clean, 41/41 tests pass (39 pre-existing + 2 added). Angular builds clean. API host restarted
+  mid-session to pick up the DI/constructor changes (confirmed no startup errors in the log) - remember this
+  next time a Function's constructor signature changes, same "func start doesn't hot-reload" caveat as before,
+  just for constructor/DI shape rather than only brand-new `[Function(...)]` attributes.
+
+**Live-verified in the browser by the user**: confirmed the "Staff" column now shows on both project list
+pages after a hard refresh (Angular's dev-server hot-reload hadn't picked up the new column initially).
+CanInvoice's exact semantics (`false` excludes entirely from invoicing; `null`/`true` invoice as before) were
+confirmed by discussion, not a live invoicing pass, since the point was inspectable directly from the diff/tests.
+
+Ambiguous item from the FDD re-audit, deliberately NOT on the numbered backlog list (flag for a decision if it
+ever matters, not a bug): FDD describes a Client having two currencies (charge vs. invoice); `Client` has one
+`CurrencyId`. A reviewer comment embedded in the FDD docx itself suggests this was likely a deliberate
+simplification already agreed with the business.
+
+Dev servers: same three as before (Azurite, API on `:7071`, Angular on `:3000`), all still running from earlier
+in this session - not restarted except the API host as noted above. Committed to `master` (see commits after
+`8ae1b70`).
+
+## Done earlier the same session, 2026-09-03
 
 Entry locking on invoice finalization (FDD: "Finalizing an invoice locks the entries it was built from") — this
 was open item 2 from the previous session's list below.
@@ -198,14 +244,54 @@ it cleanly on this session's `func start`.
 
 ## What's still open (FDD misalignments, not yet started)
 
-1. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob
-   Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in
-   dev/prod before this is planned. (Carried over, unchanged across sessions — this is now the only
-   item left on this list.)
+Built from a fresh, full FDD-vs-code re-audit done this session (2026-09-03) — not just a rollover
+of the previous single-item list. The user asked to double-check the app against the whole FDD
+document (not just areas prior sessions had already touched), on the assumption Blob Storage was
+the only remaining gap. It wasn't the only one; 7 gaps found in total. The first 3 (all small,
+self-contained fixes) are now done — see "Done later the same session" above — leaving these 4:
 
-(The `PayrollPeriod` read UI that used to be item 3 here, the per-entry billing-period choice that
-used to be item 2, and the entry-locking-on-finalize that used to be item 2 after that, are all
-done — see `f906359`, the 2026-09-02 entry, and this session's entry above respectively.)
+1. **Blob Storage — bigger than originally scoped.** Not implemented AT ALL, not just for invoice
+   PDFs: timesheet attachments also go to local disk (`LocalFileStorageService`, the only
+   `IFileStorageService` registered in `DependencyInjection.cs`), and invoice PDFs sit as a `byte[]`
+   in `Invoice.PdfContent` — directly against the FDD's "files are not stored in the database."
+   **No Azure Storage account exists anywhere yet** (confirmed with the user) — build against
+   Azurite (already running locally for the timer functions, and it emulates Blob Storage too) for
+   dev, and treat provisioning a real Azure account for prod as a separate later deployment task,
+   not a blocker for writing/testing this code now.
+2. **Project-level attachments/documents are missing entirely.** FDD: "Attachments and documents can
+   be held against a project." The `Attachment` entity only has `TimesheetEntryId` — no `ProjectId`,
+   no project-scoped upload/list/download endpoints at all (`AttachmentsFunctions.cs` is entirely
+   entry-scoped). Natural to build alongside/after item 1, since it'll want the same storage
+   abstraction rather than adding a second local-disk path.
+3. **No rate-preview screen.** FDD (Rate Cards section): "The screen shows, for any staff member,
+   the rate that will be applied on each project they are assigned to and whether that rate comes
+   from their role or from an override." The actual 5-tier resolver (`RateResolver.cs`) is correct
+   and already used at entry-save time — this is purely a missing read-only view surfacing what it
+   would resolve to, ahead of time. Medium — likely a thin new endpoint over the existing resolver
+   plus a new Angular page.
+4. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
+   and totals for projects and clients on a team, role and user basis." `IReportingService`'s six
+   reports (Time/Cost/Profit × Project/Client) break down only by User or Project today — no
+   entry-count metric anywhere, and no grouping by `Role` (a real, existing entity, just unused
+   here). "Team" has no entity in the model at all, so that half of the sentence may not have been
+   meant literally — flag for a human call if this gets picked up, don't guess at what "team" means.
+
+**One ambiguous item, deliberately NOT on this numbered list** (flag for a decision if it ever
+matters, not a bug to fix): the FDD describes a Client having two currencies — one to charge in, one
+to invoice in — but `Client` has a single `CurrencyId`. A reviewer comment embedded in the FDD docx
+itself ("I think you've got over hung up on currency... The whole system is otherwise GBP") suggests
+this was likely a deliberate simplification already agreed with the business, not something missed.
+
+Confirmed correct/complete by this session's audit (no action needed): 5-tier rate resolution
+order, RateCard/StaffCost effective-dating, discount scope (rate-card + invoice-line only), the
+Contract-entry-type-only-on-Contract-projects rule, the consolidated Staff admin screen, OOH payroll
+requiring `ApprovedPayroll` before aggregation, CSV export scoping, this session's earlier
+entry-locking-on-finalize work, per-entry billing-period choice, project estimated cost/profit, the
+expense rechargeable flag.
+
+(The `PayrollPeriod` read UI, the per-entry billing-period choice, and the entry-locking-on-finalize
+work from earlier sessions/this session are all done — see `f906359`, the 2026-09-02 entry, and this
+session's earlier entry above respectively. They are not part of the new numbered list above.)
 
 ## Known loose ends / flags already raised, not yet actioned
 
