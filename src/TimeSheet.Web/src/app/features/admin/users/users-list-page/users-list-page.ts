@@ -6,6 +6,7 @@ import { RolesService, Role } from '../../../../core/services/roles.service';
 import { StaffCostsService } from '../../../../core/services/staff-costs.service';
 import { AssignmentsService, StaffAssignment } from '../../../../core/services/assignments.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { AppUser, TenantDirectoryUser } from '../../../../core/models/user.models';
 import { StaffCost } from '../../../../core/models/staff-cost.models';
 import { Project } from '../../../../core/models/project.models';
@@ -22,6 +23,7 @@ export class UsersListPage {
   private readonly staffCostsService = inject(StaffCostsService);
   private readonly assignmentsService = inject(AssignmentsService);
   private readonly projectsAdmin = inject(ProjectsAdminService);
+  private readonly confirmService = inject(ConfirmService);
 
   protected readonly users = signal<AppUser[]>([]);
   protected readonly roles = signal<Role[]>([]);
@@ -352,9 +354,10 @@ export class UsersListPage {
       .subscribe(() => this.refreshAssignments(user.id));
   }
 
-  protected resetPassword(user: AppUser): void {
+  protected async resetPassword(user: AppUser): Promise<void> {
     const target = user.isLocalAccount ? 'in this app' : 'in Entra ID';
-    if (!confirm(`Force a password reset for ${user.displayName} ${target}?`)) return;
+    const confirmed = await this.confirmService.confirm(`Force a password reset for ${user.displayName} ${target}?`, { confirmLabel: 'Reset Password', destructive: true });
+    if (!confirmed) return;
     this.usersAdmin.resetPassword(user.id).subscribe({
       next: (result) => this.newTemporaryPassword.set(result.temporaryPassword),
       error: (err) => this.error.set(err?.error?.error ?? 'Could not reset the password.'),

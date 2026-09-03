@@ -9,13 +9,14 @@ import { ThemeService } from './core/services/theme.service';
 import { ImpersonationService } from './core/services/impersonation.service';
 import { UsersAdminService } from './core/services/users-admin.service';
 import { AppUser } from './core/models/user.models';
+import { ConfirmDialog } from './core/components/confirm-dialog/confirm-dialog';
 
 // The routes tucked inside the "Admin" nav dropdown - used to highlight the dropdown's trigger button whenever
 // the current page is one of these, even while the dropdown itself is closed (see isAdminSectionActive below).
 const ADMIN_MENU_PATHS = ['/admin/audit-log', '/admin/clients', '/admin/projects', '/admin/rate-cards', '/admin/roles', '/admin/settings', '/admin/users'];
 
 @Component({
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, FormsModule, ConfirmDialog],
   selector: 'app-root',
   styleUrl: './app.scss',
   templateUrl: './app.html',

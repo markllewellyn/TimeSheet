@@ -10,6 +10,7 @@ import { EntryActionsCell, EntryActionsContext } from './entry-actions-cell';
 import { ThemeService } from '../../../core/services/theme.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 
 const GRID_THEME_BASE = {
   borderRadius: 8,
@@ -46,6 +47,7 @@ export class LogTimePage {
   protected readonly themeService = inject(ThemeService);
   protected readonly impersonation = inject(ImpersonationService);
   private readonly currentUser = inject(CurrentUserService);
+  private readonly confirmService = inject(ConfirmService);
 
   // Mirrors the :root.dark tokens in styles.scss so the grid matches the rest of the app.
   protected readonly theme = computed(() => (this.themeService.mode() === 'dark' ? DARK_GRID_THEME : LIGHT_GRID_THEME));
@@ -154,8 +156,12 @@ export class LogTimePage {
     this.timesheetEntries.duplicate(entry.id, undefined, this.impersonation.actingAs()?.id).subscribe(() => this.refresh());
   }
 
-  private delete(entry: TimesheetEntry): void {
-    if (!confirm(`Delete this ${entry.workHours + entry.outOfHoursHours}h entry on ${entry.date}?`)) return;
+  private async delete(entry: TimesheetEntry): Promise<void> {
+    const confirmed = await this.confirmService.confirm(
+      `Delete this ${entry.workHours + entry.outOfHoursHours}h entry on ${entry.date}?`,
+      { confirmLabel: 'Delete', destructive: true },
+    );
+    if (!confirmed) return;
     this.timesheetEntries.delete(entry.id, this.impersonation.actingAs()?.id).subscribe(() => this.refresh());
   }
 }

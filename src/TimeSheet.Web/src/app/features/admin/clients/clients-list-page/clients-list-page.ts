@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ClientsService } from '../../../../core/services/clients.service';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { Client } from '../../../../core/models/project.models';
 
 @Component({
@@ -11,6 +12,7 @@ import { Client } from '../../../../core/models/project.models';
 })
 export class ClientsListPage {
   private readonly clientsService = inject(ClientsService);
+  private readonly confirmService = inject(ConfirmService);
   protected readonly clients = signal<Client[]>([]);
 
   constructor() {
@@ -21,8 +23,9 @@ export class ClientsListPage {
     this.clientsService.list(true).subscribe((clients) => this.clients.set(clients));
   }
 
-  protected deactivate(client: Client): void {
-    if (!confirm(`Deactivate ${client.name}?`)) return;
+  protected async deactivate(client: Client): Promise<void> {
+    const confirmed = await this.confirmService.confirm(`Deactivate ${client.name}?`, { confirmLabel: 'Deactivate', destructive: true });
+    if (!confirmed) return;
     this.clientsService.deactivate(client.id).subscribe(() => this.refresh());
   }
 }
