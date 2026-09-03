@@ -4,6 +4,51 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later in this session, 2026-09-03 — loading-state consistency pass (20 pages)
+
+Not from the FDD - a UI polish item the user asked for. A pre-work survey of every routed page component
+found that **zero of the app's 26 pages showed any indicator during their initial data fetch** - and worse, 7
+of them (Clients list, Projects list, Entry Flags, Approvals' both tabs, Roles, Audit Log, Payroll Periods)
+briefly showed a **false "no data" empty-state message** before the real data arrived, because their
+empty-state check (either a manual `.length === 0` or Angular's `@for...@empty` block) had no loading gate at
+all. That's a real, user-visible bug, not just a missing spinner - a genuinely-populated list could flash "No
+clients yet" / "Nothing waiting for approval" / etc. for a moment on every page load.
+
+- **New shared `LoadingSpinner` component** (`core/components/loading-spinner/loading-spinner.ts`) - a small
+  centered spinner + label, mounted via `@if (loading()) { <app-loading-spinner /> } @else { ...content }`.
+  Established as the one consistent convention across the whole app rather than inventing a per-page treatment.
+- **Convention**: a page-level `loading`/`loaded` boolean signal (name matched whichever the page already used,
+  where one existed), defaulting to whichever state is accurate before the first fetch resolves. For pages
+  whose `refresh()`/fetch method is also called again later (search-as-you-type, post-action reload, tab
+  switch), the signal is **only ever flipped true→false once, on the first call, and never reset** - so
+  re-fetching after an action doesn't tear down and re-flash a spinner over already-visible data. Documented
+  inline on each such signal.
+- **Edit/detail pages** (Client edit, Project edit, and Add/Edit Entry in edit mode) gate on the specific
+  record's own fetch, not just a supporting dropdown list - a brand-new (create-mode) record's form is always
+  immediately usable, since there's nothing to wait for.
+- **20 pages touched**: Clients list, Projects list, Entry Flags, Approvals (both tabs), Roles, Audit Log,
+  Payroll Periods (the 7 false-empty-state bug fixes above), plus Your Overview, My Invoices, Projects (all),
+  Settings, Add Expense, Add Entry, Calendar, Staff list, Log Time, Project Assignments, Project Entry Types,
+  Client edit, Project edit (13 more that previously showed nothing/an empty table during load).
+- **Deliberately skipped**: Reports, Invoicing, Rate Cards, Export - their only fetch on page load populates a
+  filter dropdown, not a data table; the actual report/invoice/export content only appears after an explicit
+  user action (Run/select/Download), which already has its own feedback (button text, `downloading`/`saving`
+  signals). A full-page spinner for a dropdown populating would be overkill, not a fix for anything broken.
+- **Missing error handlers fixed along the way**: several pages' initial fetch had no `error` callback at all,
+  so a failed request would leave `loading`/`loaded` stuck and the page hung forever with no explanation.
+  Added consistently, with **one deliberate exception**: Settings' fetch failure does NOT flip `loaded` true,
+  because that page lets you Save over whatever it's showing - revealing the form with blank/default field
+  values on a load failure (and letting Save silently overwrite the real saved settings with them) would be
+  actively harmful, unlike a list page harmlessly showing empty. The spinner there is gated on
+  `!loaded() && !error()` specifically so an error stops the spinner without ever revealing the form.
+- Angular build clean after every batch (built incrementally through the whole pass, not just once at the
+  end). Frontend-only change, no backend impact, no API host restart needed.
+
+**Live-verified in the browser by the user**: confirmed the fixes are in place, though the local dev API
+responds fast enough that the spinner itself is barely visible without throttling the network in DevTools -
+the more meaningful verification is the false-empty-state bug fix (code-reviewed, not separately re-triggered
+live) and the build passing cleanly through 20 pages' worth of template changes.
+
 ## Done even later still in this session, 2026-09-03 — replaced native confirm() dialogs, new shared ConfirmService
 
 Not from the FDD - general UI polish requested by the user after the nav reorg, starting with the smallest,
