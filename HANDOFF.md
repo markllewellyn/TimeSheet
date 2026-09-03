@@ -4,6 +4,52 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later in this session, 2026-09-03 — top nav reorganized (chronological + tidier)
+
+Not from the FDD re-audit - the user found the top nav bar messy (16-17 identically-styled pills in one flat
+wrapping row for an Admin, with no grouping and no relation to the app's actual workflow order) and asked for
+it to flow in chronological order and look tidier. Used Plan Mode for this one given the genuine design
+tradeoffs involved (grouping strategy, dropdown vs. flat, what to bundle in).
+
+- **Reordered the top-level bar to match the app's real business workflow** (Log Time → Approve → Payroll →
+  Invoice → Report, confirmed via route comments/this file's own history, matches the FDD): Log Time, Calendar,
+  Your Overview, Export, Approvals, Entry Flags, Payroll Periods, Invoicing, Reports, then the new Admin
+  dropdown - replacing the old order where Approvals was rendered last and Payroll/Invoicing/Reports were
+  scattered mid-list among unrelated config links.
+- **New "Admin ▾" dropdown** groups the 7 non-chronological "one-time setup" config items (Audit Log, Clients,
+  Projects, Rate Cards, Roles, Settings, Staff - alphabetical, since there's no chronology among them) behind
+  one trigger, reusing the exact `.relative`/toggle-signal/`.card.absolute` pattern this app already used twice
+  (notifications and impersonation dropdowns) - no new CSS needed. Cuts the Admin view's flat item count from
+  ~16 down to ~10.
+- **Fixed the previously-flagged "PM can't reach Entry Flags" gap** (see the loose-end note added earlier this
+  session) as part of the same work, since it touched the same `@if` conditions anyway: pulled "Entry Flags" out
+  of the Admin-only dropdown into a flat top-level link visible to Admin-or-PM (alongside Approvals, the other
+  Admin-or-PM item), and removed `adminGuard` from the `admin/entry-flags` route in `app.routes.ts` (kept
+  `authGuard` only) - mirroring `admin/approvals`'s own existing precedent exactly, since the backend
+  (`RequireAdminOrProjectManager`) already scopes a PM to their own projects' flags correctly. Verified
+  `entry-flags-page.ts`/`.html` have no hardcoded admin-only UI branches, so no page-level changes were needed.
+- **Added click-outside-to-close for all three dropdowns** (notifications, impersonation, the new Admin menu) -
+  none of them closed except via re-clicking their own toggle button before this. One shared
+  `@HostListener('document:click', ...)` on `App` checks `event.target.closest('[data-dropdown="..."]')` against
+  a `data-dropdown` attribute added to each dropdown's wrapper, rather than three separate near-duplicate
+  listeners.
+- **New `isAdminSectionActive` computed signal** makes the "Admin" trigger itself show an active/highlighted
+  style when the current route is one of its 7 dropdown items, even while the dropdown is closed - a plain
+  `routerLinkActive` on the trigger can't do this, since the dropdown's `<a>` tags are fully unmounted via `@if`
+  while closed, and `RouterLinkActive`'s `ContentChildren` query has nothing to find in that state.
+- Angular build clean. Frontend-only change (plus the one route-guard line in `app.routes.ts`) - no backend
+  changes, no API host restart needed.
+- **Follow-up in the same sitting**: the user separately noticed the main content area (header + `<main>` in
+  `app.html`) was capped at `max-w-7xl` (1280px), leaving visible whitespace either side of wide content like
+  the Log Time grid. Widened both to `max-w-[1600px]` - checked first that every form/detail page (client/
+  project edit, settings, add entry/expense, export) already imposes its own narrower `max-w-2xl`/`max-w-3xl`
+  wrapper internally, so widening the shared outer container only affects pages (grids/lists) that don't already
+  self-constrain - no risk of accidentally stretching a form layout.
+
+**Not yet explicitly confirmed working end-to-end by the user** (they were about to test when this was
+committed) - built clean, ready to verify. See the session's plan file for the full per-role verification
+checklist (Admin/PM/regular User) for the nav reorg specifically; the width change just needs a visual glance.
+
 ## Done last in this session, 2026-09-03 — Project Health removed entirely
 
 Follow-up to the very next entry below: after being told the Anthropic API isn't free and given the earlier
