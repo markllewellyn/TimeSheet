@@ -4,6 +4,57 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done yet still later the same session, 2026-09-03 — reporting: entry counts + role-basis breakdown
+
+Closes the last remaining backlog item (Blob Storage stays parked - still no Azure account).
+
+- **Entry counts** (FDD: "the number of entries..."): every existing report (all six Time/Cost/Profit
+  x Project/Client reports, both their summaries and every breakdown line) now carries an
+  `EntryCount` - the raw `TimesheetEntry` row count, not a day-count or hour-sum. Required widening
+  `IReportingRepository.TimeEntryAggregateRow` with a `g.Count()` at the existing (Project, Client,
+  User, Date) grouping stage, then `g.Sum(x => x.EntryCount)` wherever the service re-groups those
+  rows further (by User or by Project) to build each report's lines.
+- **Role-basis breakdown** (FDD: "...on a team, role and user basis"): 3 new reports -
+  `GetTimeOnProjectByRoleReportAsync`/`CostOnProjectByRoleReportAsync`/`ProfitOnProjectByRoleReportAsync`
+  - grouping the same underlying data by each staff member's current `User.JobRoleId` instead of by
+  User (`RoleName` = "Unassigned" when null). New Function endpoints
+  `reports/time|cost|profit-on-project-by-role`, new Angular report-type options.
+  - **Deliberately scoped to "on Project" only, not "on Client"** - a Client-scoped report already
+    spans multiple projects that can mix Time&Materials and Fixed Fee payment models, and Fixed Fee
+    revenue is recognized at the whole-project level (`IRevenueRecognitionService`) - there's no
+    honest way to slice that recognized revenue down to "this role's share of it" without either
+    misrepresenting numbers or a materially bigger design. Flag for a human call if Client-scoped
+    role reporting turns out to be wanted after all.
+  - **"Team" was NOT addressed** - it has no entity anywhere in this app's data model, so guessing at
+    what it would even mean risked inventing a feature nobody asked for. Flag for a human call if
+    this matters - don't guess at what "team" means without asking first.
+  - Role itself is NOT effective-dated (`Role.cs`'s own doc comment already says so) - a role-basis
+    report reflects each staff member's CURRENT role, not whatever role they held on the entry's own
+    date. This is the exact same accepted limitation RateCard-tier resolution already lives with, not
+    a new one introduced here.
+- Widening `TimeEntryAggregateRow`'s grouping key with `RoleId`/`RoleName` (via a left join from
+  `User.JobRoleId` to `Role`) is provably a no-op on every OTHER existing report's row count/
+  granularity: a user's role is a simple current-state fact of that user, so it can never split an
+  existing (Project, Client, User, Date) group into more than one row.
+- 2 new unit tests in `ReportingServiceTests.cs`: one proves `EntryCount` reflects raw entry rows (2
+  separate `TimesheetEntry` rows for the same user/project/date, summed into one aggregate bucket by
+  the existing grouping - only `EntryCount` can tell "2 entries totalling 10h" apart from "1 entry of
+  10h"); one proves the Role breakdown groups correctly and buckets a no-`JobRoleId` user under
+  "Unassigned" rather than dropping their hours.
+- **A real, pre-existing UX issue found and fixed via the user's own live look at the new
+  columns**: the Reports page renders whatever field names the API returns verbatim as column/tile
+  headers (`Object.keys(...)` on the JSON payload) - so `entryCount` showed as literally "entryCount"
+  rather than "Entry Count", and this was *already true* before this session for every existing
+  column (`userId`, `workHours`, etc.) - just not noticed until a new, more obviously-database-shaped
+  field name (`entryCount`) made it visible. Fixed generically (a `columnLabel()` camelCase-to-Title-
+  Case formatter applied to both the summary tiles and the breakdown table headers), not just
+  patched for the one new field, so it also silently improved every pre-existing report's headers.
+- Backend and Angular build clean, 44/44 backend tests pass (42 pre-existing + 2 added).
+
+**Live-verified in the browser by the user**: ran the new "(by Role)" report options, confirmed
+column headers now read as human labels ("Entry Count" etc.) instead of raw camelCase field names,
+across both new and pre-existing columns.
+
 ## Done still later the same session, 2026-09-03 — project-level attachments ("Documents")
 
 Blob Storage itself stayed parked (still no Azure Storage account anywhere - confirmed again with the
@@ -288,7 +339,8 @@ Built from a fresh, full FDD-vs-code re-audit done this session (2026-09-03) —
 of the previous single-item list. The user asked to double-check the app against the whole FDD
 document (not just areas prior sessions had already touched), on the assumption Blob Storage was
 the only remaining gap. It wasn't the only one; 7 gaps found in total. 3 (all small, self-contained
-fixes) plus project-level attachments are now done — see the two "Done" sections above.
+fixes), project-level attachments, and reporting (entry counts + role basis) are all now done — see
+the three "Done" sections above.
 
 **One of the 7 turned out to be a false positive, corrected later the same session**: "no
 rate-preview screen" was wrong — a rate preview already exists, added in an earlier session
@@ -297,7 +349,9 @@ Assignments" panel (`users-list-page.html`, driven by `ProjectAssignments_ListBy
 `StaffAssignmentDto.ResolvedCustomerRate`/`RateSource`) already shows, per assigned project, the
 resolved rate and a label distinguishing role-default from person/role override - exactly what the
 FDD asks for. The audit missed it by not checking the Staff screen specifically. No code change
-needed; removed from the list below rather than duplicating it. Leaving:
+needed; removed from the list rather than duplicating it.
+
+**This leaves exactly one open item**, unchanged in nature across every session so far:
 
 1. **Blob Storage — bigger than originally scoped, and deliberately parked.** Not implemented AT
    ALL, not just for invoice PDFs: timesheet AND project attachments both go to local disk
@@ -308,12 +362,6 @@ needed; removed from the list below rather than duplicating it. Leaving:
    parked rather than built against Azurite as originally suggested; pick this up whenever an actual
    Azure Storage account exists to build/test against, or ask the user again if they want the
    Azurite-emulator approach after all.
-2. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
-   and totals for projects and clients on a team, role and user basis." `IReportingService`'s six
-   reports (Time/Cost/Profit × Project/Client) break down only by User or Project today — no
-   entry-count metric anywhere, and no grouping by `Role` (a real, existing entity, just unused
-   here). "Team" has no entity in the model at all, so that half of the sentence may not have been
-   meant literally — flag for a human call if this gets picked up, don't guess at what "team" means.
 
 **One ambiguous item, deliberately NOT on this numbered list** (flag for a decision if it ever
 matters, not a bug to fix): the FDD describes a Client having two currencies — one to charge in, one
