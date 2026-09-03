@@ -121,8 +121,11 @@ export const routes: Routes = [
 
   // --- Entry Flags, Reports, Invoicing, Project Health (Req 6, 7, 4, 8) ---
   {
+    // Admin or project manager (of at least one project) - the backend (RequireAdminOrProjectManager) scopes
+    // flags to the PM's own managed project(s); this page has no adminGuard so a PM sees their own scoped
+    // flags rather than being blocked from the route entirely, matching admin/approvals' pattern.
     path: 'admin/entry-flags',
-    canActivate: [authGuard, adminGuard],
+    canActivate: [authGuard],
     loadComponent: () => import('./features/admin/entry-flags/entry-flags-page/entry-flags-page').then((m) => m.EntryFlagsPage),
   },
   {

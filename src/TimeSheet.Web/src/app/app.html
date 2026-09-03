@@ -1,6 +1,6 @@
 <div class="min-h-screen bg-background text-foreground">
   <header class="sticky top-0 z-20 border-b border-border bg-card/80 backdrop-blur-sm">
-    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-y-2 px-6 py-3">
+    <div class="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-y-2 px-6 py-3">
       <nav class="flex flex-wrap items-center gap-1 gap-y-1 text-sm">
         <a routerLink="/timesheet" class="mr-4 flex items-center gap-2 text-base font-semibold tracking-tight text-foreground">
           <img src="svgit-logo-full.png" alt="SVG IT" class="h-6 w-auto" />
@@ -11,31 +11,55 @@
         <a routerLink="/timesheet/calendar" routerLinkActive="nav-link-active" class="nav-link">Calendar</a>
         <a routerLink="/timesheet/my-overview" routerLinkActive="nav-link-active" class="nav-link">Your Overview</a>
         <a routerLink="/export" routerLinkActive="nav-link-active" class="nav-link">Export</a>
+
+        @if (currentUser.isAdmin() || currentUser.isProjectManager()) {
+          <a routerLink="/admin/approvals" routerLinkActive="nav-link-active" class="nav-link">Approvals</a>
+          <a routerLink="/admin/entry-flags" routerLinkActive="nav-link-active" class="nav-link">Entry Flags</a>
+        }
         @if (!currentUser.isAdmin()) {
           <a routerLink="/my-invoices" routerLinkActive="nav-link-active" class="nav-link">My Invoices</a>
         }
         @if (currentUser.isAdmin()) {
-          <a routerLink="/admin/clients" routerLinkActive="nav-link-active" class="nav-link">Clients</a>
-          <a routerLink="/admin/projects" routerLinkActive="nav-link-active" class="nav-link">Projects</a>
-          <a routerLink="/admin/users" routerLinkActive="nav-link-active" class="nav-link">Staff</a>
-          <a routerLink="/admin/roles" routerLinkActive="nav-link-active" class="nav-link">Roles</a>
-          <a routerLink="/admin/rate-cards" routerLinkActive="nav-link-active" class="nav-link">Rate Cards</a>
-          <a routerLink="/admin/entry-flags" routerLinkActive="nav-link-active" class="nav-link">Flags</a>
-          <a routerLink="/admin/audit-log" routerLinkActive="nav-link-active" class="nav-link">Audit Log</a>
-          <a routerLink="/admin/reports" routerLinkActive="nav-link-active" class="nav-link">Reports</a>
-          <a routerLink="/admin/invoicing" routerLinkActive="nav-link-active" class="nav-link">Invoicing</a>
           <a routerLink="/admin/payroll-periods" routerLinkActive="nav-link-active" class="nav-link">Payroll Periods</a>
-          <a routerLink="/admin/settings" routerLinkActive="nav-link-active" class="nav-link">Settings</a>
-        }
-        @if (currentUser.isAdmin() || currentUser.isProjectManager()) {
-          <a routerLink="/admin/approvals" routerLinkActive="nav-link-active" class="nav-link">Approvals</a>
+          <a routerLink="/admin/invoicing" routerLinkActive="nav-link-active" class="nav-link">Invoicing</a>
+          <a routerLink="/admin/reports" routerLinkActive="nav-link-active" class="nav-link">Reports</a>
+
+          <div class="relative" data-dropdown="admin">
+            <button
+              class="nav-link flex items-center gap-1"
+              [class.nav-link-active]="isAdminSectionActive()"
+              (click)="showAdminMenu.set(!showAdminMenu())"
+              aria-haspopup="true"
+              [attr.aria-expanded]="showAdminMenu()"
+              aria-label="Admin configuration menu"
+            >
+              Admin
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            @if (showAdminMenu()) {
+              <div class="card absolute left-0 z-10 mt-2 w-56 p-2">
+                <div class="flex flex-col gap-0.5">
+                  <a routerLink="/admin/audit-log" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Audit Log</a>
+                  <a routerLink="/admin/clients" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Clients</a>
+                  <a routerLink="/admin/projects" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Projects</a>
+                  <a routerLink="/admin/rate-cards" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Rate Cards</a>
+                  <a routerLink="/admin/roles" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Roles</a>
+                  <a routerLink="/admin/settings" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Settings</a>
+                  <a routerLink="/admin/users" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Staff</a>
+                </div>
+              </div>
+            }
+          </div>
         }
       </nav>
 
       @if (currentUser.isSignedIn()) {
         <div class="flex items-center gap-4 text-sm">
           @if (currentUser.isAdmin()) {
-            <div class="relative">
+            <div class="relative" data-dropdown="impersonation">
               <button
                 class="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
                 (click)="toggleImpersonationPicker()"
@@ -82,7 +106,7 @@
             }
           </button>
 
-          <div class="relative">
+          <div class="relative" data-dropdown="notifications">
             <button
               class="relative flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground"
               (click)="showNotifications.set(!showNotifications())"
@@ -143,7 +167,7 @@
     </div>
   }
 
-  <main class="mx-auto max-w-7xl p-6">
+  <main class="mx-auto max-w-[1600px] p-6">
     <router-outlet />
   </main>
 </div>
