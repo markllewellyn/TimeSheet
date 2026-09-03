@@ -41,14 +41,20 @@ tradeoffs involved (grouping strategy, dropdown vs. flat, what to bundle in).
   changes, no API host restart needed.
 - **Follow-up in the same sitting**: the user separately noticed the main content area (header + `<main>` in
   `app.html`) was capped at `max-w-7xl` (1280px), leaving visible whitespace either side of wide content like
-  the Log Time grid. Widened both to `max-w-[1600px]` - checked first that every form/detail page (client/
-  project edit, settings, add entry/expense, export) already imposes its own narrower `max-w-2xl`/`max-w-3xl`
-  wrapper internally, so widening the shared outer container only affects pages (grids/lists) that don't already
-  self-constrain - no risk of accidentally stretching a form layout.
+  the Log Time grid. First tried widening both to a bigger fixed cap (`max-w-[1600px]`) - checked first that
+  every form/detail page (client/project edit, settings, add entry/expense, export) already imposes its own
+  narrower `max-w-2xl`/`max-w-3xl` wrapper internally, so widening the shared outer container only affects
+  pages (grids/lists) that don't already self-constrain, no risk of stretching a form layout. **Then the user
+  moved to a larger monitor and hit the same whitespace problem again at the new, bigger fixed number** - asked
+  for a "resize option" rather than another guessed cap. Removed the `mx-auto`/`max-w-*` constraint from both
+  the header and `<main>` entirely (now just `flex flex-wrap items-center justify-between gap-y-2 px-6 py-3` /
+  `p-6`) - the content area now always fills the actual browser width with consistent side padding, on any
+  screen size, rather than capping at a number that's inevitably wrong for someone else's monitor.
 
-**Not yet explicitly confirmed working end-to-end by the user** (they were about to test when this was
-committed) - built clean, ready to verify. See the session's plan file for the full per-role verification
-checklist (Admin/PM/regular User) for the nav reorg specifically; the width change just needs a visual glance.
+**Live-verified in the browser by the user**: the fully-fluid width change confirmed looking correct on both a
+laptop screen and a larger monitor. The nav reorg itself wasn't explicitly walked through against the full
+per-role checklist below (Admin/PM/regular User) - the user moved on to the width issue before confirming each
+item - worth a quick pass next session if it hasn't come up by then.
 
 ## Done last in this session, 2026-09-03 — Project Health removed entirely
 
