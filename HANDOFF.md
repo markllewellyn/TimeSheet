@@ -4,6 +4,69 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done in a follow-up round the same session, 2026-09-03 — user-driven UX fixes (Entry Flags, Project Health)
+
+Not from the FDD re-audit - the user spent time actually using the app after the re-audit work and found four
+concrete usability problems worth fixing, plus one open question about a feature's origin that's now been
+investigated (see the flag below the fix list).
+
+1. **Entry ID now visible.** The Entry Flags "raise a flag" form has always asked for a raw numeric Timesheet
+   Entry Id, but nothing anywhere in the UI ever showed that number - the Log Time grid now has an "Entry ID"
+   column (`log-time-page.ts`) so a user can actually read one off.
+2. **Project Health "Run Now" + accurate empty-state text.** The dashboard only ever showed projects with at
+   least one existing assessment, and there was no way to create a project's first one from the UI at all - the
+   empty-state text even claimed a "trigger from a project's page" button existed, which it didn't.
+   `IProjectHealthService.ReassessAllActiveAsync` is new shared logic (the sweep loop moved out of
+   `ProjectHealthTimerFunction` into the service, so the timer and the new `ProjectHealth_RunNow` Admin
+   endpoint/button call the identical code path) - mirrors the existing `PayrollPeriods_RunNow`/
+   `BillingRollForward_RunNow` convention exactly.
+3. **"Notify Staff" now gives feedback.** It always worked server-side (creates a real Notification for the
+   entry's owner via the same bell-icon system used elsewhere) - the button just silently ignored the response,
+   `.subscribe()` with no callback at all, so it looked broken even when it worked. Now shows a success/error
+   banner like every other action in the app.
+4. **Flagged entries are now visible where they're actually seen.** A flag is never a gate (FDD) - editing an
+   entry with an open flag was never blocked - but there was previously NO visual indicator anywhere (Log Time
+   grid, Add/Edit Entry) that an entry even had one; the only way to know was the separate Admin-only Entry
+   Flags screen. `TimesheetEntryDto` now carries `OpenFlags` (reusing `EntryFlagDto` - an entry can in principle
+   have more than one open flag simultaneously, e.g. a system-raised budget flag alongside a manual one, so this
+   is a list, not a single nullable). Log Time's grid shows a "⚑ Flagged" indicator with a hover tooltip
+   (reason/notes/date, plain-text via `tooltipValueGetter` - deliberately not an interactive ag-grid tooltip
+   component, to avoid the fragility of getting a clickable button working reliably inside one); clicking the
+   indicator navigates to `/admin/entry-flags?flagId=...` **but only for Admins** - that page is Admin-only
+   today (a PM technically has backend permission to act on flags for their own projects per
+   `RequireAdminOrProjectManager`, but has no nav entry into the page at all - a separate, still-open gap, not
+   fixed this round, flagged again below for visibility since it was already noted once and easy to lose track
+   of). The Entry Flags page itself reads a `flagId` query param and scrolls/highlights that row when arriving
+   via the click-through.
+5. **"Clearing notes" replaced the native `prompt()` with a proper inline input** (a small text field + Confirm/
+   Cancel appearing in place of the row's action buttons) - a `prompt()` dialog looked jarring and out of place
+   next to the rest of the app's styled UI, was raised directly by the user as feeling wrong.
+- Backend and Angular build clean, 44/44 backend tests pass (unchanged - all 5 fixes here are either thin
+  CRUD/UI wiring or query-shape changes with no new business-logic branching, consistent with this codebase's
+  existing bar for what warrants a dedicated test - matches the precedent already set for the entry-attachment
+  and project-attachment features, which also have none). API host restarted for the DI/constructor changes
+  (`IEntryFlagRepository`'s new method signature, `ProjectHealthService`'s new `ILogger` dependency) - confirmed
+  no startup errors both times.
+
+**Investigated but NOT fixed - a genuine, material finding worth flagging prominently**: the user asked what
+part of the FDD "Project Health" satisfies, since they couldn't tell from using it. A direct search of the
+extracted FDD document text (unzipped the docx, stripped XML tags) for "health", "AI", "risk", "assessment",
+"Claude", "on track", and "behind schedule" - in both the main document body AND its embedded reviewer comments
+- returned **zero matches for every single term**. The feature was introduced in commit `19c368d`
+("AI Project Health (Requirement 8): Claude-powered nightly assessment"), whose message cites "Requirement 8"
+of "the plan's phases 1-9" - but **no document defining that plan or numbering 9 requirements exists anywhere
+in this repository today** (checked `.md` files repo-wide and the `Resources/Timesheets_20260824092236`
+PowerApps export bundle - nothing). So: this cannot currently be traced to explicit FDD text, and its actual
+origin (a separate stakeholder-agreed requirement never written into this FDD doc? a different planning
+conversation from an earlier session, now lost? something added without real grounding?) can't be verified from
+what survives in this repo. **This needs the user's own call**, not a guess: keep it as a nice-to-have AI
+feature (once an API key is added), or deprioritize/remove it since it doesn't demonstrably trace to the FDD.
+What the feature actually DOES, regardless of its origin: a nightly per-project check (bounded
+concurrency, respects the Anthropic API's rate limits) that gathers each project's budget/hours-consumed/
+time-elapsed data plus recent timesheet descriptions, asks Claude to classify it On Track / At Risk / Behind
+with a plain-English explanation and recommended action, persists the verdict, and notifies Admins only when a
+project's status *worsens* (never on every run, to avoid alert fatigue).
+
 ## Done yet still later the same session, 2026-09-03 — reporting: entry counts + role-basis breakdown
 
 Closes the last remaining backlog item (Blob Storage stays parked - still no Azure account).
@@ -382,6 +445,12 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **A Project Manager has no way to reach the Entry Flags screen at all.** The backend already allows it -
+  `RequireAdminOrProjectManager` gates `EntryFlags_RaiseManual`/`Clear`/`NotifyStaff` for a PM acting on their
+  own project(s) - but `app.html`'s nav only shows the "Flags" link to Admins, and the Log Time grid's new
+  click-through (this session) is also Admin-only for the same reason. So a PM's already-granted backend
+  permission is practically unreachable today. Noticed while adding the click-through, not fixed this session -
+  needs either a PM-visible nav entry or another way in (e.g. surfaced from a project's own page).
 - **SQLite/EF can't translate `ORDER BY` on a `DateTimeOffset` column — hit again this session** for
   `ProjectAttachmentRepository.GetByProjectAsync` (silently 500'd every list call; the fix is already
   applied — see the project-attachments entry above). This is a *recurring* trap in this codebase,
