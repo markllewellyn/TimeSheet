@@ -1,10 +1,49 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-02)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-03)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
-## Done this session, 2026-09-02 (`2e96d28`)
+## Done this session, 2026-09-03
+
+Entry locking on invoice finalization (FDD: "Finalizing an invoice locks the entries it was built from") — this
+was open item 2 from the previous session's list below.
+
+- New nullable `TimesheetEntry.InvoiceId` FK (+ `Invoice` nav property), new migration
+  `LockTimesheetEntriesOnInvoiceFinalize` (`RecordedTimes.InvoiceId`, FK to `Invoices`, `Restrict` delete).
+- `InvoicingService.FinalizeInvoiceAsync` now calls a new private `LockEntriesAsync`: since
+  `InvoiceGenerationService.BuildDraftAsync` only ever persisted an aggregated per-project sum on each Time &
+  Materials line item (the individual `TimesheetEntry` rows that fed it were never recorded anywhere), locking
+  has to **reconstitute** that entry set at finalize time by re-running the exact same
+  `ITimesheetEntryRepository.GetCountedForInvoicingAsync(projectId, periodStart, periodEnd, ct)` query used to
+  build each T&M line item, then stamping `InvoiceId` on every entry it returns. Fixed Fee and Expense line
+  items don't derive from `TimesheetEntry` rows at all, so nothing is touched for those.
+- `TimesheetEntriesFunctions.Update`/`Delete`/`Duplicate` (source-entry check only, same as the existing
+  `ApprovedPayroll`/`SentToPayroll` guard) now also reject with 409 when `entry.InvoiceId is not null`, via a
+  new `InvoicedLockedResult()` helper mirroring the existing `SentToPayrollLockedResult()`.
+- `TimesheetEntryDto` gained a computed `Invoiced` bool (`e.InvoiceId is not null`); Angular's
+  `TimesheetEntry` model and `entry-actions-cell.ts` follow the same pattern as the existing "sent to payroll"
+  lock — the grid now shows "Locked (invoiced)" (vs "Locked (sent to payroll)") and hides Edit/Duplicate/Delete.
+- 3 new unit tests in a new `InvoicingServiceTests.cs` (there was no test file for `InvoicingService` before
+  this — `BuildDraftAsync`/`GenerateDraftInvoiceAsync` had coverage via `InvoiceGenerationServiceTests`, but
+  `FinalizeInvoiceAsync` itself had none): a T&M entry counted into a finalized invoice's period gets locked, an
+  entry outside that period is left alone, and a Fixed Fee project's entries are never touched at all (matching
+  `InvoiceGenerationServiceTests`' in-memory-SQLite-plus-real-repositories style, with lightweight fakes for
+  `IPdfInvoiceRenderer`/`INotificationService`). `BillingRollForwardServiceTests`' direct `new InvoicingService(...)`
+  construction updated for the new constructor parameter.
+- Backend builds clean, 39/39 tests pass (36 pre-existing + 3 added). Angular builds clean.
+
+**Live-verified in the browser by the user**: generated and finalized a Draft invoice for a Time & Materials
+project's entries, then confirmed those entries now show "Locked (invoiced)" in the Log Time grid with
+Edit/Duplicate/Delete hidden, exactly as intended.
+
+Dev servers were NOT left running at the end of the previous session (fresh session, no processes survived) -
+this session started them fresh: Azurite (same command as before, data dir
+`C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\`), API on `http://localhost:7071` (`func start`),
+Angular on `http://localhost:3000` (`npm start`). Same dev SQLite file; this session's migration applied to it
+cleanly. Committed to `master` as `7588358`.
+
+## Done in the previous session, 2026-09-02 (`2e96d28`)
 
 Per-entry billing-period choice (FDD: "When an entry is invoiced the user can choose to add it to the current
 billing period or to the next billing period") — this was open item 2 from the previous session's list below.
@@ -161,17 +200,12 @@ it cleanly on this session's `func start`.
 
 1. **Blob Storage for invoice PDFs** — FDD wants generated invoice PDFs (and attachments) in Blob
    Storage, not the DB. **Needs your input first** on what Azure Storage setup actually exists in
-   dev/prod before this is planned. (Carried over, unchanged across sessions.)
-2. **Entries aren't actually locked when an invoice is finalized** — FDD: "Finalizing an invoice
-   locks the entries it was built from." `InvoicingService.FinalizeInvoiceAsync` never touches the
-   underlying `TimesheetEntry` rows at all today; nothing stops an already-invoiced entry from being
-   edited or deleted afterward (`Update`/`Delete`/`Duplicate` in `TimesheetEntriesFunctions` only
-   check `ApprovedPayroll`/`SentToPayroll`, an unrelated payroll-side lock). Noticed while building
-   this session's per-entry billing-period choice — see HANDOFF's "one thing worth deciding" note
-   above for how it relates.
+   dev/prod before this is planned. (Carried over, unchanged across sessions — this is now the only
+   item left on this list.)
 
-(The `PayrollPeriod` read UI that used to be item 3 here, and the per-entry billing-period choice
-that used to be item 2, are both done — see `f906359` and this session's entry above respectively.)
+(The `PayrollPeriod` read UI that used to be item 3 here, the per-entry billing-period choice that
+used to be item 2, and the entry-locking-on-finalize that used to be item 2 after that, are all
+done — see `f906359`, the 2026-09-02 entry, and this session's entry above respectively.)
 
 ## Known loose ends / flags already raised, not yet actioned
 
