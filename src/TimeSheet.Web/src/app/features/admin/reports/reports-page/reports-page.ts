@@ -6,7 +6,10 @@ import { ProjectsAdminService } from '../../../../core/services/projects-admin.s
 import { ReportEnvelope, ReportRangePreset, ReportsService, ReportType } from '../../../../core/services/reports.service';
 import { Client, Project } from '../../../../core/models/project.models';
 
-const PROJECT_SCOPED: ReportType[] = ['time-on-project', 'cost-on-project', 'profit-on-project'];
+const PROJECT_SCOPED: ReportType[] = [
+  'time-on-project', 'cost-on-project', 'profit-on-project',
+  'time-on-project-by-role', 'cost-on-project-by-role', 'profit-on-project-by-role',
+];
 
 @Component({
   selector: 'app-reports-page',
@@ -38,6 +41,12 @@ export class ReportsPage {
     const first = this.report()?.breakdown?.[0];
     return first ? Object.keys(first) : [];
   });
+
+  /** camelCase API field name -> human label, e.g. "entryCount" -> "Entry Count". Used for both the summary
+   * tiles and the breakdown table headers, since both render whatever fields the report happens to return. */
+  protected columnLabel(key: string): string {
+    return key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+  }
 
   constructor() {
     this.clientsService.list().subscribe((clients) => this.clients.set(clients));

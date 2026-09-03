@@ -6,7 +6,11 @@ import { environment } from '../../../environments/environment';
 export type ReportType =
   | 'time-on-project' | 'time-on-client'
   | 'cost-on-project' | 'cost-on-client'
-  | 'profit-on-project' | 'profit-on-client';
+  | 'profit-on-project' | 'profit-on-client'
+  // FDD: "...on a team, role and user basis." Role-basis only exists for Project scope - see
+  // IReportingService's doc comment (Client scope can't honestly attribute Fixed Fee revenue recognition to a
+  // specific role).
+  | 'time-on-project-by-role' | 'cost-on-project-by-role' | 'profit-on-project-by-role';
 
 export type ReportRangePreset = 'Last7Days' | 'LastMonth' | 'LastYear' | 'Custom';
 

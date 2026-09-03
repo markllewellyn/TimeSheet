@@ -80,6 +80,131 @@ public class ReportingServiceTests
         Assert.Equal(600m, report.Breakdown[0].Profit);
     }
 
+    [Fact]
+    public async Task GetProfitOnProjectReportAsync_MultipleEntriesSameUserAndDate_EntryCountReflectsRawEntryRows()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Projects.Add(project);
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // Two separate TimesheetEntry rows for the same user/project/date - the repository's existing
+        // aggregation groups these into a single (Project,Client,User,Date) row (summing hours), so EntryCount
+        // is the only way to tell "2 entries totalling 10h" apart from "1 entry of 10h" - proves it counts raw
+        // rows, not days or hour-sums.
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 6m, OutOfHoursHours = 0m, Description = "Morning", CreatedUtc = DateTimeOffset.UtcNow,
+            ResolvedCustomerRate = 100m, ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
+        });
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 4m, OutOfHoursHours = 0m, Description = "Afternoon", CreatedUtc = DateTimeOffset.UtcNow,
+            ResolvedCustomerRate = 100m, ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(1000m, report.Summary.Billed); // 10h combined * £100
+        Assert.Equal(2, report.Summary.EntryCount);
+        Assert.Single(report.Breakdown);
+        Assert.Equal(2, report.Breakdown[0].EntryCount);
+    }
+
+    [Fact]
+    public async Task GetTimeOnProjectByRoleReportAsync_GroupsByCurrentRole_UnassignedBucketForNoJobRole()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        var role = new Role { Name = "Consultant", CreatedUtc = DateTimeOffset.UtcNow };
+        db.Roles.Add(role);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Projects.Add(project);
+
+        var withRole = new User
+        {
+            EntraObjectId = "oid-1", Email = "with-role@svgit.co.uk", DisplayName = "Has Role",
+            PayrollNumber = "P0001", JobRoleId = role.Id, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        var withoutRole = new User
+        {
+            EntraObjectId = "oid-2", Email = "no-role@svgit.co.uk", DisplayName = "No Role",
+            PayrollNumber = "P0002", CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.AddRange(withRole, withoutRole);
+        await db.SaveChangesAsync();
+
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = withRole.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 5m, OutOfHoursHours = 0m, Description = "Consultant work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = withoutRole.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 11),
+            WorkHours = 3m, OutOfHoursHours = 0m, Description = "No role work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetTimeOnProjectByRoleReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(2, report.Breakdown.Count);
+        var consultantLine = Assert.Single(report.Breakdown, l => l.RoleId == role.Id);
+        Assert.Equal("Consultant", consultantLine.RoleName);
+        Assert.Equal(5m, consultantLine.TotalHours);
+        Assert.Equal(1, consultantLine.EntryCount);
+
+        var unassignedLine = Assert.Single(report.Breakdown, l => l.RoleId == null);
+        Assert.Equal("Unassigned", unassignedLine.RoleName);
+        Assert.Equal(3m, unassignedLine.TotalHours);
+        Assert.Equal(1, unassignedLine.EntryCount);
+
+        Assert.Equal(8m, report.Summary.TotalHours);
+        Assert.Equal(2, report.Summary.EntryCount);
+    }
+
     /// <summary>Never called in this test - same-currency conversions short-circuit before reaching the
     /// provider - but ICurrencyRateProvider has no parameterless implementation to new up otherwise.</summary>
     private class NoopCurrencyRateProvider : Domain.Services.ICurrencyRateProvider

@@ -15,6 +15,9 @@
         <option value="cost-on-project">Cost to Business on Project</option>
         <option value="profit-on-client">Profit to Business on Client</option>
         <option value="profit-on-project">Profit to Business on Project</option>
+        <option value="time-on-project-by-role">Time on Project (by Role)</option>
+        <option value="cost-on-project-by-role">Cost to Business on Project (by Role)</option>
+        <option value="profit-on-project-by-role">Profit to Business on Project (by Role)</option>
       </select>
     </label>
 
@@ -70,7 +73,7 @@
       <div class="flex flex-wrap gap-8">
         @for (kv of r.summary | keyvalue; track kv.key) {
           <div>
-            <p class="text-xs text-muted-foreground">{{ kv.key }}</p>
+            <p class="text-xs text-muted-foreground">{{ columnLabel(kv.key) }}</p>
             <p class="text-xl font-semibold tracking-tight">{{ kv.value }}</p>
           </div>
         }
@@ -82,7 +85,7 @@
         <thead>
           <tr>
             @for (col of breakdownColumns(); track col) {
-              <th>{{ col }}</th>
+              <th>{{ columnLabel(col) }}</th>
             }
           </tr>
         </thead>
