@@ -23,6 +23,20 @@ public class AttachmentConfiguration : IEntityTypeConfiguration<Attachment>
     }
 }
 
+public class ProjectAttachmentConfiguration : IEntityTypeConfiguration<ProjectAttachment>
+{
+    public void Configure(EntityTypeBuilder<ProjectAttachment> builder)
+    {
+        builder.Property(a => a.FileName).HasMaxLength(260).IsRequired();
+        builder.Property(a => a.StorageKey).HasMaxLength(1000).IsRequired();
+        builder.Property(a => a.ContentType).HasMaxLength(200).IsRequired();
+
+        // Restrict, not Cascade - matches every other staff FK on Project (e.g. ProjectManager): removing a
+        // user who happens to have uploaded a document must not silently delete that document.
+        builder.HasOne(a => a.UploadedBy).WithMany().HasForeignKey(a => a.UploadedByUserId).OnDelete(DeleteBehavior.Restrict);
+    }
+}
+
 public class CurrencyRateConfiguration : IEntityTypeConfiguration<CurrencyRate>
 {
     public void Configure(EntityTypeBuilder<CurrencyRate> builder)

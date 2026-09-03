@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { PaymentModel, Project, ProjectEstimate, ProjectType } from '../models/project.models';
+import { PaymentModel, Project, ProjectAttachment, ProjectEstimate, ProjectType } from '../models/project.models';
 
 export interface CreateProjectRequest {
   clientId: number;
@@ -60,5 +60,23 @@ export class ProjectsAdminService {
 
   getEstimate(id: number): Observable<ProjectEstimate> {
     return this.http.get<ProjectEstimate>(`${this.baseUrl}/projects/${id}/estimate`);
+  }
+
+  listAttachments(projectId: number): Observable<ProjectAttachment[]> {
+    return this.http.get<ProjectAttachment[]>(`${this.baseUrl}/projects/${projectId}/attachments`);
+  }
+
+  uploadAttachment(projectId: number, file: File): Observable<ProjectAttachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<ProjectAttachment>(`${this.baseUrl}/projects/${projectId}/attachments`, formData);
+  }
+
+  downloadAttachment(attachmentId: number): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/project-attachments/${attachmentId}`, { responseType: 'blob' });
+  }
+
+  deleteAttachment(attachmentId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/project-attachments/${attachmentId}`);
   }
 }

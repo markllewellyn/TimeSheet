@@ -65,5 +65,8 @@ public class Project
 
     public List<StaffProject> Assignments { get; set; } = [];
 
+    /// <summary>FDD: "Attachments and documents can be held against a project." See ProjectAttachment.</summary>
+    public List<ProjectAttachment> Attachments { get; set; } = [];
+
     public string GetEffectiveCurrency(string clientReportingCurrency) => CurrencyOverride ?? clientReportingCurrency;
 }

@@ -14,3 +14,8 @@ public record CreateProjectRequest(
 public record UpdateProjectRequest(
     string Name, string? Description, string ProjectType, bool? CanInvoice, string? CurrencyOverride, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, bool IsActive, int? ProjectManagerUserId);
+
+/// <summary>FDD: "Attachments and documents can be held against a project." UploadedByName is included (unlike
+/// the entry-scoped AttachmentDto) since a project's documents are seen by potentially several people - Admin
+/// and PM alike - not just the one owner an entry has.</summary>
+public record ProjectAttachmentDto(int Id, string FileName, string ContentType, long SizeBytes, DateTimeOffset UploadedAtUtc, string UploadedByName);

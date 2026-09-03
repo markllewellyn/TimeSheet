@@ -22,6 +22,7 @@ public class TimesheetDbContext(DbContextOptions<TimesheetDbContext> options) : 
     public DbSet<RecordedTimeArchive> RecordedTimeArchives => Set<RecordedTimeArchive>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
     public DbSet<Attachment> Attachments => Set<Attachment>();
+    public DbSet<ProjectAttachment> ProjectAttachments => Set<ProjectAttachment>();
     public DbSet<Currency> Currencies => Set<Currency>();
     public DbSet<CurrencyExchangeHistory> CurrencyExchangeHistories => Set<CurrencyExchangeHistory>();
     public DbSet<CurrencyRate> CurrencyRates => Set<CurrencyRate>();

@@ -1,16 +1,16 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
-import { PaymentModel, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
+import { PaymentModel, ProjectAttachment, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
 import { AppUser } from '../../../../core/models/user.models';
 
 @Component({
   selector: 'app-project-edit-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, RouterLink],
+  imports: [FormsModule, DecimalPipe, DatePipe, RouterLink],
   templateUrl: './project-edit-page.html',
 })
 export class ProjectEditPage {
@@ -43,12 +43,17 @@ export class ProjectEditPage {
 
   protected readonly estimate = signal<ProjectEstimate | null>(null);
 
+  protected readonly attachments = signal<ProjectAttachment[]>([]);
+  protected readonly uploading = signal(false);
+  protected readonly attachmentsError = signal<string | null>(null);
+
   constructor() {
     this.usersAdmin.list(false).subscribe((users) => this.users.set(users));
 
     if (this.editId) {
       const id = Number(this.editId);
       this.projectsAdmin.getEstimate(id).subscribe((e) => this.estimate.set(e));
+      this.loadAttachments(id);
       this.projectsAdmin.getById(id).subscribe((p) => {
         this.projectClientId.set(p.clientId);
         this.name.set(p.name);
@@ -125,5 +130,52 @@ export class ProjectEditPage {
 
   protected cancel(): void {
     this.router.navigate(['/admin/clients']);
+  }
+
+  private loadAttachments(projectId: number): void {
+    this.projectsAdmin.listAttachments(projectId).subscribe({
+      next: (a) => this.attachments.set(a),
+      error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not load the project documents.'),
+    });
+  }
+
+  protected onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.editId) return;
+
+    this.uploading.set(true);
+    this.attachmentsError.set(null);
+    this.projectsAdmin.uploadAttachment(Number(this.editId), file).subscribe({
+      next: () => {
+        this.uploading.set(false);
+        input.value = '';
+        this.loadAttachments(Number(this.editId));
+      },
+      error: (err) => {
+        this.uploading.set(false);
+        input.value = '';
+        this.attachmentsError.set(err?.error?.error ?? 'Could not upload the document.');
+      },
+    });
+  }
+
+  protected downloadAttachment(attachment: ProjectAttachment): void {
+    this.projectsAdmin.downloadAttachment(attachment.id).subscribe((blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  protected deleteAttachment(attachment: ProjectAttachment): void {
+    if (!this.editId) return;
+    this.projectsAdmin.deleteAttachment(attachment.id).subscribe({
+      next: () => this.loadAttachments(Number(this.editId)),
+      error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not delete the document.'),
+    });
   }
 }

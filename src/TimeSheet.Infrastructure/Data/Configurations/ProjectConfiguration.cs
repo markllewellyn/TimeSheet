@@ -34,6 +34,11 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .HasForeignKey(a => a.ProjectId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        builder.HasMany(p => p.Attachments)
+            .WithOne(a => a.Project)
+            .HasForeignKey(a => a.ProjectId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Restrict, not Cascade: removing a user who happens to be a PM must not silently delete the project -
         // the admin has to reassign the PM first (same reasoning as every other staff FK on this entity).
         builder.HasOne(p => p.ProjectManager)

@@ -71,3 +71,13 @@ export interface ProjectEstimate {
   estimatedProfit: number;
   lines: ProjectEstimateLine[];
 }
+
+// FDD: "Attachments and documents can be held against a project." Mirrors TimeSheet.Contracts.ProjectAttachmentDto.
+export interface ProjectAttachment {
+  id: number;
+  fileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedAtUtc: string;
+  uploadedByName: string;
+}
