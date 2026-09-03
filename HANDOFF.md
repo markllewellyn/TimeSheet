@@ -4,6 +4,37 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-03 — replaced native confirm() dialogs, new shared ConfirmService
+
+Not from the FDD - general UI polish requested by the user after the nav reorg, starting with the smallest,
+most contained item: three places still used the browser's native `confirm()` popup (Log Time's delete entry,
+Clients' deactivate, Staff's force-password-reset) - the same "feels out of place" issue already fixed for
+Entry Flags' clearing-notes `prompt()` earlier this session.
+
+- **New `ConfirmService`** (`core/services/confirm.service.ts`) + **`ConfirmDialog`** component
+  (`core/components/confirm-dialog/confirm-dialog.ts`), mounted once in `app.html` (`<app-confirm-dialog />`,
+  alongside `<router-outlet>`) rather than three separate bespoke inline-UI implementations - a modal overlay
+  works uniformly regardless of the underlying list technology (AG-Grid cell renderer for Log Time vs. plain
+  HTML table rows for Clients/Staff), which an inline-expanding-row approach (like Entry Flags' clearing-notes
+  fix) couldn't do consistently across all three.
+- `ConfirmService.confirm(message, { confirmLabel?, destructive? })` returns a `Promise<boolean>` - callers do
+  `const ok = await this.confirmService.confirm(...); if (!ok) return;` in place of the old
+  `if (!confirm(...)) return;`. `destructive: true` renders the confirm button as `.btn-danger` instead of
+  `.btn-primary`, used for all three current call sites since delete/deactivate/reset-password are all
+  destructive-ish actions.
+- Updated: `log-time-page.ts` (delete entry), `clients-list-page.ts` (deactivate), `users-list-page.ts`
+  (force password reset). All three methods became `async` to `await` the new promise-based confirm.
+- This is reusable infrastructure now - any future native `confirm()`/`prompt()` replacement should use
+  `ConfirmService` rather than building another bespoke inline UI.
+- Angular build clean. Frontend-only change, no backend impact.
+
+**Live-verified in the browser by the user**: confirmed looking good.
+
+Other UI polish flagged but not yet started: most pages show no loading indicator while their initial data
+fetch is in flight (blank/empty flash instead) - a much bigger, more invasive pass than this one since it
+touches dozens of pages rather than three call sites. Not started; ask the user before picking this up given
+the scope.
+
 ## Done even later in this session, 2026-09-03 — top nav reorganized (chronological + tidier)
 
 Not from the FDD re-audit - the user found the top nav bar messy (16-17 identically-styled pills in one flat
