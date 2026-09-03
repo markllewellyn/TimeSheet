@@ -8,6 +8,27 @@ export interface Attachment {
   uploadedAtUtc: string;
 }
 
+// Mirrors TimeSheet.Contracts.EntryFlagDto (C#) 1:1 - see also core/services/entry-flags.service.ts's EntryFlag,
+// which duplicates this shape for the Entry Flags admin page's own use (kept separate from this models file
+// deliberately - models here don't import from services).
+export interface OpenEntryFlag {
+  id: number;
+  timesheetEntryId: number;
+  projectId: number;
+  projectName: string | null;
+  clientName: string | null;
+  reason: string;
+  budgetLimitAtTimeOfEntry: number;
+  cumulativeValueAtTimeOfEntry: number;
+  raisedByUserId: number | null;
+  raisedNotes: string | null;
+  raisedAtUtc: string;
+  isCleared: boolean;
+  clearedByUserId: number | null;
+  clearedAtUtc: string | null;
+  clearedNotes: string | null;
+}
+
 // FDD: "When an entry is invoiced the user can choose to add it to the current billing period or to the next
 // billing period." Next holds an entry out of its own natural (date-based) period and counts it toward the
 // immediately following period instead - see ITimesheetEntryRepository.GetCountedForInvoicingAsync (backend).
@@ -32,6 +53,8 @@ export interface TimesheetEntry {
   billingPeriodChoice: BillingPeriodChoice;
   // FDD: "Finalizing an invoice locks the entries it was built from."
   invoiced: boolean;
+  // A flag is never a gate (FDD) - this is purely informational, doesn't affect editability. Empty = not flagged.
+  openFlags: OpenEntryFlag[];
 }
 
 export interface TimesheetEntrySummary {

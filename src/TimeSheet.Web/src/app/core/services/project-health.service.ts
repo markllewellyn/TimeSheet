@@ -5,6 +5,11 @@ import { environment } from '../../../environments/environment';
 
 export type ProjectHealthStatus = 'OnTrack' | 'AtRisk' | 'Behind';
 
+export interface ProjectHealthSweepResult {
+  assessed: number;
+  failed: number;
+}
+
 export interface ProjectHealthAssessment {
   id: number;
   projectId: number;
@@ -30,5 +35,9 @@ export class ProjectHealthService {
 
   reassess(projectId: number): Observable<ProjectHealthAssessment> {
     return this.http.post<ProjectHealthAssessment>(`${this.baseUrl}/projects/${projectId}/health/reassess`, {});
+  }
+
+  runNow(): Observable<ProjectHealthSweepResult> {
+    return this.http.post<ProjectHealthSweepResult>(`${this.baseUrl}/projects/health/run-now`, {});
   }
 }

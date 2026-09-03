@@ -9,6 +9,7 @@ import { EstimatedWeeklyWorkload } from '../../../core/models/workload.models';
 import { EntryActionsCell, EntryActionsContext } from './entry-actions-cell';
 import { ThemeService } from '../../../core/services/theme.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
+import { CurrentUserService } from '../../../core/auth/current-user.service';
 
 const GRID_THEME_BASE = {
   borderRadius: 8,
@@ -44,6 +45,7 @@ export class LogTimePage {
   private readonly router = inject(Router);
   protected readonly themeService = inject(ThemeService);
   protected readonly impersonation = inject(ImpersonationService);
+  private readonly currentUser = inject(CurrentUserService);
 
   // Mirrors the :root.dark tokens in styles.scss so the grid matches the rest of the app.
   protected readonly theme = computed(() => (this.themeService.mode() === 'dark' ? DARK_GRID_THEME : LIGHT_GRID_THEME));
@@ -59,6 +61,9 @@ export class LogTimePage {
   };
 
   protected readonly columnDefs: ColDef<TimesheetEntry>[] = [
+    // Surfaced so a user can actually read off the number the Entry Flags "raise a flag" form asks for -
+    // otherwise nowhere in the UI ever showed an entry's id at all.
+    { headerName: 'Entry ID', field: 'id', width: 90, type: 'numericColumn' },
     { headerName: 'Client', field: 'clientName', flex: 1 },
     { headerName: 'Project', field: 'projectName', flex: 1 },
     { headerName: 'Date', field: 'date', width: 120 },
@@ -71,6 +76,20 @@ export class LogTimePage {
       valueGetter: (p) => (p.data ? p.data.workHours + p.data.outOfHoursHours : null),
     },
     { headerName: 'Description', field: 'description', flex: 2 },
+    {
+      // A flag is never a gate (FDD) - purely informational, doesn't affect editability - so this is a plain
+      // indicator, not a blocked/locked state like the entry-actions column's "Locked" text. Hover shows why
+      // it's flagged (plain-text tooltip - reliable across browsers, unlike an interactive ag-grid tooltip);
+      // clicking jumps to the Entry Flags admin page, but only for Admins - that page is Admin-only today, so
+      // offering the click-through to anyone else would just lead them to a screen they can't use.
+      headerName: 'Flagged',
+      field: 'openFlags',
+      width: 100,
+      valueFormatter: (p) => (p.value?.length > 0 ? '⚑ Flagged' : ''),
+      tooltipValueGetter: (p) => this.flagTooltipText(p.data),
+      cellClass: (p) => (p.value?.length > 0 ? 'text-[var(--destructive)] font-medium' + (this.currentUser.isAdmin() ? ' cursor-pointer underline' : '') : ''),
+      onCellClicked: (p) => this.goToFlag(p.data),
+    },
     { headerName: 'To Payroll', field: 'toPayroll', width: 110, type: 'numericColumn', valueFormatter: (p) => (p.value ?? 0).toFixed(2) },
     {
       headerName: 'Sent to Payroll',
@@ -105,6 +124,22 @@ export class LogTimePage {
   protected onSearchChange(value: string): void {
     this.searchText.set(value);
     this.refresh();
+  }
+
+  private flagTooltipText(entry: TimesheetEntry | undefined): string {
+    if (!entry || entry.openFlags.length === 0) return '';
+    return entry.openFlags
+      .map((f) => {
+        const when = new Date(f.raisedAtUtc).toLocaleDateString();
+        const reason = f.reason === 'Manual' ? 'Flagged for query' : `Budget/allocation exceeded (${f.reason})`;
+        return f.raisedNotes ? `${reason} (${when}): ${f.raisedNotes}` : `${reason} (${when})`;
+      })
+      .join('\n');
+  }
+
+  private goToFlag(entry: TimesheetEntry | undefined): void {
+    if (!entry || entry.openFlags.length === 0 || !this.currentUser.isAdmin()) return;
+    this.router.navigate(['/admin/entry-flags'], { queryParams: { flagId: entry.openFlags[0].id } });
   }
 
   protected addEntry(): void {

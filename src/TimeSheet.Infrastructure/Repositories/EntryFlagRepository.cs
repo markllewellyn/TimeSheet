@@ -23,6 +23,16 @@ public class EntryFlagRepository(TimesheetDbContext db) : IEntryFlagRepository
         return flags.OrderBy(f => f.RaisedAtUtc).ToList();
     }
 
+    public async Task<IReadOnlyList<EntryFlag>> GetOpenByTimesheetEntryIdsAsync(IReadOnlyCollection<int> timesheetEntryIds, CancellationToken ct)
+    {
+        // SQLite can't translate ORDER BY on a DateTimeOffset column - order client-side instead, same as
+        // GetOpenAsync above.
+        var flags = await db.EntryFlags
+            .Where(f => !f.IsCleared && timesheetEntryIds.Contains(f.TimesheetEntryId))
+            .ToListAsync(ct);
+        return flags.OrderByDescending(f => f.RaisedAtUtc).ToList();
+    }
+
     public async Task AddAsync(EntryFlag flag, CancellationToken ct) => await db.EntryFlags.AddAsync(flag, ct);
 
     public void Update(EntryFlag flag) => db.EntryFlags.Update(flag);

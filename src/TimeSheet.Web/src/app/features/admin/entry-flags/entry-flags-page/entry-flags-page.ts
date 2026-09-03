@@ -1,6 +1,7 @@
 import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { EntryFlagsService, EntryFlag } from '../../../../core/services/entry-flags.service';
 
 @Component({
@@ -11,19 +12,38 @@ import { EntryFlagsService, EntryFlag } from '../../../../core/services/entry-fl
 })
 export class EntryFlagsPage {
   private readonly entryFlagsService = inject(EntryFlagsService);
+  private readonly route = inject(ActivatedRoute);
   protected readonly flags = signal<EntryFlag[]>([]);
+
+  // Set when arriving via a "View in Flags" click-through from the Log Time grid (see log-time-page.ts's
+  // goToFlag) - highlights that one row and scrolls it into view, since this page otherwise has no per-flag
+  // deep link of its own.
+  protected readonly highlightedFlagId = signal<number | null>(null);
 
   protected readonly raiseEntryId = signal<number | null>(null);
   protected readonly raiseNotes = signal('');
   protected readonly raising = signal(false);
   protected readonly error = signal<string | null>(null);
+  protected readonly successMessage = signal<string | null>(null);
+
+  protected readonly clearingFlagId = signal<number | null>(null);
+  protected readonly clearNotes = signal('');
+  protected readonly clearing = signal(false);
 
   constructor() {
-    this.refresh();
+    const flagIdParam = Number(this.route.snapshot.queryParamMap.get('flagId'));
+    if (flagIdParam) this.highlightedFlagId.set(flagIdParam);
+    this.refresh(flagIdParam > 0);
   }
 
-  private refresh(): void {
-    this.entryFlagsService.listOpen().subscribe((flags) => this.flags.set(flags));
+  private refresh(scrollToHighlighted = false): void {
+    this.entryFlagsService.listOpen().subscribe((flags) => {
+      this.flags.set(flags);
+      if (scrollToHighlighted) {
+        const id = this.highlightedFlagId();
+        setTimeout(() => document.getElementById(`flag-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      }
+    });
   }
 
   protected raise(): void {
@@ -45,12 +65,40 @@ export class EntryFlagsPage {
     });
   }
 
-  protected clear(f: EntryFlag): void {
-    const notes = prompt('Clearing notes (optional):');
-    this.entryFlagsService.clear(f.id, notes || null).subscribe(() => this.refresh());
+  protected startClear(f: EntryFlag): void {
+    this.clearingFlagId.set(f.id);
+    this.clearNotes.set('');
+    this.error.set(null);
+  }
+
+  protected cancelClear(): void {
+    this.clearingFlagId.set(null);
+    this.clearNotes.set('');
+  }
+
+  protected confirmClear(f: EntryFlag): void {
+    this.clearing.set(true);
+    this.error.set(null);
+    this.entryFlagsService.clear(f.id, this.clearNotes() || null).subscribe({
+      next: () => {
+        this.clearing.set(false);
+        this.clearingFlagId.set(null);
+        this.clearNotes.set('');
+        this.refresh();
+      },
+      error: (err) => {
+        this.clearing.set(false);
+        this.error.set(err?.error?.error ?? 'Could not clear the flag.');
+      },
+    });
   }
 
   protected notifyStaff(f: EntryFlag): void {
-    this.entryFlagsService.notifyStaff(f.id).subscribe();
+    this.error.set(null);
+    this.successMessage.set(null);
+    this.entryFlagsService.notifyStaff(f.id).subscribe({
+      next: () => this.successMessage.set(`Notified the staff member for entry #${f.timesheetEntryId}.`),
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not notify the staff member.'),
+    });
   }
 }

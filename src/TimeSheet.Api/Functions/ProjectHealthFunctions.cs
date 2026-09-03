@@ -30,6 +30,18 @@ public class ProjectHealthFunctions(IProjectHealthService projectHealth, ICurren
         return new OkObjectResult(result.Select(ToDto));
     }
 
+    /// <summary>Sweeps every active project on demand, same as the nightly timer - so an Admin can populate the
+    /// dashboard's first assessments (or demo the feature) without waiting for 2am. Calls the exact same
+    /// ReassessAllActiveAsync the timer calls (see ProjectHealthTimerFunction), so behavior is identical.</summary>
+    [Function("ProjectHealth_RunNow")]
+    public async Task<IActionResult> RunNow(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects/health/run-now")] HttpRequest req, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var result = await projectHealth.ReassessAllActiveAsync(ct);
+        return new OkObjectResult(result);
+    }
+
     [Function("ProjectHealth_Reassess")]
     public async Task<IActionResult> Reassess(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "projects/{projectId:int}/health/reassess")] HttpRequest req, int projectId, CancellationToken ct)

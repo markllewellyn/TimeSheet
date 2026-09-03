@@ -1,5 +1,22 @@
 <div class="flex flex-col gap-4">
-  <h1 class="page-title">Project Health</h1>
+  <div class="page-header">
+    <h1 class="page-title">Project Health</h1>
+    <button
+      class="btn-secondary"
+      [disabled]="running()"
+      (click)="runNow()"
+      title="Manually runs the same nightly AI health assessment job that normally happens automatically at 2am - assesses every active project against its budget/timeline and recent activity."
+    >
+      {{ running() ? 'Running…' : 'Run Now' }}
+    </button>
+  </div>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+  @if (successMessage(); as s) {
+    <div class="banner-success">{{ s }}</div>
+  }
 
   @if (assessments().length === 0) {
     <div class="empty-state">
@@ -9,7 +26,7 @@
         </svg>
       </span>
       <p class="empty-state-title">No assessments yet</p>
-      <p class="empty-state-body">Health checks run nightly, or you can trigger one on demand from a project's page.</p>
+      <p class="empty-state-body">Health checks run nightly, or click "Run Now" above to assess every active project immediately.</p>
     </div>
   }
 

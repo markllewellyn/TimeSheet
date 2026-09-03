@@ -26,6 +26,8 @@ public interface IProjectHealthAssessor
     Task<ProjectHealthAssessment> AssessAsync(int projectId, CancellationToken ct);
 }
 
+public record ProjectHealthSweepResult(int Assessed, int Failed);
+
 public interface IProjectHealthService
 {
     Task<ProjectHealthAssessment?> GetLatestAsync(int projectId, CancellationToken ct);
@@ -37,4 +39,10 @@ public interface IProjectHealthService
     /// <summary>Assesses, persists, and - only when the status worsens (or on-demand is explicitly
     /// requested) - notifies Admins. Avoids alert fatigue: a nightly run that stays OnTrack raises nothing.</summary>
     Task<ProjectHealthAssessment> ReassessAsync(int projectId, CancellationToken ct);
+
+    /// <summary>Reassesses every active project (bounded concurrency, respecting the AI provider's rate
+    /// limits) - the shared logic behind both NightlyProjectHealthAssessment and the manual "Run Now" trigger,
+    /// so the two are guaranteed to behave identically. A single project's failure (e.g. a missing/invalid AI
+    /// provider API key) never aborts the sweep for the rest - see ReassessAsync's own error behavior.</summary>
+    Task<ProjectHealthSweepResult> ReassessAllActiveAsync(CancellationToken ct);
 }

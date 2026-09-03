@@ -20,6 +20,7 @@ public class TimesheetEntriesFunctions(
     IClientRepository clients,
     IEntryTypeRepository entryTypes,
     IUserRepository users,
+    IEntryFlagRepository entryFlags,
     IRateResolver rateResolver,
     IBudgetMonitoringService budgetMonitoring,
     IEntryFlagService entryFlagService,
@@ -41,7 +42,10 @@ public class TimesheetEntriesFunctions(
         var to = req.Query.TryGetValue("to", out var t) && DateOnly.TryParse(t, out var td) ? td : (DateOnly?)null;
 
         var result = await entries.GetForUserAsync(effectiveUserId, search, from, to, ct);
-        var dtos = result.Select(ToDto).ToList();
+        var openFlagsByEntryId = (await entryFlags.GetOpenByTimesheetEntryIdsAsync(result.Select(e => e.Id).ToList(), ct))
+            .GroupBy(f => f.TimesheetEntryId)
+            .ToDictionary(g => g.Key, g => g.Select(ToFlagDto).ToList());
+        var dtos = result.Select(e => ToDto(e, openFlagsByEntryId.GetValueOrDefault(e.Id, []))).ToList();
 
         return new OkObjectResult(new
         {
@@ -60,7 +64,8 @@ public class TimesheetEntriesFunctions(
         var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
         if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
-        return new OkObjectResult(ToDto(entry));
+        var openFlags = (await entryFlags.GetOpenByTimesheetEntryIdsAsync([entry.Id], ct)).Select(ToFlagDto).ToList();
+        return new OkObjectResult(ToDto(entry, openFlags));
     }
 
     [Function("TimesheetEntries_Create")]
@@ -523,12 +528,21 @@ public class TimesheetEntriesFunctions(
     private static BillingPeriodChoice ResolveBillingPeriodChoice(string? value) =>
         Enum.TryParse<BillingPeriodChoice>(value, out var parsed) ? parsed : BillingPeriodChoice.Current;
 
-    private static TimesheetEntryDto ToDto(TimesheetEntry e) => new(
+    // openFlags defaults empty for Create/Update/Duplicate's own response - a just-created/duplicated entry
+    // can't have a flag yet, and Update's caller re-fetches via List right after anyway (see log-time-page.ts),
+    // so an already-flagged entry being edited briefly showing no flags in the PUT response itself is harmless.
+    private static TimesheetEntryDto ToDto(TimesheetEntry e, IReadOnlyList<EntryFlagDto>? openFlags = null) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.ClientId, e.Client?.Name ?? e.Project?.Client?.Name ?? "",
         e.Date, e.WorkHours, e.OutOfHoursHours, e.Description,
         e.ToPayroll, e.ApprovedPayroll, e.SentToPayroll,
         e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList(),
-        e.EntryTypeId, e.EntryType?.Name, e.BillingPeriodChoice.ToString(), e.InvoiceId is not null);
+        e.EntryTypeId, e.EntryType?.Name, e.BillingPeriodChoice.ToString(), e.InvoiceId is not null, openFlags ?? []);
+
+    private static EntryFlagDto ToFlagDto(EntryFlag f) => new(
+        f.Id, f.TimesheetEntryId, f.ProjectId, null, null,
+        f.Reason.ToString(), f.BudgetLimitAtTimeOfEntry, f.CumulativeValueAtTimeOfEntry,
+        f.RaisedByUserId, f.RaisedNotes, f.RaisedAtUtc,
+        f.IsCleared, f.ClearedByUserId, f.ClearedAtUtc, f.ClearedNotes);
 }
 
 public record DuplicateTimesheetEntryRequest(DateOnly? Date, int? OnBehalfOfUserId = null);

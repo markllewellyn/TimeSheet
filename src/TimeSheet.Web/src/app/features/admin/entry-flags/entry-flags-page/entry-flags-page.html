@@ -8,6 +8,9 @@
   @if (error(); as e) {
     <div class="banner-error">{{ e }}</div>
   }
+  @if (successMessage(); as s) {
+    <div class="banner-success">{{ s }}</div>
+  }
 
   <div class="card-padded flex flex-wrap items-end gap-3">
     <label class="field">
@@ -47,7 +50,7 @@
         </thead>
         <tbody>
           @for (f of flags(); track f.id) {
-            <tr>
+            <tr [id]="'flag-' + f.id" [class]="highlightedFlagId() === f.id ? 'bg-[var(--accent)]' : ''">
               <td class="text-muted-foreground">#{{ f.timesheetEntryId }}</td>
               <td class="text-muted-foreground">{{ f.clientName }}</td>
               <td class="font-medium text-foreground">{{ f.projectName }}</td>
@@ -55,8 +58,24 @@
               <td class="text-muted-foreground">{{ f.raisedNotes ?? (f.reason === 'Manual' ? '-' : (f.cumulativeValueAtTimeOfEntry + ' / ' + f.budgetLimitAtTimeOfEntry + 'h')) }}</td>
               <td class="text-muted-foreground">{{ f.raisedAtUtc | date: 'short' }}</td>
               <td class="text-right">
-                <button class="btn-link mr-3" (click)="notifyStaff(f)">Notify Staff</button>
-                <button class="btn-link text-[var(--success)]" (click)="clear(f)">Clear</button>
+                @if (clearingFlagId() === f.id) {
+                  <div class="flex items-center justify-end gap-2">
+                    <input
+                      type="text"
+                      class="input w-48"
+                      placeholder="Clearing notes (optional)"
+                      [ngModel]="clearNotes()"
+                      (ngModelChange)="clearNotes.set($event)"
+                    />
+                    <button class="btn-link text-[var(--success)]" [disabled]="clearing()" (click)="confirmClear(f)">
+                      {{ clearing() ? 'Clearing…' : 'Confirm' }}
+                    </button>
+                    <button class="btn-link" [disabled]="clearing()" (click)="cancelClear()">Cancel</button>
+                  </div>
+                } @else {
+                  <button class="btn-link mr-3" (click)="notifyStaff(f)">Notify Staff</button>
+                  <button class="btn-link text-[var(--success)]" (click)="startClear(f)">Clear</button>
+                }
               </td>
             </tr>
           }

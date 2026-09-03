@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
@@ -10,8 +11,11 @@ public class ProjectHealthService(
     IProjectRepository projects,
     IProjectHealthAssessor assessor,
     INotificationService notificationService,
-    IUnitOfWork uow) : IProjectHealthService
+    IUnitOfWork uow,
+    ILogger<ProjectHealthService> logger) : IProjectHealthService
 {
+    private const int MaxSweepConcurrency = 4;
+
     public async Task<ProjectHealthAssessment?> GetLatestAsync(int projectId, CancellationToken ct)
     {
         var project = await projects.GetByIdAsync(projectId, ct);
@@ -64,6 +68,36 @@ public class ProjectHealthService(
 
         await uow.SaveChangesAsync(ct);
         return assessment;
+    }
+
+    public async Task<ProjectHealthSweepResult> ReassessAllActiveAsync(CancellationToken ct)
+    {
+        var activeProjects = await projects.GetAllActiveAsync(ct);
+        using var throttle = new SemaphoreSlim(MaxSweepConcurrency);
+        var assessed = 0;
+        var failed = 0;
+
+        var tasks = activeProjects.Select(async project =>
+        {
+            await throttle.WaitAsync(ct);
+            try
+            {
+                await ReassessAsync(project.Id, ct);
+                Interlocked.Increment(ref assessed);
+            }
+            catch (Exception ex)
+            {
+                Interlocked.Increment(ref failed);
+                logger.LogWarning(ex, "Failed to assess health for project {ProjectId}", project.Id);
+            }
+            finally
+            {
+                throttle.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+        return new ProjectHealthSweepResult(assessed, failed);
     }
 
     private static int Severity(ProjectHealthStatus? status) => status switch
