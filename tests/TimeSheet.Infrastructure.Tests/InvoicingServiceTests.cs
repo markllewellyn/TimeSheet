@@ -43,7 +43,7 @@ public class InvoicingServiceTests
         {
             ClientId = client.Id, Name = "Project A", Code = "A", PaymentModel = paymentModel,
             FixedFeeAmount = paymentModel == PaymentModel.FixedProjectCost ? 1000m : null,
-            StartDate = new DateOnly(2026, 1, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 1, 1), IsActive = true, CanInvoice = true, CreatedUtc = DateTimeOffset.UtcNow,
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();

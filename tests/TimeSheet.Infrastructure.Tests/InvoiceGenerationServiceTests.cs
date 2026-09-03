@@ -41,7 +41,7 @@ public class InvoiceGenerationServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "Project A", Code = "A", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 1, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 1, 1), IsActive = true, CanInvoice = true, CreatedUtc = DateTimeOffset.UtcNow,
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();
@@ -152,18 +152,34 @@ public class InvoiceGenerationServiceTests
     }
 
     [Fact]
-    public async Task BuildDraftAsync_ProjectCanInvoiceNull_StillCounted()
+    public async Task BuildDraftAsync_ProjectCanInvoiceTrue_Counted()
     {
         await using var db = CreateInMemoryDb();
         var (client, project, user) = await SeedAsync(db);
-        // CanInvoice defaults to null for every project predating this flag - must behave exactly like true.
-        Assert.Null(project.CanInvoice);
+        Assert.True(project.CanInvoice);
         db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
         await db.SaveChangesAsync();
 
         var invoice = await CreateService(db).BuildDraftAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
 
         Assert.Single(invoice.LineItems);
+    }
+
+    [Fact]
+    public async Task BuildDraftAsync_ProjectCanInvoiceNull_ExcludedEntirely()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        // Matches the established convention elsewhere CanInvoice is read (ExpenseEntriesFunctions' Contract
+        // gate, project-edit-page.ts's own comment): "not true" (null OR false) means not invoiceable.
+        project.CanInvoice = null;
+        db.Projects.Update(project);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var invoice = await CreateService(db).BuildDraftAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Empty(invoice.LineItems);
     }
 
     private class ThrowingRateProvider : ICurrencyRateProvider

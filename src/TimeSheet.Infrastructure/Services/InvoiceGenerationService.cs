@@ -52,10 +52,13 @@ public class InvoiceGenerationService(
 
         foreach (var project in clientProjects)
         {
-            // Legacy [Projects].CanInvoice, null = invoiceable (the pre-existing default for every project
-            // predating this flag being wired up) - only an explicit false excludes a project from every kind
-            // of line item (T&M, Fixed Fee, and Expense alike), not just some of them.
-            if (project.CanInvoice == false) continue;
+            // Legacy [Projects].CanInvoice - "not true" (null OR false) means not invoiceable, matching the
+            // established convention elsewhere this flag is already read: ExpenseEntriesFunctions' Contract-kind
+            // gate (`CanInvoice == true` is rejected for Contract values - i.e. Contract values require a
+            // non-true CanInvoice) and project-edit-page.ts's own comment ("Null and false both mean 'not
+            // invoiceable'"). Excludes a project from every kind of line item (T&M, Fixed Fee, and Expense
+            // alike), not just some of them.
+            if (project.CanInvoice != true) continue;
 
             var projectCurrency = project.CurrencyOverride ?? targetCurrency;
 
