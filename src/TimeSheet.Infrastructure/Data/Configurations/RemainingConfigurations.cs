@@ -129,21 +129,6 @@ public class AuditLogConfiguration : IEntityTypeConfiguration<AuditLog>
     }
 }
 
-public class ProjectHealthAssessmentConfiguration : IEntityTypeConfiguration<ProjectHealthAssessment>
-{
-    public void Configure(EntityTypeBuilder<ProjectHealthAssessment> builder)
-    {
-        builder.Property(a => a.Status).HasConversion<string>().HasMaxLength(20);
-        builder.Property(a => a.Summary).HasMaxLength(2000).IsRequired();
-        builder.Property(a => a.AiModelUsed).HasMaxLength(100).IsRequired();
-        builder.Property(a => a.PercentBudgetConsumed).HasPrecision(6, 2);
-        builder.Property(a => a.PercentTimeElapsed).HasPrecision(6, 2);
-
-        builder.HasIndex(a => new { a.ProjectId, a.AssessedAtUtc });
-        builder.HasOne(a => a.Project).WithMany().HasForeignKey(a => a.ProjectId).OnDelete(DeleteBehavior.Cascade);
-    }
-}
-
 public class RoleConfiguration : IEntityTypeConfiguration<Role>
 {
     public void Configure(EntityTypeBuilder<Role> builder)

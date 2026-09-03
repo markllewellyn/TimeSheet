@@ -56,9 +56,6 @@ public class Project
 
     public bool IsActive { get; set; } = true;
 
-    /// <summary>Denormalized pointer to the latest AI health verdict, avoiding a correlated MAX() subquery on dashboard reads.</summary>
-    public int? LatestHealthAssessmentId { get; set; }
-
     public DateTimeOffset CreatedUtc { get; set; }
     public int? CreatedByUserId { get; set; }
     public DateTimeOffset? ModifiedUtc { get; set; }

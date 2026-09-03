@@ -45,8 +45,5 @@ public class ProjectConfiguration : IEntityTypeConfiguration<Project>
             .WithMany()
             .HasForeignKey(p => p.ProjectManagerUserId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        // LatestHealthAssessmentId is a plain denormalized pointer (no navigation property), so EF maps it
-        // as an ordinary nullable column with no inferred FK/cascade relationship to ProjectHealthAssessment.
     }
 }
