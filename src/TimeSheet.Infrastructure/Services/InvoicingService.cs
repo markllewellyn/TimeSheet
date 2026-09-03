@@ -8,6 +8,7 @@ namespace TimeSheet.Infrastructure.Services;
 public class InvoicingService(
     IInvoiceRepository invoices,
     IClientRepository clients,
+    ITimesheetEntryRepository entries,
     IInvoiceGenerationService generation,
     IPdfInvoiceRenderer pdfRenderer,
     INotificationService notificationService,
@@ -106,6 +107,7 @@ public class InvoicingService(
         invoice.FinalizedByUserId = finalizedByUserId;
 
         invoices.Update(invoice);
+        await LockEntriesAsync(invoice, ct);
         await uow.SaveChangesAsync(ct);
 
         await notificationService.RaiseToAdminsAsync(
@@ -127,6 +129,26 @@ public class InvoicingService(
         }
 
         return invoice.PdfContent;
+    }
+
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Nothing persists which
+    /// individual TimesheetEntry rows fed a Time &amp; Materials line item (BuildDraftAsync only keeps the
+    /// aggregated sum) - so the entry set is reconstituted here by re-running the exact same period/project
+    /// query that built the line item in the first place, then stamping each one with this invoice's id.
+    /// Fixed Fee and Expense line items don't derive from TimesheetEntry rows, so there's nothing to lock for
+    /// those. Idempotent-safe to call more than once (an already-locked entry is simply re-stamped with the
+    /// same value), though FinalizeInvoiceAsync's Draft-only guard means that never actually happens.</summary>
+    private async Task LockEntriesAsync(Invoice invoice, CancellationToken ct)
+    {
+        foreach (var line in invoice.LineItems.Where(l => l.Type == InvoiceLineItemType.TimeAndMaterials))
+        {
+            var counted = await entries.GetCountedForInvoicingAsync(line.ProjectId, invoice.PeriodStart, invoice.PeriodEnd, ct);
+            foreach (var entry in counted)
+            {
+                entry.InvoiceId = invoice.Id;
+                entries.Update(entry);
+            }
+        }
     }
 
     private static string? FormatAddress(Client client)

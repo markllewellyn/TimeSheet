@@ -30,6 +30,8 @@ export interface TimesheetEntry {
   entryTypeId: number | null;
   entryTypeName: string | null;
   billingPeriodChoice: BillingPeriodChoice;
+  // FDD: "Finalizing an invoice locks the entries it was built from."
+  invoiced: boolean;
 }
 
 export interface TimesheetEntrySummary {

@@ -15,7 +15,7 @@ export interface EntryActionsContext {
   template: `
     <div class="flex h-full items-center gap-3 text-sm">
       @if (locked()) {
-        <span class="text-xs text-muted-foreground">Locked (sent to payroll)</span>
+        <span class="text-xs text-muted-foreground">{{ lockedReason() }}</span>
       } @else {
         <button class="hover:underline" (click)="edit()">Edit</button>
         <button class="hover:underline" (click)="duplicate()">Duplicate</button>
@@ -32,7 +32,11 @@ export class EntryActionsCell implements ICellRendererAngularComp {
   }
 
   locked(): boolean {
-    return this.params.data?.sentToPayroll === true;
+    return this.params.data?.sentToPayroll === true || this.params.data?.invoiced === true;
+  }
+
+  lockedReason(): string {
+    return this.params.data?.invoiced === true ? 'Locked (invoiced)' : 'Locked (sent to payroll)';
   }
 
   refresh(): boolean {

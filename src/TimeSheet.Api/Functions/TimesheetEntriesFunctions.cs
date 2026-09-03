@@ -187,6 +187,7 @@ public class TimesheetEntriesFunctions(
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null) return new NotFoundResult();
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
+        if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
         var body = await req.ReadFromJsonAsync<UpdateTimesheetEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
@@ -244,6 +245,7 @@ public class TimesheetEntriesFunctions(
         var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
+        if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
         entries.Remove(entry);
         await auditLog.LogAsync(user, "TimesheetEntry.Deleted", "TimesheetEntry", entry.Id,
@@ -265,6 +267,7 @@ public class TimesheetEntriesFunctions(
         var (authorized, impersonatedUserId) = CheckOwnership(source, user, body?.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
         if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
+        if (source.InvoiceId is not null) return InvoicedLockedResult();
 
         var targetDate = body?.Date ?? source.Date;
 
@@ -449,6 +452,14 @@ public class TimesheetEntriesFunctions(
             StatusCode = StatusCodes.Status409Conflict,
         };
 
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Set by
+    /// InvoicingService.FinalizeInvoiceAsync, never here - this is read-only enforcement.</summary>
+    private static IActionResult InvoicedLockedResult() =>
+        new ObjectResult(new { error = "This entry has been included on a finalized invoice and can no longer be changed." })
+        {
+            StatusCode = StatusCodes.Status409Conflict,
+        };
+
     /// <summary>Query-string form of impersonation context, for endpoints (Get/List/Delete) that have no JSON
     /// body to carry OnBehalfOfUserId on.</summary>
     private static int? ParseOnBehalfOfUserId(HttpRequest req) =>
@@ -493,7 +504,7 @@ public class TimesheetEntriesFunctions(
         e.Date, e.WorkHours, e.OutOfHoursHours, e.Description,
         e.ToPayroll, e.ApprovedPayroll, e.SentToPayroll,
         e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList(),
-        e.EntryTypeId, e.EntryType?.Name, e.BillingPeriodChoice.ToString());
+        e.EntryTypeId, e.EntryType?.Name, e.BillingPeriodChoice.ToString(), e.InvoiceId is not null);
 }
 
 public record DuplicateTimesheetEntryRequest(DateOnly? Date, int? OnBehalfOfUserId = null);

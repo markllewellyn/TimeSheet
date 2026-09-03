@@ -49,6 +49,7 @@ public class TimesheetEntryConfiguration : IEntityTypeConfiguration<TimesheetEnt
         builder.HasOne(e => e.RateCard).WithMany().HasForeignKey(e => e.RateCardId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(e => e.StaffCost).WithMany().HasForeignKey(e => e.StaffCostId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(e => e.EntryType).WithMany().HasForeignKey(e => e.EntryTypeId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(e => e.Attachments)
             .WithOne(a => a.TimesheetEntry)

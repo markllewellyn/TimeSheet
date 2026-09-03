@@ -7,7 +7,9 @@ namespace TimeSheet.Domain.Entities;
 /// business logic - nothing in the app reads or writes them beyond a default value. ExpensesValue is likewise
 /// present but deliberately unused - expenses are tracked via the separate ExpenseEntry table instead.
 /// ModifiedUtc extends the legacy table directly (no legacy equivalent, too small to warrant a split table).
-/// An entry is never blocked or gated - see EntryFlag for the FDD's non-blocking "flag for query" model.
+/// An entry is never blocked or gated by an EntryFlag - see EntryFlag for the FDD's non-blocking "flag for
+/// query" model - but it IS locked once InvoiceId is set (FDD: "Finalizing an invoice locks the entries it was
+/// built from").
 /// </summary>
 public class TimesheetEntry
 {
@@ -54,6 +56,15 @@ public class TimesheetEntry
     /// always) for every entry predating this feature. See ITimesheetEntryRepository.GetCountedForInvoicingAsync
     /// for how this is applied at invoice-generation time.</summary>
     public BillingPeriodChoice BillingPeriodChoice { get; set; } = BillingPeriodChoice.Current;
+
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Set once, at
+    /// InvoicingService.FinalizeInvoiceAsync time, by re-running the same period/project selection query
+    /// (ITimesheetEntryRepository.GetCountedForInvoicingAsync) that built the invoice's Time &amp; Materials line
+    /// items - never set for entries behind a Fixed Fee or Expense line, since those don't derive from
+    /// TimesheetEntry rows at all. Never cleared afterward - a Finalized invoice is never un-finalized in this
+    /// app. See TimesheetEntriesFunctions for the Update/Delete/Duplicate guard this enables.</summary>
+    public int? InvoiceId { get; set; }
+    public Invoice? Invoice { get; set; }
 
     public bool ApprovedPayroll { get; set; }
     public int? ApprovedByStaffId { get; set; }

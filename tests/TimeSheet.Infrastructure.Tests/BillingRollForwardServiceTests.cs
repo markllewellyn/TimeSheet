@@ -35,6 +35,7 @@ public class BillingRollForwardServiceTests
         IInvoicingService invoicing = new InvoicingService(
             new InvoiceRepository(db),
             new ClientRepository(db),
+            new TimesheetEntryRepository(db),
             new InvoiceGenerationService(
                 new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
                 new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),

@@ -4,7 +4,8 @@ public record TimesheetEntryDto(
     int Id, int ProjectId, string ProjectName, int ClientId, string ClientName,
     DateOnly Date, decimal WorkHours, decimal OutOfHoursHours, string? Description,
     decimal ToPayroll, bool ApprovedPayroll, bool SentToPayroll,
-    IReadOnlyList<AttachmentDto> Attachments, int? EntryTypeId, string? EntryTypeName, string BillingPeriodChoice);
+    IReadOnlyList<AttachmentDto> Attachments, int? EntryTypeId, string? EntryTypeName, string BillingPeriodChoice,
+    bool Invoiced);
 
 /// <summary>AdminSendToPayroll mirrors the legacy app's admin-only "Sent to Payroll" checkbox on Add - if
 /// true, the created entry is simultaneously approved and sent in one step. OnBehalfOfUserId lets an Admin log
