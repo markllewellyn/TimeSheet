@@ -4,6 +4,44 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done last in this session, 2026-09-03 — Project Health removed entirely
+
+Follow-up to the very next entry below: after being told the Anthropic API isn't free and given the earlier
+finding that the feature doesn't demonstrably trace to any FDD text (see that entry's "Investigated but NOT
+fixed" note), the user decided to just remove it rather than pay for or keep an unverified feature around.
+
+- **Deleted entirely** (not disabled/hidden): `ProjectHealthAssessment` entity, `IProjectHealthService`/
+  `ProjectHealthService`, `IProjectHealthAssessor`/`ProjectHealthAssessor`, `IHealthAnalysisClient`/
+  `ClaudeHealthAnalysisClient`, `IProjectHealthAssessmentRepository`/`ProjectHealthAssessmentRepository`,
+  `ProjectHealthFunctions.cs`, `ProjectHealthTimerFunction.cs`, `ProjectHealthDtos.cs`, the Angular
+  `project-health-page`/`project-health.service.ts`, the `admin/health` route, and the "Project Health" nav
+  link. New migration `RemoveProjectHealth` drops the `ProjectHealthAssessments` table and
+  `Project.LatestHealthAssessmentId` column (both originally added together in the old
+  `20260826110920_LegacySchemaAlignment` migration - never edit an already-applied historical migration, add a
+  reverse one instead).
+- **Deliberately did NOT remove** `NotificationType.ProjectHealthDeclined` (`Enums.cs`) or its title-mapping
+  case in `NotificationService.cs` ("Project health alert") - that enum is persisted via `HasConversion<string>()`,
+  so deleting the member would break deserialization of any pre-existing `Notification` row of that type. This
+  exact situation already had a precedent in the same enum: `EscalationRaised`/`EscalationDecided` carry a
+  comment explaining they're "Unused going forward... kept so historical Notification rows still deserialize" -
+  followed that same pattern rather than inventing a new one. Nothing can produce a *new* one of these
+  notifications anymore now that `ProjectHealthService` is gone, which is the only thing that mattered.
+- **Confirmed NOT touched**: `IRevenueRecognitionService`/`RevenueRecognitionService` (Fixed Fee revenue
+  recognition for invoicing/reporting) - an easily-confused-by-name but completely unrelated interface; the
+  earlier investigation's mention of it alongside Project Health was purely about a design constraint (Fixed
+  Fee revenue can't be honestly attributed to a specific role in reporting), never a code dependency.
+- Full removal manifest was produced by an exhaustive repo-wide search first (every file, every reference)
+  before deleting anything, specifically to avoid exactly the kind of "looks unrelated but actually breaks
+  deserialization" mistake the `NotificationType` case above would have been.
+- Backend and Angular build clean, 44/44 tests pass (unchanged - there were never any tests for this feature).
+  API host restarted (DI/constructor changes from removing 4 service registrations); confirmed old
+  `/api/projects/health/*` routes now correctly 404. New migration confirmed applied to the dev DB directly
+  (both the table and column verified actually gone, not just "no error on apply").
+- The item below this one ("Done in a follow-up round... Entry Flags, Project Health") describes UX fixes made
+  to Project Health *before* this removal decision - all of that code and everything it fixed no longer exists.
+  Left as historical record rather than deleted from this file, but don't go looking for any of it in the
+  running app anymore.
+
 ## Done in a follow-up round the same session, 2026-09-03 — user-driven UX fixes (Entry Flags, Project Health)
 
 Not from the FDD re-audit - the user spent time actually using the app after the re-audit work and found four
