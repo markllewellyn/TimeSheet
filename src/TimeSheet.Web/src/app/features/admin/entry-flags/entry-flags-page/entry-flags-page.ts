@@ -3,17 +3,21 @@ import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { EntryFlagsService, EntryFlag } from '../../../../core/services/entry-flags.service';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-entry-flags-page',
   standalone: true,
-  imports: [DatePipe, FormsModule],
+  imports: [DatePipe, FormsModule, LoadingSpinner],
   templateUrl: './entry-flags-page.html',
 })
 export class EntryFlagsPage {
   private readonly entryFlagsService = inject(EntryFlagsService);
   private readonly route = inject(ActivatedRoute);
   protected readonly flags = signal<EntryFlag[]>([]);
+  // Only ever set true->false, on the very first refresh() call - never reset for subsequent reloads after an
+  // action (raise/clear), so those don't flash the spinner over an already-populated list.
+  protected readonly loading = signal(true);
 
   // Set when arriving via a "View in Flags" click-through from the Log Time grid (see log-time-page.ts's
   // goToFlag) - highlights that one row and scrolls it into view, since this page otherwise has no per-flag
@@ -37,12 +41,19 @@ export class EntryFlagsPage {
   }
 
   private refresh(scrollToHighlighted = false): void {
-    this.entryFlagsService.listOpen().subscribe((flags) => {
-      this.flags.set(flags);
-      if (scrollToHighlighted) {
-        const id = this.highlightedFlagId();
-        setTimeout(() => document.getElementById(`flag-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-      }
+    this.entryFlagsService.listOpen().subscribe({
+      next: (flags) => {
+        this.flags.set(flags);
+        this.loading.set(false);
+        if (scrollToHighlighted) {
+          const id = this.highlightedFlagId();
+          setTimeout(() => document.getElementById(`flag-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+        }
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err?.error?.error ?? 'Could not load flags.');
+      },
     });
   }
 

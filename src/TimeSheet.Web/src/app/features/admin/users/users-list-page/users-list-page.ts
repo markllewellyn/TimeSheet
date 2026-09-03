@@ -10,11 +10,12 @@ import { ConfirmService } from '../../../../core/services/confirm.service';
 import { AppUser, TenantDirectoryUser } from '../../../../core/models/user.models';
 import { StaffCost } from '../../../../core/models/staff-cost.models';
 import { Project } from '../../../../core/models/project.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-users-list-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, LoadingSpinner],
   templateUrl: './users-list-page.html',
 })
 export class UsersListPage {
@@ -26,6 +27,9 @@ export class UsersListPage {
   private readonly confirmService = inject(ConfirmService);
 
   protected readonly users = signal<AppUser[]>([]);
+  // Only ever true->false, on the first refresh() - subsequent refreshes (after invite/save actions) don't
+  // reset it.
+  protected readonly loading = signal(true);
   protected readonly roles = signal<Role[]>([]);
   protected readonly allProjects = signal<Project[]>([]);
 
@@ -99,7 +103,13 @@ export class UsersListPage {
   }
 
   private refresh(): void {
-    this.usersAdmin.list().subscribe((users) => this.users.set(users));
+    this.usersAdmin.list().subscribe({
+      next: (users) => {
+        this.users.set(users);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected onProjectFilterChange(projectId: number | null): void {

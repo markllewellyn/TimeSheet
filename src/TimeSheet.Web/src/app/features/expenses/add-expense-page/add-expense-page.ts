@@ -8,13 +8,14 @@ import { ClientsService } from '../../../core/services/clients.service';
 import { ExpenseEntriesService } from '../../../core/services/expense-entries.service';
 import { Project } from '../../../core/models/project.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 type EntryKind = 'Expense' | 'Contract';
 
 @Component({
   selector: 'app-add-expense-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './add-expense-page.html',
 })
 export class AddExpensePage {
@@ -62,31 +63,43 @@ export class AddExpensePage {
     this.projectsLoaded.set(false);
 
     if (kind === 'Expense') {
-      this.projectsService.listAssignedToMe().subscribe((projects) => {
-        this.projects.set(projects);
-        this.projectsLoaded.set(true);
+      this.projectsService.listAssignedToMe().subscribe({
+        next: (projects) => {
+          this.projects.set(projects);
+          this.projectsLoaded.set(true);
+        },
+        error: (err) => {
+          this.projectsLoaded.set(true);
+          this.error.set(err?.error?.error ?? 'Could not load your assigned projects.');
+        },
       });
       return;
     }
 
     // Contract entries aren't tied to the admin's own assignments - they're logged against any
     // non-invoiceable project across all clients, same "all clients" fetch pattern as projects-all-page.
-    this.clientsService.list().subscribe((clientsList) => {
-      if (clientsList.length === 0) {
-        this.projects.set([]);
-        this.projectsLoaded.set(true);
-        return;
-      }
-      forkJoin(clientsList.map((c) => this.projectsAdmin.listByClient(c.id))).subscribe({
-        next: (results) => {
-          this.projects.set(results.flat().filter((p) => p.canInvoice !== true));
-          this.projectsLoaded.set(true);
-        },
-        error: () => {
+    this.clientsService.list().subscribe({
+      next: (clientsList) => {
+        if (clientsList.length === 0) {
           this.projects.set([]);
           this.projectsLoaded.set(true);
-        },
-      });
+          return;
+        }
+        forkJoin(clientsList.map((c) => this.projectsAdmin.listByClient(c.id))).subscribe({
+          next: (results) => {
+            this.projects.set(results.flat().filter((p) => p.canInvoice !== true));
+            this.projectsLoaded.set(true);
+          },
+          error: () => {
+            this.projects.set([]);
+            this.projectsLoaded.set(true);
+          },
+        });
+      },
+      error: (err) => {
+        this.projectsLoaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load clients.');
+      },
     });
   }
 

@@ -7,11 +7,12 @@ import { EntryTypesService, EntryType } from '../../../core/services/entry-types
 import { Project } from '../../../core/models/project.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-add-entry-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './add-entry-page.html',
 })
 export class AddEntryPage {
@@ -29,6 +30,10 @@ export class AddEntryPage {
 
   protected readonly projects = signal<Project[]>([]);
   protected readonly projectsLoaded = signal(false);
+  // Only relevant/checked in edit mode (see `loading` below) - never set true when creating a brand-new entry,
+  // since there's no existing record to wait for and isEditMode short-circuits before this value matters.
+  protected readonly entryLoaded = signal(false);
+  protected readonly loading = computed(() => !this.projectsLoaded() || (this.isEditMode && !this.entryLoaded()));
   protected readonly clients = computed(() => {
     const seen = new Map<number, string>();
     for (const p of this.projects()) seen.set(p.clientId, p.clientName);
@@ -66,10 +71,16 @@ export class AddEntryPage {
     // impersonate a user and edit that user's timesheet entries while impersonating (FDD). Enforced
     // server-side regardless (TimesheetEntriesFunctions.CheckOwnership).
     const onBehalfOf = this.impersonation.actingAs();
-    this.projectsService.listAssignedToMe(onBehalfOf?.id).subscribe((projects) => {
-      this.projects.set(projects);
-      this.projectsLoaded.set(true);
-      if (this.editId) this.loadExisting(Number(this.editId));
+    this.projectsService.listAssignedToMe(onBehalfOf?.id).subscribe({
+      next: (projects) => {
+        this.projects.set(projects);
+        this.projectsLoaded.set(true);
+        if (this.editId) this.loadExisting(Number(this.editId));
+      },
+      error: (err) => {
+        this.projectsLoaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load your assigned projects.');
+      },
     });
 
     effect(() => {
@@ -83,15 +94,22 @@ export class AddEntryPage {
   }
 
   private loadExisting(id: number): void {
-    this.timesheetEntries.getById(id, this.impersonation.actingAs()?.id).subscribe((entry) => {
-      this.selectedClientId.set(entry.clientId);
-      this.selectedProjectId.set(entry.projectId);
-      this.date.set(entry.date);
-      this.workHours.set(entry.workHours);
-      this.outOfHoursHours.set(entry.outOfHoursHours);
-      this.description.set(entry.description ?? '');
-      this.selectedEntryTypeId.set(entry.entryTypeId);
-      this.billingPeriodChoice.set(entry.billingPeriodChoice);
+    this.timesheetEntries.getById(id, this.impersonation.actingAs()?.id).subscribe({
+      next: (entry) => {
+        this.selectedClientId.set(entry.clientId);
+        this.selectedProjectId.set(entry.projectId);
+        this.date.set(entry.date);
+        this.workHours.set(entry.workHours);
+        this.outOfHoursHours.set(entry.outOfHoursHours);
+        this.description.set(entry.description ?? '');
+        this.selectedEntryTypeId.set(entry.entryTypeId);
+        this.billingPeriodChoice.set(entry.billingPeriodChoice);
+        this.entryLoaded.set(true);
+      },
+      error: (err) => {
+        this.entryLoaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load this entry.');
+      },
     });
   }
 

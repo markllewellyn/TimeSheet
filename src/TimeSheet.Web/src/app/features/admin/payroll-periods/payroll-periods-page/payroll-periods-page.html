@@ -25,38 +25,42 @@
     <div class="banner-success">{{ s }}</div>
   }
 
-  <div class="card overflow-hidden px-4">
-    <table class="table-clean">
-      <thead>
-        <tr>
-          <th>Period</th>
-          <th>Staff</th>
-          <th>Total OOH Hours</th>
-          <th>Total OOH Pay</th>
-          <th>Generated</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (p of periods(); track p.id) {
-          <tr
-            class="cursor-pointer"
-            [class.bg-muted]="selectedPeriodId() === p.id"
-            (click)="select(p)"
-          >
-            <td class="font-medium text-foreground">{{ p.periodStart | date: 'MMMM yyyy' }}</td>
-            <td>{{ p.staffCount }}</td>
-            <td>{{ p.totalOutOfHoursHours | number: '1.1-1' }}</td>
-            <td>{{ p.totalOutOfHoursPay | number: '1.2-2' }}</td>
-            <td class="text-muted-foreground">{{ p.generatedAtUtc | date: 'short' }}</td>
-          </tr>
-        } @empty {
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
           <tr>
-            <td colspan="5" class="text-center text-sm text-muted-foreground">No payroll periods have been generated yet.</td>
+            <th>Period</th>
+            <th>Staff</th>
+            <th>Total OOH Hours</th>
+            <th>Total OOH Pay</th>
+            <th>Generated</th>
           </tr>
-        }
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          @for (p of periods(); track p.id) {
+            <tr
+              class="cursor-pointer"
+              [class.bg-muted]="selectedPeriodId() === p.id"
+              (click)="select(p)"
+            >
+              <td class="font-medium text-foreground">{{ p.periodStart | date: 'MMMM yyyy' }}</td>
+              <td>{{ p.staffCount }}</td>
+              <td>{{ p.totalOutOfHoursHours | number: '1.1-1' }}</td>
+              <td>{{ p.totalOutOfHoursPay | number: '1.2-2' }}</td>
+              <td class="text-muted-foreground">{{ p.generatedAtUtc | date: 'short' }}</td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="5" class="text-center text-sm text-muted-foreground">No payroll periods have been generated yet.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 
   @if (selectedPeriodId(); as id) {
     <div>

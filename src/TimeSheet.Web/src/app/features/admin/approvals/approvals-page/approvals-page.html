@@ -38,7 +38,9 @@
       <button class="btn-ghost" (click)="refreshPending()">Refresh</button>
     </div>
 
-    @if (pending().length === 0) {
+    @if (!pendingLoaded()) {
+      <app-loading-spinner />
+    } @else if (pending().length === 0) {
       <div class="empty-state">
         <p class="empty-state-title">Nothing waiting for approval</p>
         <p class="empty-state-body">All timesheet entries have been approved for payroll.</p>
@@ -111,7 +113,9 @@
       <button class="btn-ghost" (click)="refreshReady()">Refresh</button>
     </div>
 
-    @if (ready().length === 0) {
+    @if (!readyLoaded()) {
+      <app-loading-spinner />
+    } @else if (ready().length === 0) {
       <div class="empty-state">
         <p class="empty-state-title">Nothing ready to send</p>
         <p class="empty-state-body">Approved entries waiting to be sent to payroll will appear here.</p>

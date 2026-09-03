@@ -3,11 +3,12 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MyOverviewService } from '../../../core/services/my-overview.service';
 import { MyOverviewLine } from '../../../core/models/my-overview.models';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-my-overview-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, LoadingSpinner],
   templateUrl: './my-overview-page.html',
 })
 export class MyOverviewPage {
@@ -15,6 +16,7 @@ export class MyOverviewPage {
 
   protected readonly lines = signal<MyOverviewLine[]>([]);
   protected readonly loaded = signal(false);
+  protected readonly error = signal<string | null>(null);
   protected readonly searchText = signal('');
   protected readonly sentToPayrollOnly = signal(false);
 
@@ -37,9 +39,15 @@ export class MyOverviewPage {
   });
 
   constructor() {
-    this.myOverview.get().subscribe((lines) => {
-      this.lines.set(lines);
-      this.loaded.set(true);
+    this.myOverview.get().subscribe({
+      next: (lines) => {
+        this.lines.set(lines);
+        this.loaded.set(true);
+      },
+      error: (err) => {
+        this.loaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load your overview.');
+      },
     });
   }
 }

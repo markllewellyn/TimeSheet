@@ -3,11 +3,12 @@ import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApprovalsService } from '../../../../core/services/approvals.service';
 import { ApprovalEntry } from '../../../../core/models/approval.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-approvals-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, LoadingSpinner],
   templateUrl: './approvals-page.html',
 })
 export class ApprovalsPage {
@@ -19,6 +20,9 @@ export class ApprovalsPage {
   // --- Approval queue tab ---
   protected readonly searchText = signal('');
   protected readonly pending = signal<ApprovalEntry[]>([]);
+  // Set true on the first refreshPending() only, then never reset - later refreshes (search-as-you-type,
+  // post-approve reload) shouldn't flash the spinner back over an already-populated list.
+  protected readonly pendingLoaded = signal(false);
   protected readonly postingBatches = signal<string[]>([]);
   protected readonly selectedPendingIds = signal<Set<number>>(new Set());
   protected readonly postingBatchChoice = signal('');
@@ -55,18 +59,31 @@ export class ApprovalsPage {
   }
 
   protected refreshPending(): void {
-    this.approvalsService.pending(this.searchText() || undefined).subscribe((res) => {
-      this.pending.set(res.entries);
-      this.postingBatches.set(res.postingBatches);
-      this.selectedPendingIds.set(new Set());
+    this.approvalsService.pending(this.searchText() || undefined).subscribe({
+      next: (res) => {
+        this.pending.set(res.entries);
+        this.postingBatches.set(res.postingBatches);
+        this.selectedPendingIds.set(new Set());
+        this.pendingLoaded.set(true);
+      },
+      error: (err) => {
+        this.pendingLoaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load the approval queue.');
+      },
     });
   }
 
   protected refreshReady(): void {
-    this.approvalsService.readyForPayroll().subscribe((rows) => {
-      this.ready.set(rows);
-      this.readyLoaded.set(true);
-      this.selectedReadyIds.set(new Set());
+    this.approvalsService.readyForPayroll().subscribe({
+      next: (rows) => {
+        this.ready.set(rows);
+        this.readyLoaded.set(true);
+        this.selectedReadyIds.set(new Set());
+      },
+      error: (err) => {
+        this.readyLoaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load the ready-for-payroll queue.');
+      },
     });
   }
 

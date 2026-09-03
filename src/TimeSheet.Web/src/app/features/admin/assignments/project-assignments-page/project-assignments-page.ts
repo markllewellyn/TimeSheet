@@ -4,11 +4,12 @@ import { ActivatedRoute } from '@angular/router';
 import { AssignmentsService, ProjectAssignment } from '../../../../core/services/assignments.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { AppUser } from '../../../../core/models/user.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-project-assignments-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './project-assignments-page.html',
 })
 export class ProjectAssignmentsPage {
@@ -19,6 +20,8 @@ export class ProjectAssignmentsPage {
   protected readonly projectId = Number(this.route.snapshot.paramMap.get('id'));
   protected readonly assignments = signal<ProjectAssignment[]>([]);
   protected readonly users = signal<AppUser[]>([]);
+  // Only ever true->false, on the first refresh() - subsequent refreshes don't reset it.
+  protected readonly loading = signal(true);
 
   protected readonly newUserId = signal<number | null>(null);
   protected readonly newStartDate = signal(new Date().toISOString().slice(0, 10));
@@ -32,7 +35,13 @@ export class ProjectAssignmentsPage {
   }
 
   private refresh(): void {
-    this.assignmentsService.listByProject(this.projectId).subscribe((assignments) => this.assignments.set(assignments));
+    this.assignmentsService.listByProject(this.projectId).subscribe({
+      next: (assignments) => {
+        this.assignments.set(assignments);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected addAssignment(): void {

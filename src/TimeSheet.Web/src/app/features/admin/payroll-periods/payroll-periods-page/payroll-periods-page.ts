@@ -2,11 +2,12 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { PayrollPeriodsService } from '../../../../core/services/payroll-periods.service';
 import { PayrollPeriod, PayrollPeriodDetail } from '../../../../core/models/payroll-period.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-payroll-periods-page',
   standalone: true,
-  imports: [DatePipe, DecimalPipe],
+  imports: [DatePipe, DecimalPipe, LoadingSpinner],
   templateUrl: './payroll-periods-page.html',
 })
 export class PayrollPeriodsPage {
@@ -18,6 +19,8 @@ export class PayrollPeriodsPage {
   protected readonly error = signal<string | null>(null);
   protected readonly successMessage = signal<string | null>(null);
   protected readonly running = signal(false);
+  // Only ever true->false, on the first refresh() - subsequent refreshes (after Run Now) don't reset it.
+  protected readonly loading = signal(true);
 
   constructor() {
     this.refresh();
@@ -25,8 +28,14 @@ export class PayrollPeriodsPage {
 
   private refresh(): void {
     this.payrollPeriodsService.list().subscribe({
-      next: (periods) => this.periods.set(periods),
-      error: (err) => this.error.set(err?.error?.error ?? 'Could not load payroll periods.'),
+      next: (periods) => {
+        this.periods.set(periods);
+        this.loading.set(false);
+      },
+      error: (err) => {
+        this.loading.set(false);
+        this.error.set(err?.error?.error ?? 'Could not load payroll periods.');
+      },
     });
   }
 

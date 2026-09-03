@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { InvoicesService, ProjectManagerInvoice } from '../../../core/services/invoices.service';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 /**
  * FDD: "Project managers can view the staged invoice for their projects." Read-only - a PM never generates,
@@ -11,7 +12,7 @@ import { InvoicesService, ProjectManagerInvoice } from '../../../core/services/i
 @Component({
   selector: 'app-my-invoices-page',
   standalone: true,
-  imports: [DecimalPipe],
+  imports: [DecimalPipe, LoadingSpinner],
   templateUrl: './my-invoices-page.html',
 })
 export class MyInvoicesPage {
@@ -19,11 +20,18 @@ export class MyInvoicesPage {
 
   protected readonly invoices = signal<ProjectManagerInvoice[]>([]);
   protected readonly loaded = signal(false);
+  protected readonly error = signal<string | null>(null);
 
   constructor() {
-    this.invoicesService.listForProjectManager().subscribe((invoices) => {
-      this.invoices.set(invoices);
-      this.loaded.set(true);
+    this.invoicesService.listForProjectManager().subscribe({
+      next: (invoices) => {
+        this.invoices.set(invoices);
+        this.loaded.set(true);
+      },
+      error: (err) => {
+        this.loaded.set(true);
+        this.error.set(err?.error?.error ?? 'Could not load your invoices.');
+      },
     });
   }
 }

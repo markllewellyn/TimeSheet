@@ -2,25 +2,33 @@ import { Component, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { ConfirmService } from '../../../../core/services/confirm.service';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 import { Client } from '../../../../core/models/project.models';
 
 @Component({
   selector: 'app-clients-list-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LoadingSpinner],
   templateUrl: './clients-list-page.html',
 })
 export class ClientsListPage {
   private readonly clientsService = inject(ClientsService);
   private readonly confirmService = inject(ConfirmService);
   protected readonly clients = signal<Client[]>([]);
+  protected readonly loading = signal(true);
 
   constructor() {
     this.refresh();
   }
 
   protected refresh(): void {
-    this.clientsService.list(true).subscribe((clients) => this.clients.set(clients));
+    this.clientsService.list(true).subscribe({
+      next: (clients) => {
+        this.clients.set(clients);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected async deactivate(client: Client): Promise<void> {

@@ -30,59 +30,63 @@
     </p>
   }
 
-  @if (projectsLoaded() && clients().length === 0) {
-    <div class="banner-warning">
-      @if (kind() === 'Contract') {
-        There are no non-invoiceable projects to log a contract value against.
-      } @else {
-        You aren't assigned to any projects yet, so there's nothing to log an expense against. Ask an Admin to
-        assign you under Clients → (a client) → Projects → (a project) → Assignments.
-      }
+  @if (!projectsLoaded()) {
+    <app-loading-spinner />
+  } @else {
+    @if (clients().length === 0) {
+      <div class="banner-warning">
+        @if (kind() === 'Contract') {
+          There are no non-invoiceable projects to log a contract value against.
+        } @else {
+          You aren't assigned to any projects yet, so there's nothing to log an expense against. Ask an Admin to
+          assign you under Clients → (a client) → Projects → (a project) → Assignments.
+        }
+      </div>
+    }
+
+    <div class="card-padded grid grid-cols-2 gap-4">
+      <label class="field">
+        <span class="field-label">Client</span>
+        <select class="input" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
+          <option [ngValue]="null" disabled>Select a client</option>
+          @for (c of clients(); track c.id) {
+            <option [ngValue]="c.id">{{ c.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Project</span>
+        <select class="input" [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
+          <option [ngValue]="null" disabled>Select a project</option>
+          @for (p of projectsForClient(); track p.id) {
+            <option [ngValue]="p.id">{{ p.name }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span class="field-label">Date</span>
+        <input type="date" class="input" [ngModel]="date()" (ngModelChange)="date.set($event)" />
+      </label>
+
+      <label class="field">
+        <span class="field-label">{{ kind() === 'Contract' ? 'Contract Value' : 'Value of Expense' }}</span>
+        <div class="flex gap-2">
+          <input type="number" min="0" step="0.01" class="input" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
+          <input type="text" maxlength="3" class="input w-20 uppercase" [ngModel]="currency()" (ngModelChange)="currency.set($event)" />
+        </div>
+      </label>
+
+      <label class="field col-span-2">
+        <span class="field-label">Description</span>
+        <input type="text" placeholder="Task description" class="input" [ngModel]="description()" (ngModelChange)="description.set($event)" />
+      </label>
+    </div>
+
+    <div class="mt-6 flex gap-3">
+      <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Log' }}</button>
+      <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
     </div>
   }
-
-  <div class="card-padded grid grid-cols-2 gap-4">
-    <label class="field">
-      <span class="field-label">Client</span>
-      <select class="input" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
-        <option [ngValue]="null" disabled>Select a client</option>
-        @for (c of clients(); track c.id) {
-          <option [ngValue]="c.id">{{ c.name }}</option>
-        }
-      </select>
-    </label>
-
-    <label class="field">
-      <span class="field-label">Project</span>
-      <select class="input" [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
-        <option [ngValue]="null" disabled>Select a project</option>
-        @for (p of projectsForClient(); track p.id) {
-          <option [ngValue]="p.id">{{ p.name }}</option>
-        }
-      </select>
-    </label>
-
-    <label class="field">
-      <span class="field-label">Date</span>
-      <input type="date" class="input" [ngModel]="date()" (ngModelChange)="date.set($event)" />
-    </label>
-
-    <label class="field">
-      <span class="field-label">{{ kind() === 'Contract' ? 'Contract Value' : 'Value of Expense' }}</span>
-      <div class="flex gap-2">
-        <input type="number" min="0" step="0.01" class="input" [ngModel]="amount()" (ngModelChange)="amount.set($event)" />
-        <input type="text" maxlength="3" class="input w-20 uppercase" [ngModel]="currency()" (ngModelChange)="currency.set($event)" />
-      </div>
-    </label>
-
-    <label class="field col-span-2">
-      <span class="field-label">Description</span>
-      <input type="text" placeholder="Task description" class="input" [ngModel]="description()" (ngModelChange)="description.set($event)" />
-    </label>
-  </div>
-
-  <div class="mt-6 flex gap-3">
-    <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Log' }}</button>
-    <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
-  </div>
 </div>

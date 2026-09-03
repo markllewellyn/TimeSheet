@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RolesService, Role } from '../../../../core/services/roles.service';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-roles-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './roles-page.html',
 })
 export class RolesPage {
@@ -15,13 +16,21 @@ export class RolesPage {
   protected readonly newName = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
+  // Only ever true->false, on the first refresh() - later refreshes (after add/toggle) don't reset it.
+  protected readonly loading = signal(true);
 
   constructor() {
     this.refresh();
   }
 
   private refresh(): void {
-    this.rolesService.list(true).subscribe((roles) => this.roles.set(roles));
+    this.rolesService.list(true).subscribe({
+      next: (roles) => {
+        this.roles.set(roles);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected add(): void {

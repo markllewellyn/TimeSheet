@@ -8,11 +8,12 @@ import { RateCardsService, RateCard } from '../../../../core/services/rate-cards
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { AppUser } from '../../../../core/models/user.models';
 import { BillingPeriod } from '../../../../core/models/project.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-client-edit-page',
   standalone: true,
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, LoadingSpinner],
   templateUrl: './client-edit-page.html',
 })
 export class ClientEditPage {
@@ -25,6 +26,9 @@ export class ClientEditPage {
 
   private readonly editId = this.route.snapshot.paramMap.get('id');
   protected readonly isEditMode = this.editId !== null;
+  // A brand-new client's form is immediately usable (no existing record to wait for) - only edit mode gates on
+  // the client record actually arriving.
+  protected readonly loaded = signal(!this.isEditMode);
 
   protected readonly name = signal('');
   protected readonly accountCode = signal('');
@@ -61,22 +65,29 @@ export class ClientEditPage {
 
     if (this.editId) {
       const id = Number(this.editId);
-      this.clientsService.getById(id).subscribe((c) => {
-        this.name.set(c.name);
-        this.accountCode.set(c.accountCode);
-        this.startDate.set(c.startDate);
-        this.billingAddressLine1.set(c.billingAddressLine1 ?? '');
-        this.billingCity.set(c.billingCity ?? '');
-        this.billingPostalCode.set(c.billingPostalCode ?? '');
-        this.billingCountryCode.set(c.billingCountryCode ?? '');
-        this.primaryContactName.set(c.primaryContactName ?? '');
-        this.primaryContactEmail.set(c.primaryContactEmail ?? '');
-        this.currencyId.set(c.currencyId);
-        this.invoicingMonthEndDay.set(c.invoicingMonthEndDay);
-        this.notes.set(c.notes ?? '');
-        this.billingPeriod.set(c.billingPeriod);
-        this.currentPeriodStart.set(c.currentPeriodStart);
-        this.currentPeriodEnd.set(c.currentPeriodEnd);
+      this.clientsService.getById(id).subscribe({
+        next: (c) => {
+          this.name.set(c.name);
+          this.accountCode.set(c.accountCode);
+          this.startDate.set(c.startDate);
+          this.billingAddressLine1.set(c.billingAddressLine1 ?? '');
+          this.billingCity.set(c.billingCity ?? '');
+          this.billingPostalCode.set(c.billingPostalCode ?? '');
+          this.billingCountryCode.set(c.billingCountryCode ?? '');
+          this.primaryContactName.set(c.primaryContactName ?? '');
+          this.primaryContactEmail.set(c.primaryContactEmail ?? '');
+          this.currencyId.set(c.currencyId);
+          this.invoicingMonthEndDay.set(c.invoicingMonthEndDay);
+          this.notes.set(c.notes ?? '');
+          this.billingPeriod.set(c.billingPeriod);
+          this.currentPeriodStart.set(c.currentPeriodStart);
+          this.currentPeriodEnd.set(c.currentPeriodEnd);
+          this.loaded.set(true);
+        },
+        error: (err) => {
+          this.loaded.set(true);
+          this.error.set(err?.error?.error ?? 'Could not load this client.');
+        },
       });
       this.refreshRateCards(id);
       this.usersAdmin.list(false).subscribe((users) => this.staff.set(users));

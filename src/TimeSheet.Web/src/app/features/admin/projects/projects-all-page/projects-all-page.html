@@ -6,7 +6,9 @@
     </a>
   </div>
 
-  @if (loaded() && projects().length === 0) {
+  @if (!loaded()) {
+    <app-loading-spinner />
+  } @else if (projects().length === 0) {
     <p class="text-sm text-muted-foreground">
       No projects yet. Create a Client first, then add a Project under it.
     </p>

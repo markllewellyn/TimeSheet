@@ -8,7 +8,9 @@
     <div class="banner-success">{{ m }}</div>
   }
 
-  @if (loaded()) {
+  @if (!loaded() && !error()) {
+    <app-loading-spinner />
+  } @else if (loaded()) {
     <div class="card-padded grid grid-cols-2 gap-4">
       <label class="field">
         <span class="field-label">Base Reporting Currency</span>

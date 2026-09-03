@@ -4,6 +4,7 @@ import { forkJoin } from 'rxjs';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { Project } from '../../../../core/models/project.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 /**
  * A flat, all-clients view of Projects - the per-client project list (admin/clients/:clientId/projects) is
@@ -13,7 +14,7 @@ import { Project } from '../../../../core/models/project.models';
 @Component({
   selector: 'app-projects-all-page',
   standalone: true,
-  imports: [RouterLink],
+  imports: [RouterLink, LoadingSpinner],
   templateUrl: './projects-all-page.html',
 })
 export class ProjectsAllPage {

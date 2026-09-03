@@ -5,7 +5,13 @@
     same invoice are not.
   </p>
 
-  @if (loaded() && invoices().length === 0) {
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  @if (!loaded()) {
+    <app-loading-spinner />
+  } @else if (invoices().length === 0) {
     <div class="empty-state">You aren't the project manager for any project with invoiced work yet.</div>
   }
 

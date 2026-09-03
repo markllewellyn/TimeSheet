@@ -5,6 +5,9 @@
     <div class="banner-error">{{ e }}</div>
   }
 
+  @if (!loaded()) {
+    <app-loading-spinner />
+  } @else {
   <div class="card-padded grid grid-cols-2 gap-4">
     <label class="field">
       <span class="field-label">Name</span>
@@ -150,5 +153,6 @@
         <button class="btn-secondary mt-6 h-fit" [disabled]="rateCardSaving()" (click)="addRateCard()">{{ rateCardSaving() ? 'Saving…' : 'Add Rate' }}</button>
       </div>
     </div>
+  }
   }
 </div>

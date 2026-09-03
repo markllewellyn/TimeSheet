@@ -158,6 +158,9 @@
     </label>
   </div>
 
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else {
   <div class="card overflow-hidden px-4">
     <table class="table-clean">
       <thead>
@@ -330,4 +333,5 @@
       </tbody>
     </table>
   </div>
+  }
 </div>

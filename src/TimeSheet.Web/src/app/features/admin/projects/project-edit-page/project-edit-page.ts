@@ -6,11 +6,12 @@ import { ProjectsAdminService } from '../../../../core/services/projects-admin.s
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { PaymentModel, ProjectAttachment, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
 import { AppUser } from '../../../../core/models/user.models';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-project-edit-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, DatePipe, RouterLink],
+  imports: [FormsModule, DecimalPipe, DatePipe, RouterLink, LoadingSpinner],
   templateUrl: './project-edit-page.html',
 })
 export class ProjectEditPage {
@@ -21,6 +22,8 @@ export class ProjectEditPage {
 
   private readonly editId = this.route.snapshot.paramMap.get('id');
   protected readonly isEditMode = this.editId !== null;
+  // A brand-new project's form is immediately usable - only edit mode gates on the project record arriving.
+  protected readonly loaded = signal(!this.isEditMode);
   private readonly clientIdFromRoute = Number(this.route.snapshot.paramMap.get('clientId'));
   private readonly projectClientId = signal(this.clientIdFromRoute);
 
@@ -54,24 +57,31 @@ export class ProjectEditPage {
       const id = Number(this.editId);
       this.projectsAdmin.getEstimate(id).subscribe((e) => this.estimate.set(e));
       this.loadAttachments(id);
-      this.projectsAdmin.getById(id).subscribe((p) => {
-        this.projectClientId.set(p.clientId);
-        this.name.set(p.name);
-        this.code.set(p.code);
-        this.description.set(p.description ?? '');
-        this.paymentModel.set(p.paymentModel);
-        this.projectType.set(p.projectType);
-        this.projectManagerUserId.set(p.projectManagerUserId);
-        // Null and false both mean "not invoiceable" everywhere else this field is read (the Contract-expense
-        // picker/gate use `canInvoice !== true`) - defaulting an ambiguous null to true here would silently
-        // flip a project's invoicing eligibility as a side effect of an unrelated edit.
-        this.canInvoice.set(p.canInvoice ?? false);
-        this.currencyOverride.set(p.currencyOverride ?? '');
-        this.startDate.set(p.startDate);
-        this.endDate.set(p.endDate ?? '');
-        this.budgetHours.set(p.budgetHours);
-        this.fixedFeeAmount.set(p.fixedFeeAmount);
-        this.isActive.set(p.isActive);
+      this.projectsAdmin.getById(id).subscribe({
+        next: (p) => {
+          this.projectClientId.set(p.clientId);
+          this.name.set(p.name);
+          this.code.set(p.code);
+          this.description.set(p.description ?? '');
+          this.paymentModel.set(p.paymentModel);
+          this.projectType.set(p.projectType);
+          this.projectManagerUserId.set(p.projectManagerUserId);
+          // Null and false both mean "not invoiceable" everywhere else this field is read (the Contract-expense
+          // picker/gate use `canInvoice !== true`) - defaulting an ambiguous null to true here would silently
+          // flip a project's invoicing eligibility as a side effect of an unrelated edit.
+          this.canInvoice.set(p.canInvoice ?? false);
+          this.currencyOverride.set(p.currencyOverride ?? '');
+          this.startDate.set(p.startDate);
+          this.endDate.set(p.endDate ?? '');
+          this.budgetHours.set(p.budgetHours);
+          this.fixedFeeAmount.set(p.fixedFeeAmount);
+          this.isActive.set(p.isActive);
+          this.loaded.set(true);
+        },
+        error: (err) => {
+          this.loaded.set(true);
+          this.error.set(err?.error?.error ?? 'Could not load this project.');
+        },
       });
     }
   }

@@ -1,11 +1,12 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { SettingsService } from '../../../../core/services/settings.service';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-settings-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './settings-page.html',
 })
 export class SettingsPage {
@@ -24,12 +25,18 @@ export class SettingsPage {
   protected readonly savedMessage = signal<string | null>(null);
 
   constructor() {
-    this.settingsService.get().subscribe((s) => {
-      this.baseReportingCurrency.set(s.baseReportingCurrency);
-      this.defaultInvoiceMonthEndDay.set(s.defaultInvoiceMonthEndDay);
-      this.projectBudgetWarningThresholdPercent.set(s.projectBudgetWarningThresholdPercent);
-      this.projectBudgetAlertThresholdPercent.set(s.projectBudgetAlertThresholdPercent);
-      this.loaded.set(true);
+    this.settingsService.get().subscribe({
+      next: (s) => {
+        this.baseReportingCurrency.set(s.baseReportingCurrency);
+        this.defaultInvoiceMonthEndDay.set(s.defaultInvoiceMonthEndDay);
+        this.projectBudgetWarningThresholdPercent.set(s.projectBudgetWarningThresholdPercent);
+        this.projectBudgetAlertThresholdPercent.set(s.projectBudgetAlertThresholdPercent);
+        this.loaded.set(true);
+      },
+      // Deliberately does NOT set loaded true here - this is a form that can Save over whatever it's showing,
+      // so surfacing blank/default field values as if they were real settings (and letting Save overwrite the
+      // actual saved settings with them) would be actively harmful, unlike a list page silently showing empty.
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not load settings.'),
     });
   }
 

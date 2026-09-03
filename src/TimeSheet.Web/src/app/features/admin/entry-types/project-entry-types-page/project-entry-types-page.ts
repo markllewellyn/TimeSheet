@@ -3,11 +3,12 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { EntryTypesService, EntryType } from '../../../../core/services/entry-types.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
+import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-project-entry-types-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './project-entry-types-page.html',
 })
 export class ProjectEntryTypesPage {
@@ -18,6 +19,8 @@ export class ProjectEntryTypesPage {
   protected readonly projectId = Number(this.route.snapshot.paramMap.get('id'));
   protected readonly entryTypes = signal<EntryType[]>([]);
   protected readonly isContractProject = signal(false);
+  // Only ever true->false, on the first refresh() - subsequent refreshes don't reset it.
+  protected readonly loading = signal(true);
 
   protected readonly newName = signal('');
   protected readonly newIsContractType = signal(false);
@@ -30,7 +33,13 @@ export class ProjectEntryTypesPage {
   }
 
   private refresh(): void {
-    this.entryTypesService.listByProject(this.projectId).subscribe((entryTypes) => this.entryTypes.set(entryTypes));
+    this.entryTypesService.listByProject(this.projectId).subscribe({
+      next: (entryTypes) => {
+        this.entryTypes.set(entryTypes);
+        this.loading.set(false);
+      },
+      error: () => this.loading.set(false),
+    });
   }
 
   protected addEntryType(): void {

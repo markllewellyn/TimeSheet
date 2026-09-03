@@ -3,6 +3,10 @@
     <h1 class="page-title">Your Overview</h1>
   </div>
 
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
   <div class="flex flex-wrap items-center gap-4">
     <input
       class="input max-w-xs"
@@ -16,12 +20,14 @@
     </label>
   </div>
 
-  @if (loaded() && lines().length === 0) {
+  @if (!loaded()) {
+    <app-loading-spinner />
+  } @else if (lines().length === 0) {
     <div class="empty-state">
       <p class="empty-state-title">Nothing logged yet</p>
       <p class="empty-state-body">Once you log time, a breakdown by client and project will appear here.</p>
     </div>
-  } @else if (loaded() && visibleLines().length === 0) {
+  } @else if (visibleLines().length === 0) {
     <p class="text-sm text-muted-foreground">No rows match your filters.</p>
   } @else {
     <div class="card overflow-hidden px-4">

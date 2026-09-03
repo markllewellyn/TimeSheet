@@ -5,38 +5,42 @@
     <div class="banner-error">{{ e }}</div>
   }
 
-  <div class="card overflow-hidden px-4">
-    <table class="table-clean">
-      <thead>
-        <tr>
-          <th>User</th>
-          <th>Status</th>
-          <th>Start</th>
-          <th>End</th>
-          <th>Allocated Hrs/Wk</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (a of assignments(); track a.id) {
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
           <tr>
-            <td class="font-medium text-foreground">{{ a.userDisplayName }}</td>
-            <td>
-              <span [class]="a.status === 'Active' ? 'badge-success' : a.status === 'Paused' ? 'badge-warning' : 'badge-neutral'">{{ a.status }}</span>
-            </td>
-            <td class="text-muted-foreground">{{ a.startDate }}</td>
-            <td class="text-muted-foreground">{{ a.endDate ?? '-' }}</td>
-            <td class="text-muted-foreground">{{ a.allocatedHoursPerWeek ?? '-' }}</td>
-            <td class="text-right">
-              @if (a.status !== 'Ended') {
-                <button class="btn-link text-[var(--destructive)]" (click)="endAssignment(a)">End</button>
-              }
-            </td>
+            <th>User</th>
+            <th>Status</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Allocated Hrs/Wk</th>
+            <th></th>
           </tr>
-        }
-      </tbody>
-    </table>
-  </div>
+        </thead>
+        <tbody>
+          @for (a of assignments(); track a.id) {
+            <tr>
+              <td class="font-medium text-foreground">{{ a.userDisplayName }}</td>
+              <td>
+                <span [class]="a.status === 'Active' ? 'badge-success' : a.status === 'Paused' ? 'badge-warning' : 'badge-neutral'">{{ a.status }}</span>
+              </td>
+              <td class="text-muted-foreground">{{ a.startDate }}</td>
+              <td class="text-muted-foreground">{{ a.endDate ?? '-' }}</td>
+              <td class="text-muted-foreground">{{ a.allocatedHoursPerWeek ?? '-' }}</td>
+              <td class="text-right">
+                @if (a.status !== 'Ended') {
+                  <button class="btn-link text-[var(--destructive)]" (click)="endAssignment(a)">End</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
 
   <div class="card-padded grid grid-cols-4 gap-3">
     <label class="field">

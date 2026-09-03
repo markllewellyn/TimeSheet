@@ -69,12 +69,18 @@
       <button class="btn-ghost" (click)="refresh()">Refresh</button>
     </div>
 
-    <ag-grid-angular
-      class="h-[560px] w-full"
-      [theme]="theme()"
-      [rowData]="rowData()"
-      [columnDefs]="columnDefs"
-      [defaultColDef]="{ sortable: true, resizable: true }"
-    />
+    @if (loading()) {
+      <div class="h-[560px]">
+        <app-loading-spinner />
+      </div>
+    } @else {
+      <ag-grid-angular
+        class="h-[560px] w-full"
+        [theme]="theme()"
+        [rowData]="rowData()"
+        [columnDefs]="columnDefs"
+        [defaultColDef]="{ sortable: true, resizable: true }"
+      />
+    }
   </div>
 </div>

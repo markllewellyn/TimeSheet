@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
 import { TimesheetEntry } from '../../../core/models/timesheet-entry.models';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 // A small fixed palette, indexed deterministically by clientId (see colorForClient) - avoids hardcoding
 // specific client names to specific colors (the legacy app did this, which breaks the moment a client is
@@ -22,12 +23,15 @@ interface CalendarDay {
 @Component({
   selector: 'app-calendar-page',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, LoadingSpinner],
   templateUrl: './calendar-page.html',
 })
 export class CalendarPage {
   private readonly timesheetEntries = inject(TimesheetEntriesService);
   private readonly impersonation = inject(ImpersonationService);
+  // Only ever true->false, on the first refresh() - navigating months afterward doesn't reset it, so the grid
+  // stays visible (just briefly stale) while the next month's entries load instead of flashing a spinner.
+  protected readonly loading = signal(true);
 
   private readonly today = new Date();
   protected readonly viewYear = signal(this.today.getFullYear());
@@ -155,8 +159,12 @@ export class CalendarPage {
     const { firstInView, lastInView } = this.viewRange();
     this.timesheetEntries
       .list({ from: toIso(firstInView), to: toIso(lastInView), onBehalfOfUserId: this.impersonation.actingAs()?.id })
-      .subscribe((res) => {
-        this.entries.set(res.entries);
+      .subscribe({
+        next: (res) => {
+          this.entries.set(res.entries);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
       });
   }
 }

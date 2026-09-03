@@ -11,6 +11,7 @@ import { ThemeService } from '../../../core/services/theme.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
+import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 const GRID_THEME_BASE = {
   borderRadius: 8,
@@ -37,7 +38,7 @@ const DARK_GRID_THEME = themeQuartz.withParams({
 @Component({
   selector: 'app-log-time-page',
   standalone: true,
-  imports: [AgGridAngular],
+  imports: [AgGridAngular, LoadingSpinner],
   templateUrl: './log-time-page.html',
 })
 export class LogTimePage {
@@ -54,6 +55,9 @@ export class LogTimePage {
   protected readonly searchText = signal('');
   protected readonly summary = signal<TimesheetEntrySummary | null>(null);
   protected readonly rowData = signal<TimesheetEntry[]>([]);
+  // Only ever true->false, on the first refresh() - subsequent refreshes (search, post-action reload) don't
+  // reset it, so the grid doesn't get torn down and remounted on every keystroke.
+  protected readonly loading = signal(true);
   protected readonly workload = signal<EstimatedWeeklyWorkload | null>(null);
 
   private readonly actionsContext: EntryActionsContext = {
@@ -117,9 +121,13 @@ export class LogTimePage {
   protected refresh(): void {
     this.timesheetEntries
       .list({ search: this.searchText() || undefined, onBehalfOfUserId: this.impersonation.actingAs()?.id })
-      .subscribe((res) => {
-        this.rowData.set(res.entries);
-        this.summary.set(res.summary);
+      .subscribe({
+        next: (res) => {
+          this.rowData.set(res.entries);
+          this.summary.set(res.summary);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
       });
   }
 
