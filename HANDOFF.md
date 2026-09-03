@@ -288,7 +288,16 @@ Built from a fresh, full FDD-vs-code re-audit done this session (2026-09-03) —
 of the previous single-item list. The user asked to double-check the app against the whole FDD
 document (not just areas prior sessions had already touched), on the assumption Blob Storage was
 the only remaining gap. It wasn't the only one; 7 gaps found in total. 3 (all small, self-contained
-fixes) plus project-level attachments are now done — see the two "Done" sections above — leaving:
+fixes) plus project-level attachments are now done — see the two "Done" sections above.
+
+**One of the 7 turned out to be a false positive, corrected later the same session**: "no
+rate-preview screen" was wrong — a rate preview already exists, added in an earlier session
+(`bf54538`, 2026-08-28) that predates the re-audit. The consolidated Staff screen's "Project
+Assignments" panel (`users-list-page.html`, driven by `ProjectAssignments_ListByUser` →
+`StaffAssignmentDto.ResolvedCustomerRate`/`RateSource`) already shows, per assigned project, the
+resolved rate and a label distinguishing role-default from person/role override - exactly what the
+FDD asks for. The audit missed it by not checking the Staff screen specifically. No code change
+needed; removed from the list below rather than duplicating it. Leaving:
 
 1. **Blob Storage — bigger than originally scoped, and deliberately parked.** Not implemented AT
    ALL, not just for invoice PDFs: timesheet AND project attachments both go to local disk
@@ -299,13 +308,7 @@ fixes) plus project-level attachments are now done — see the two "Done" sectio
    parked rather than built against Azurite as originally suggested; pick this up whenever an actual
    Azure Storage account exists to build/test against, or ask the user again if they want the
    Azurite-emulator approach after all.
-2. **No rate-preview screen.** FDD (Rate Cards section): "The screen shows, for any staff member,
-   the rate that will be applied on each project they are assigned to and whether that rate comes
-   from their role or from an override." The actual 5-tier resolver (`RateResolver.cs`) is correct
-   and already used at entry-save time — this is purely a missing read-only view surfacing what it
-   would resolve to, ahead of time. Medium — likely a thin new endpoint over the existing resolver
-   plus a new Angular page.
-3. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
+2. **Reporting is missing entry counts and a role-basis breakdown.** FDD: "...the number of entries,
    and totals for projects and clients on a team, role and user basis." `IReportingService`'s six
    reports (Time/Cost/Profit × Project/Client) break down only by User or Project today — no
    entry-count metric anywhere, and no grouping by `Role` (a real, existing entity, just unused
