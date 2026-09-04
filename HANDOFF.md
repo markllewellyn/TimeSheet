@@ -4,6 +4,39 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later again in this session, 2026-09-04 — Entry Flags ID search, user-facing handbook, committed
+
+Follow-up to the round below, prompted by two things the user raised after trying the new picker live: their own
+logged entries seemed to be missing from a search, and a request to also search by the raw Entry ID ("log
+number").
+
+- **Investigated "my own entries don't show up in the search"**: could not reproduce it. Tested live as Admin with
+  two different terms ("Llewellyn", "Acme") - the signed-in user's own entries appeared correctly both times (see
+  screenshots taken during the session). No code path excludes the searcher's own entries. Best remaining
+  explanation: the picker's 25-result cap (most-recent-first) could push an older entry of the user's own past the
+  cutoff on a broad search term - not confirmed, since it couldn't be reproduced directly. **Not fully closed** -
+  if it recurs, the exact search term used is needed to pin it down for real.
+- **Entry Flags search now also matches by exact Entry ID**, which sidesteps the above regardless of its cause.
+  `TimesheetEntryRepository.SearchForFlaggingAsync` now OR's in `e.Id == entryId` when the search term parses as
+  an integer, alongside the existing staff/client/project name match - an ID match is exact, not subject to the
+  recency-ordering/cap issue a broad text search has. `EntryFlags_SearchEntries`'s minimum-length gate now allows
+  a single-digit numeric search (a real Entry ID could be that short) while keeping the 2-character minimum for
+  text searches. Placeholder text updated ("...or Entry ID…"). Backend/Angular build clean, 44/44 tests pass
+  (unchanged). API host restarted (existing Function's body changed, not just hot-reloaded, per this file's own
+  "don't trust an edited Function without a restart" gotcha) - clean startup. **Live-verified**: searching "42"
+  returns exactly that one entry (Sarah Chen / Data Quality Audit), regardless of how many other entries exist.
+- **New end-user documentation**: `Resources/TimeSheet-Handbook.html` - a self-contained, role-organized guide
+  (Everyone / Project Manager / Admin) covering every screen in the app, written against the live app toured this
+  session (not the FDD, which is a requirements spec, not a usage guide). This is the first user-facing
+  documentation this repo has ever had - previously just this HANDOFF file (internal/dev-only) and Angular's own
+  boilerplate README existed. Opens directly in a browser (no build step, no server) since it's plain HTML/CSS/
+  inline JS with no external dependencies beyond a Google Fonts stylesheet link.
+- **All of the above, plus the impersonation-dropdown fix and Entry Flags picker from the round below, committed
+  together** as `d67167e` ("Fix impersonation dropdown positioning; add Entry Flags picker with ID search; add
+  end-user handbook") - 10 files. Not pushed anywhere: **this repo has no git remote configured at all**
+  (`git remote -v` returns nothing, `master` tracks no upstream) - worth knowing before assuming `git push` will
+  ever do anything in this repo without first being asked to add one.
+
 ## Done even later still in this session, 2026-09-04 — impersonation-dropdown fix, Entry Flags picker, data cleanup
 
 User asked for exactly 3 of the 5 items flagged at the end of the previous round (Blob Storage still parked, no
@@ -776,6 +809,15 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **New, not resolved**: the user reported their own logged entries missing from an Entry Flags search while
+  signed in as Admin. Could not be reproduced (tested live with two different search terms - own entries
+  appeared correctly both times) and no code path was found that would exclude the searcher's own entries.
+  Adding exact Entry ID search (see this session's later entry above) should route around the most likely cause
+  (the picker's 25-result, most-recent-first cap pushing an older entry out) but this is a mitigation, not a
+  confirmed fix - if it happens again, get the exact search term used.
+- **EntryType rows exist on only one project** (ERP Migration Phase 2) after this session's cleanup - every
+  other project in the app still has zero, so the Entry Type picker on Add Entry stays hidden for them. Adding
+  more is a "which projects, what types" business decision, not something to guess at - ask the user first.
 - ~~The impersonation dropdown's option list renders with invisible text~~ — **fixed 2026-09-04, same
   session.** Turned out not to be a color/CSS issue as first suspected when found - a positioning bug. The
   panel used `right-0` but its trigger sits near the left edge of the header, so the panel rendered almost
