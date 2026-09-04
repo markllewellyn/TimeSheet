@@ -4,6 +4,124 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-04 — impersonation-dropdown fix, Entry Flags picker, data cleanup
+
+User asked for exactly 3 of the 5 items flagged at the end of the previous round (Blob Storage still parked, no
+Azure Storage account): the impersonation-dropdown bug just found, the `EntryFlagsFunctions.RaiseManual` raw-Id
+picker, and general data/environment cleanup.
+
+1. **Fixed: impersonation dropdown's real bug** (not a color/CSS issue as first suspected - a positioning bug).
+   The trigger button sits near the **left** edge of the header row (before theme/notifications/profile), but
+   its panel used `right-0` (`app.html`) - meant for a right-edge trigger like the Admin dropdown's `left-0`
+   counterpart - so the 256px-wide panel rendered almost entirely off-screen to the left, leaving only a ~60px
+   clipped sliver visible. Changed to `left-0`, mirroring the Admin dropdown's own positioning. One-line fix.
+   Live-verified: dropdown now renders fully visible, correctly positioned, all three names readable.
+2. **Entry Flags "raise a flag" now has a real picker**, replacing the raw numeric Timesheet Entry Id input.
+   - New `ITimesheetEntryRepository.SearchForFlaggingAsync(searchText, projectIds, take, ct)` - free-text search
+     over staff/client/project name, most-recent-first, capped at `take` (25) since it's a typeahead result set,
+     not a full list. Deliberately NOT filtered to unapproved entries like `GetPendingApprovalAsync` - a flag can
+     be raised against any entry regardless of approval state.
+   - New `EntryFlags_SearchEntries` endpoint (`GET entry-flags/search-entries?search=...`), same PM-scoping
+     precedent as `TimesheetApprovalFunctions.ResolveScopeAsync`: Admin sees everything, a PM is restricted to
+     their own managed project(s) via `IProjectRepository.GetManagedByUserAsync`, a PM managing nothing gets an
+     empty result rather than a 403. New `EntryFlagSearchResultDto`.
+   - Frontend (`entry-flags-page`): explicit-action search box (matching the existing tenant-directory-search
+     convention in `users-list-page.ts` - not live-as-you-type) + results list; clicking a result selects it,
+     showing "Entry to flag: #id · Staff — Client/Project · Date" with a "Change entry" link, then Notes +
+     Flag Entry as before. `raiseEntryId` signal removed entirely, replaced by `selectedEntry`.
+   - Backend and Angular build clean, 44/44 tests pass (unchanged - thin CRUD/search wiring, matching this
+     codebase's existing bar). API host restarted (new Function definition, confirmed via HANDOFF's own
+     "`func start` doesn't hot-reload new Functions" gotcha) - clean startup, no errors.
+   - **Live-verified end-to-end**: searched "Sarah", selected a real entry (#42), flagged it with notes, saw it
+     appear in the flagged-entries table with the right client/project/reason/notes, then cleared it again to
+     leave no artifact.
+3. **Data/environment cleanup**:
+   - **RateCard defaults added** for Consultant ($120/hr) and Director ($200/hr) - both had zero "Default (all
+     clients/projects)" row, meaning role-based fallback resolution failed for any staff/client/project combo
+     not already covered by a narrower client/project-specific or person-level override. Senior Consultant
+     already had a default row ($100/hr, 0.5% discount) - nothing added there. Placeholder dev-data figures. Not
+     the case that ALL rate cards were missing as the old HANDOFF note implied - Director actually already had
+     two narrower overrides (D365 Migration project: $150, Everlast client: $160), just no fallback default.
+   - **EntryType rows added** to ERP Migration Phase 2 (project 3): Development, Testing, Documentation - the
+     first project in the app to have any. Live-verified the Add Entry page's Entry Type picker now actually
+     appears (it's conditionally rendered - invisible entirely when a project has zero EntryType rows) and lists
+     all three.
+   - **Everlast reverted to OneOff billing** (was switched to Monthly last session purely to demo
+     `MonthlyBillingRollForward`, per that session's own flagged "decide before treating this as fully done"
+     note). Invoice #10 (the real Draft it generated) was left alone - reverting the billing-period going
+     forward doesn't retroactively undo a real draft invoice, nor was that asked for.
+   - **Entry #23 and #119 fully reverted** - genuinely necessary since both were locked by the app's own guards
+     (`ApprovedPayroll || SentToPayroll` blocks Edit/Delete) with no "unapprove" endpoint anywhere in the app.
+     Used a small scratchpad EF Core console tool (referencing `TimeSheet.Infrastructure` directly, not raw SQL,
+     so column mapping is guaranteed correct) to load and mutate the two rows via the real `TimesheetDbContext` -
+     **flagged to and explicitly approved by the user first**, since this bypasses the app's API/business-logic
+     layer entirely. API host stopped first to avoid concurrent SQLite writers, restarted after.
+     - Entry #23: cleared `ApprovedPayroll`/`ApprovedByStaffId`/`ApprovedByName`/`DateApprovedPayroll`/
+       `PostingBatch`. **Found something the previous session's HANDOFF note didn't mention**: entry #23 was
+       also `SentToPayroll = true` (not just approved) - the first revert pass only cleared the Approved fields,
+       leaving it in an invalid "sent but not approved" state the app's own guards would never normally produce.
+       Caught and fixed in a second pass (cleared `SentToPayroll`/`SentByStaffId`/`SentByName`/
+       `DateSentToPayroll` too). Confirmed back in the normal Approval Queue afterward (search "ERP" - queue
+       count rose from 24 to 25 with the revert).
+     - Entry #119: deleted outright (its own description said "safe to delete"). **Its August 2026
+       `PayrollPeriod` row could NOT simply be deleted too** - live-checked first and found it actually
+       aggregated **2 staff, 4.0h total**, not just entry #119's "1 staff, 3.0h" as the old HANDOFF note said -
+       a second, legitimate staff member's real OOH hours were mixed into the same period. Deleted only the
+       `TimesheetEntry` row (no FK from `PayrollPeriodLine` to `TimesheetEntry` - it stores per-user aggregated
+       totals only, confirmed by reading the entity), then used the existing "Run Now" button on Payroll
+       Periods to let `IPayrollAggregationService` rebuild the period's Lines in place from scratch (its own doc
+       comment confirms re-running is idempotent-by-design for exactly this reason) - correctly recomputed to
+       **1 staff, 1.0h, $210.00**, cleanly excluding the deleted entry while preserving the other real data.
+   - Backend and Angular build clean throughout, 44/44 tests pass (unchanged).
+
+**Live-verified in the browser**: all of the above confirmed working end-to-end during this same session (nav
+fix, Entry Flags picker's full raise→clear cycle, RateCard/EntryType additions reflected immediately in the Add
+Entry picker, Everlast's Billing Period field, the Approval Queue count, and the Payroll Periods page's rebuilt
+August 2026 row).
+
+## Done later still in this session, 2026-09-04 — live browser pass on nav + password-reset audit log
+
+Claude in Chrome connected this time, so both items flagged below as "code review only, not live" got a real
+live pass. Dev API host had to be started first (only Azurite + Angular had survived from earlier in the
+session; `func start` from `src/TimeSheet.Api` — confirmed clean startup, no errors).
+
+- **Per-role nav, now live-verified for all three roles** (Admin/PM/regular User), not just code review. Admin
+  session (the user's own login) confirmed: full flat nav (Log Time/Calendar/Your Overview/Export/Approvals/
+  Entry Flags/Payroll Periods/Invoicing/Reports) plus an "Admin ▾" dropdown with exactly the 7 expected items
+  (Audit Log, Clients, Projects, Rate Cards, Roles, Settings, Staff), no "My Invoices". PM and regular-User
+  sessions needed separate logins - impersonation was tried first as a shortcut but confirmed **not** to work
+  for this (it only affects "log time on behalf of", the top nav still reflects the actual signed-in identity,
+  not the impersonated one) - see the bug note below. Used the Staff page's own "Reset Password" to generate
+  one-time temp passwords for James O'Brien and Sarah Chen so the user could sign in as each without me ever
+  handling a password myself (I can't type passwords into any field, hard rule, regardless of source).
+  - **Sarah Chen (PM on project 3)**: nav showed Log Time/Calendar/Your Overview/Export/Approvals/Entry Flags/
+    My Invoices - no Payroll Periods/Invoicing/Reports/Admin. Clicked into both PM-visible admin-ish pages to
+    confirm they're not just visible but functional: Approvals loaded her "Approval Queue (24)" scoped to her
+    managed project (ERP Migration Phase 2); Entry Flags loaded normally ("All clear - no open flags").
+  - **James O'Brien (regular User)**: nav showed only Log Time/Calendar/Your Overview/Export/My Invoices -
+    everything Admin-or-PM-gated correctly absent.
+  - This fully confirms and closes the "worth a quick pass" flag from the nav-reorg entry below, now genuinely
+    verified live rather than by code review alone, matching what the code review had already found.
+- **Password-reset audit log, live-verified.** Reset James O'Brien's password from the Staff page (Admin
+  session) - confirmed the `ConfirmService` dialog shows correctly (not a native `confirm()`), a one-time temp
+  password banner appears on success, and a new `User.PasswordReset` row appears in Admin → Audit Log with the
+  correct entity (`User #3`) and details (`james.obrien@svgit.co.uk (local)`). This is the live confirmation
+  the previous entry's fix (`AdminUsersFunctions.ResetPassword` now writes `AuditLog`) didn't get at the time.
+- **Real bug found, not yet fixed**: the impersonation dropdown ("Log time on behalf of another user", the
+  swap-arrows icon top-left of the nav) renders its option list with invisible text - confirmed via
+  `read_page`'s accessibility tree that the options (James O'Brien/Priya Patel/Sarah Chen) are genuinely there
+  and clickable, but a screenshot/zoom shows an empty-looking dark box with no visible text (likely dark-on-dark
+  CSS, not a rendering failure - the tree proves the DOM content exists). Not fixed this round - flagging for
+  next session.
+- **Left-over demo-data artifact**: James O'Brien's and Sarah Chen's local-account passwords were both reset
+  during this pass (Sarah Chen once, James O'Brien twice) so the user could sign in as each to check the nav -
+  the pre-reset passwords are gone, only the last one-time temp password shown for each still works (and both
+  should probably be changed again to something the user will actually remember, since the temp passwords were
+  only ever shown transiently on screen). Same "clearly attributable and reversible" category as prior
+  sessions' verification leftovers.
+- Dev servers: Azurite + Angular were already running from earlier in the session; API host was (re)started
+  this round - all three left running at the end.
+
 ## Done in this session, 2026-09-04 — HANDOFF cleanup, per-role nav check, one small audit-log fix
 
 The FDD-numbered backlog was already down to one item (Blob Storage) coming into this session, so this round
@@ -658,6 +776,11 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- ~~The impersonation dropdown's option list renders with invisible text~~ — **fixed 2026-09-04, same
+  session.** Turned out not to be a color/CSS issue as first suspected when found - a positioning bug. The
+  panel used `right-0` but its trigger sits near the left edge of the header, so the panel rendered almost
+  entirely off-screen to the left; changed to `left-0` (matching the Admin dropdown's own positioning). Live-
+  verified fully visible and correctly positioned afterward.
 - ~~A Project Manager has no way to reach the Entry Flags screen at all~~ — **stale, already fixed.** This was
   raised when the click-through was added, but the very next round of work the same session (the nav reorg,
   `2aa6693`) fixed it as a side effect: `app.html` now shows "Entry Flags" as a flat top-level link to
@@ -692,38 +815,45 @@ session's earlier entry above respectively. They are not part of the new numbere
   need a second project managed by someone else with a pending entry, which wasn't available
   without full Admin access this session. The list-scoping and same-project cross-staff approval
   paths (the more commonly hit cases) *were* live-verified — see the `5a79f83` commit message.
-- **Left-over demo-data artifacts from this session's live verification**:
-  - Entry id 23 on project 3 ("ERP Migration Phase 2") was approved for payroll by
+- ~~**Left-over demo-data artifacts from this session's live verification**~~ — **reverted 2026-09-04, a later
+  session**, at the user's explicit approval (this bypassed the app's own API/business-logic layer, so it was
+  flagged before doing it - see that session's own "Done" entry above for the full mechanism and a genuine
+  discrepancy it caught along the way: entry #23 turned out to also be `SentToPayroll = true`, not just
+  approved, which the note below originally missed).
+  - ~~Entry id 23 on project 3 ("ERP Migration Phase 2") was approved for payroll by
     `sarah.chen@svgit.co.uk` (acting as that project's PM) into a posting batch literally named
-    `PM-VERIFY-BATCH (verification - can be reverted by admin if desired)`.
-  - Entry id 119, a 3-hour out-of-hours entry on project 3 dated 2026-08-15, description "OOH
+    `PM-VERIFY-BATCH (verification - can be reverted by admin if desired)`.~~ Fully reverted (both the
+    Approved and SentToPayroll fields) - confirmed back in the normal Approval Queue.
+  - ~~Entry id 119, a 3-hour out-of-hours entry on project 3 dated 2026-08-15, description "OOH
     verification entry for MonthlyPayrollAggregation timer test (safe to delete)" — created and
     approved (posting batch `OOH-TIMER-VERIFY`) specifically to give the payroll aggregation timer
     real data to aggregate. A `PayrollPeriod` row for August 2026 (1 staff, 3.0h) now exists because
-    of it.
-  - **Everlast** (client id 4) was switched to `BillingPeriod = Monthly` with `CurrentPeriodEnd` in
+    of it.~~ Deleted; the August 2026 `PayrollPeriod` row was rebuilt via "Run Now" (not deleted - it
+    also held a second, legitimate staff member's real hours) and now correctly shows 1 staff, 1.0h.
+  - ~~**Everlast** (client id 4) was switched to `BillingPeriod = Monthly` with `CurrentPeriodEnd` in
     the past (done via the browser, by you) so `MonthlyBillingRollForward` had something to act on
     — it generated **Invoice #10**, a real Draft for the 2026-08-01..08-31 period, $3,800.00 USD,
     and advanced Everlast's window to September. Decide whether to leave Everlast on Monthly
     billing (it'll keep auto-generating Drafts each month once the timer actually runs on schedule)
-    or switch it back to OneOff; check Admin → Invoicing → Everlast for the Draft.
-  - None of the above block anything — all clearly attributable and reversible, same pattern as
-    prior sessions' verification leftovers below.
+    or switch it back to OneOff; check Admin → Invoicing → Everlast for the Draft.~~ Reverted to
+    OneOff. Invoice #10 itself was left as-is (a real draft, not undone by the billing-period change).
 - Everything below is unchanged from last session:
-  - The Roles created earlier (Director, Senior Consultant, Consultant) have **no default RateCard
-    rows** — role-based fallback resolution will fail for any staff/client/project combo not
-    already covered by a person-level override, until someone adds one via the Rate Cards admin
-    page.
+  - ~~The Roles created earlier (Director, Senior Consultant, Consultant) have **no default RateCard
+    rows**~~ — **partially fixed 2026-09-04, a later session**: Consultant and Director now have a
+    Default (all clients/projects) row ($120/hr, $200/hr respectively, placeholder dev-data figures).
+    Senior Consultant already had one ($100/hr) - the note was inaccurate for that role specifically.
   - ~~`ProjectsAdminService.listByClient` (frontend) has a pre-existing bug using backslashes instead
     of forward slashes in its URL template~~ — **stale, checked 2026-09-04**: the current
     `listByClient` builds `` `${baseUrl}/clients/${clientId}/projects` `` with forward slashes, and a
     full `git log -p --follow` of the file never shows a backslash version at any point in its
     history. Whatever this referred to no longer exists (or never did) - not chasing further since
     there's nothing left to fix.
-  - `EntryFlagsFunctions.RaiseManual` UI (entry-flags-page) takes a raw Timesheet Entry Id typed in
-    by hand rather than a picker.
-  - No projects have `EntryType` rows yet — the "Entry Type" picker on Add Entry only appears once
-    an admin adds at least one via a project's "Entry Types" page.
+  - ~~`EntryFlagsFunctions.RaiseManual` UI (entry-flags-page) takes a raw Timesheet Entry Id typed in
+    by hand rather than a picker.~~ **Fixed 2026-09-04, a later session** - see that session's own
+    "Done" entry above for the new search-based picker (new `EntryFlags_SearchEntries` endpoint).
+  - ~~No projects have `EntryType` rows yet~~ — **partially fixed 2026-09-04, a later session**: ERP
+    Migration Phase 2 (project 3) now has three (Development, Testing, Documentation) - the first
+    project in the app to have any. Every other project still has none.
   - Tenant directory search (`AdminUsers_SearchTenantDirectory`) will 500/error until
     `User.Read.All` is Entra-admin-consented on the `GraphAdmin` app registration.
   - ~~`AdminUsersFunctions.ResetPassword` only logs password resets via `ILogger`, not `AuditLog`~~ —

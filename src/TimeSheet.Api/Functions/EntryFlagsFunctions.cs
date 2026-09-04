@@ -16,6 +16,7 @@ namespace TimeSheet.Api.Functions;
 public class EntryFlagsFunctions(
     IEntryFlagRepository flags,
     ITimesheetEntryRepository entries,
+    IProjectRepository projects,
     IEntryFlagService entryFlagService,
     IAuditLogService auditLog,
     IUnitOfWork uow,
@@ -32,6 +33,39 @@ public class EntryFlagsFunctions(
             open = open.Where(f => f.Project?.ProjectManagerUserId == user.UserId).ToList();
         }
         return new OkObjectResult(open.Select(ToDto));
+    }
+
+    /// <summary>Powers the "raise a flag" picker - an admin/PM search for an entry to flag by staff/client/
+    /// project name or by its own numeric Entry Id, so they don't need to already know the id ahead of time (an
+    /// id search still finds it exactly even so). Same PM-scoping precedent as
+    /// TimesheetApprovalFunctions.ResolveScopeAsync: Admin sees everything, a PM is restricted to their own
+    /// managed project(s), and a PM managing nothing simply gets an empty result rather than a 403.</summary>
+    [Function("EntryFlags_SearchEntries")]
+    public async Task<IActionResult> SearchEntries(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "entry-flags/search-entries")] HttpRequest req, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var search = req.Query["search"].ToString().Trim();
+        // A numeric search is an exact Entry Id lookup, so even a single digit is a meaningful query; a
+        // text search needs at least 2 characters to avoid an overly broad staff/client/project match.
+        var isTooShort = search.Length < (int.TryParse(search, out _) ? 1 : 2);
+        if (string.IsNullOrWhiteSpace(search) || isTooShort)
+        {
+            return new OkObjectResult(Array.Empty<EntryFlagSearchResultDto>());
+        }
+
+        IReadOnlyCollection<int>? projectIds = null;
+        if (!user.IsAdmin)
+        {
+            var managed = await projects.GetManagedByUserAsync(user.UserId, ct);
+            if (managed.Count == 0) return new OkObjectResult(Array.Empty<EntryFlagSearchResultDto>());
+            projectIds = managed.Select(p => p.Id).ToHashSet();
+        }
+
+        var results = await entries.SearchForFlaggingAsync(search, projectIds, take: 25, ct);
+        return new OkObjectResult(results.Select(e => new EntryFlagSearchResultDto(
+            e.Id, e.UserId, e.User?.DisplayName ?? "", e.Date, e.Description,
+            e.Project?.Name ?? "", e.Client?.Name ?? "", e.WorkHours, e.OutOfHoursHours)));
     }
 
     [Function("EntryFlags_RaiseManual")]

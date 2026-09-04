@@ -50,6 +50,12 @@ public interface ITimesheetEntryRepository
     /// project manager's own managed project(s) when the caller isn't Admin - null means no restriction.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetPendingApprovalAsync(string? searchText, IReadOnlyCollection<int>? projectIds, CancellationToken ct);
 
+    /// <summary>Powers the Entry Flags "raise a flag" picker - unlike GetPendingApprovalAsync this isn't
+    /// restricted to unapproved entries, since a flag can be raised against any entry regardless of its approval
+    /// state. Free-text search over staff/client/project name, most recent first, capped at `take` since this is
+    /// a typeahead result set rather than a full list. Same projectIds scoping as GetPendingApprovalAsync.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> SearchForFlaggingAsync(string searchText, IReadOnlyCollection<int>? projectIds, int take, CancellationToken ct);
+
     /// <summary>Approved but not yet sent to payroll - the "Ready for Payroll" queue. Same projectIds scoping as
     /// GetPendingApprovalAsync.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct);

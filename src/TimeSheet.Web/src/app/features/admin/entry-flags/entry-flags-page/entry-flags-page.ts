@@ -2,7 +2,7 @@ import { DatePipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { EntryFlagsService, EntryFlag } from '../../../../core/services/entry-flags.service';
+import { EntryFlagsService, EntryFlag, EntryFlagSearchResult } from '../../../../core/services/entry-flags.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
@@ -24,7 +24,15 @@ export class EntryFlagsPage {
   // deep link of its own.
   protected readonly highlightedFlagId = signal<number | null>(null);
 
-  protected readonly raiseEntryId = signal<number | null>(null);
+  // Entry picker for "raise a flag" - a free-text search over staff/client/project name (explicit action, not
+  // live-as-you-type, matching this app's existing directory-search convention in users-list-page.ts) rather
+  // than requiring the raw numeric Timesheet Entry Id to be typed in by hand.
+  protected readonly entrySearchQuery = signal('');
+  protected readonly entrySearchResults = signal<EntryFlagSearchResult[]>([]);
+  protected readonly entrySearching = signal(false);
+  protected readonly entrySearched = signal(false);
+  protected readonly selectedEntry = signal<EntryFlagSearchResult | null>(null);
+
   protected readonly raiseNotes = signal('');
   protected readonly raising = signal(false);
   protected readonly error = signal<string | null>(null);
@@ -57,14 +65,49 @@ export class EntryFlagsPage {
     });
   }
 
+  protected searchEntries(): void {
+    const query = this.entrySearchQuery().trim();
+    if (query.length < 2) {
+      this.error.set('Enter at least 2 characters to search.');
+      return;
+    }
+
+    this.entrySearching.set(true);
+    this.entryFlagsService.searchEntries(query).subscribe({
+      next: (results) => {
+        this.entrySearching.set(false);
+        this.entrySearched.set(true);
+        this.error.set(null);
+        this.entrySearchResults.set(results);
+      },
+      error: (err) => {
+        this.entrySearching.set(false);
+        this.entrySearched.set(true);
+        this.entrySearchResults.set([]);
+        this.error.set(err?.error?.error ?? 'Could not search entries.');
+      },
+    });
+  }
+
+  protected selectEntry(result: EntryFlagSearchResult): void {
+    this.selectedEntry.set(result);
+    this.entrySearchQuery.set('');
+    this.entrySearchResults.set([]);
+    this.entrySearched.set(false);
+  }
+
+  protected clearSelectedEntry(): void {
+    this.selectedEntry.set(null);
+  }
+
   protected raise(): void {
-    const entryId = this.raiseEntryId();
-    if (!entryId) return;
+    const entry = this.selectedEntry();
+    if (!entry) return;
     this.raising.set(true);
-    this.entryFlagsService.raiseManual(entryId, this.raiseNotes() || null).subscribe({
+    this.entryFlagsService.raiseManual(entry.id, this.raiseNotes() || null).subscribe({
       next: () => {
         this.raising.set(false);
-        this.raiseEntryId.set(null);
+        this.selectedEntry.set(null);
         this.raiseNotes.set('');
         this.error.set(null);
         this.refresh();

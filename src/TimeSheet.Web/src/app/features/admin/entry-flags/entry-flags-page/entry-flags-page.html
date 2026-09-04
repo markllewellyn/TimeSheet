@@ -12,16 +12,51 @@
     <div class="banner-success">{{ s }}</div>
   }
 
-  <div class="card-padded flex flex-wrap items-end gap-3">
-    <label class="field">
-      <span class="field-label">Timesheet Entry Id</span>
-      <input type="number" min="1" class="input w-40" [ngModel]="raiseEntryId()" (ngModelChange)="raiseEntryId.set($event)" />
-    </label>
-    <label class="field flex-1">
-      <span class="field-label">Notes</span>
-      <input type="text" class="input" placeholder="Why does this entry need query?" [ngModel]="raiseNotes()" (ngModelChange)="raiseNotes.set($event)" />
-    </label>
-    <button class="btn-secondary" [disabled]="raising() || !raiseEntryId()" (click)="raise()">{{ raising() ? 'Flagging…' : 'Flag Entry' }}</button>
+  <div class="card-padded flex flex-col gap-3">
+    @if (selectedEntry(); as entry) {
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="field flex-1">
+          <span class="field-label">Entry to flag</span>
+          <p class="text-sm">
+            <span class="font-medium text-foreground">#{{ entry.id }} · {{ entry.staffName }}</span>
+            <span class="text-muted-foreground"> — {{ entry.clientName }} / {{ entry.projectName }} · {{ entry.date | date: 'mediumDate' }}</span>
+          </p>
+          <button class="btn-link self-start" (click)="clearSelectedEntry()">Change entry</button>
+        </div>
+        <label class="field flex-1">
+          <span class="field-label">Notes</span>
+          <input type="text" class="input" placeholder="Why does this entry need query?" [ngModel]="raiseNotes()" (ngModelChange)="raiseNotes.set($event)" />
+        </label>
+        <button class="btn-secondary" [disabled]="raising()" (click)="raise()">{{ raising() ? 'Flagging…' : 'Flag Entry' }}</button>
+      </div>
+    } @else {
+      <div class="flex flex-wrap items-end gap-3">
+        <label class="field flex-1">
+          <span class="field-label">Find an entry to flag</span>
+          <input
+            type="text"
+            class="input"
+            placeholder="Search by staff, client, project, or Entry ID…"
+            [ngModel]="entrySearchQuery()"
+            (ngModelChange)="entrySearchQuery.set($event)"
+            (keyup.enter)="searchEntries()"
+          />
+        </label>
+        <button class="btn-secondary" [disabled]="entrySearching()" (click)="searchEntries()">{{ entrySearching() ? 'Searching…' : 'Search' }}</button>
+      </div>
+      @if (entrySearchResults().length > 0) {
+        <div class="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-1">
+          @for (r of entrySearchResults(); track r.id) {
+            <button class="rounded-md px-2 py-1.5 text-left text-sm text-foreground hover:bg-secondary" (click)="selectEntry(r)">
+              <span class="font-medium">{{ r.staffName }}</span>
+              <span class="text-muted-foreground"> — {{ r.clientName }} / {{ r.projectName }} · {{ r.date | date: 'mediumDate' }} · {{ r.description }}</span>
+            </button>
+          }
+        </div>
+      } @else if (entrySearched()) {
+        <p class="text-sm text-muted-foreground">No matching entries found.</p>
+      }
+    }
   </div>
 
   @if (loading()) {

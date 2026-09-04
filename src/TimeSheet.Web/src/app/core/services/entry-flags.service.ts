@@ -3,6 +3,18 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 
+export interface EntryFlagSearchResult {
+  id: number;
+  staffId: number;
+  staffName: string;
+  date: string;
+  description: string;
+  projectName: string;
+  clientName: string;
+  workHours: number;
+  outOfHoursHours: number;
+}
+
 export interface EntryFlag {
   id: number;
   timesheetEntryId: number;
@@ -28,6 +40,10 @@ export class EntryFlagsService {
 
   listOpen(): Observable<EntryFlag[]> {
     return this.http.get<EntryFlag[]>(`${this.baseUrl}/open`);
+  }
+
+  searchEntries(search: string): Observable<EntryFlagSearchResult[]> {
+    return this.http.get<EntryFlagSearchResult[]>(`${this.baseUrl}/search-entries`, { params: { search } });
   }
 
   raiseManual(timesheetEntryId: number, notes: string | null): Observable<EntryFlag> {

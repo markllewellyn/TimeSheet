@@ -100,6 +100,27 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         return await query.OrderBy(e => e.Date).ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<TimesheetEntry>> SearchForFlaggingAsync(string searchText, IReadOnlyCollection<int>? projectIds, int take, CancellationToken ct)
+    {
+        var query = db.TimesheetEntries
+            .Include(e => e.User)
+            .Include(e => e.Client)
+            .Include(e => e.Project)
+            .AsQueryable();
+
+        if (projectIds is not null) query = query.Where(e => projectIds.Contains(e.ProjectId));
+
+        var term = searchText.Trim();
+        var isEntryId = int.TryParse(term, out var entryId);
+        query = query.Where(e =>
+            (isEntryId && e.Id == entryId) ||
+            EF.Functions.Like(e.User!.DisplayName, $"%{term}%") ||
+            EF.Functions.Like(e.Client!.Name, $"%{term}%") ||
+            EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+
+        return await query.OrderByDescending(e => e.Date).Take(take).ToListAsync(ct);
+    }
+
     public async Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct)
     {
         var query = db.TimesheetEntries

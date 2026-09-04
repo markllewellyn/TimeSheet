@@ -1,0 +1,802 @@
+<title>TimeSheet Handbook</title>
+<style>
+  :root {
+    --paper: #f5f7f8;
+    --paper-raised: #ffffff;
+    --ink: #12202b;
+    --muted: #5b6b72;
+    --muted-2: #7c8b92;
+    --line: #d8dee1;
+    --line-soft: #e6eaec;
+    --accent: #0e7a82;
+    --accent-ink: #ffffff;
+    --accent-soft: #e3f1f1;
+    --flag: #a6650e;
+    --flag-soft: #f7ecd9;
+    --pm: #4a5fb0;
+    --pm-soft: #e8eaf7;
+    --admin: #8a3ea1;
+    --admin-soft: #f2e6f4;
+    --good: #1c7a4e;
+    --good-soft: #e2f3e9;
+    --code-bg: #eef2f3;
+    --shadow: 0 1px 2px rgba(18, 32, 43, 0.06), 0 8px 24px rgba(18, 32, 43, 0.06);
+    --font-display: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --font-mono: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #101820;
+      --paper-raised: #17222b;
+      --ink: #eaf1f3;
+      --muted: #93a3aa;
+      --muted-2: #7c8e96;
+      --line: #253138;
+      --line-soft: #1d2830;
+      --accent: #3bc0c8;
+      --accent-ink: #06181a;
+      --accent-soft: #163539;
+      --flag: #e3ac52;
+      --flag-soft: #362a15;
+      --pm: #8fa0e8;
+      --pm-soft: #232a4a;
+      --admin: #d29fe0;
+      --admin-soft: #33223a;
+      --good: #5cc98d;
+      --good-soft: #16332390;
+      --code-bg: #1a252d;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper: #101820;
+    --paper-raised: #17222b;
+    --ink: #eaf1f3;
+    --muted: #93a3aa;
+    --muted-2: #7c8e96;
+    --line: #253138;
+    --line-soft: #1d2830;
+    --accent: #3bc0c8;
+    --accent-ink: #06181a;
+    --accent-soft: #163539;
+    --flag: #e3ac52;
+    --flag-soft: #362a15;
+    --pm: #8fa0e8;
+    --pm-soft: #232a4a;
+    --admin: #d29fe0;
+    --admin-soft: #33223a;
+    --good: #5cc98d;
+    --good-soft: #16332390;
+    --code-bg: #1a252d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    line-height: 1.55;
+  }
+
+  h1, h2, h3, h4 { font-family: var(--font-display); text-wrap: balance; color: var(--ink); }
+
+  code, .mono, .log-id, .badge, time, .field-name {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  a { color: var(--accent); }
+
+  .wrap { max-width: 920px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---------- Masthead ---------- */
+  .masthead {
+    border-bottom: 1px solid var(--line);
+    background: var(--paper-raised);
+  }
+  .masthead-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 40px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  .masthead h1 {
+    font-size: clamp(28px, 4vw, 38px);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .masthead p {
+    max-width: 62ch;
+    color: var(--muted);
+    font-size: 15.5px;
+    margin: 0;
+  }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+
+  /* ---------- Role pills ---------- */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    letter-spacing: 0.02em;
+    padding: 3px 10px 3px 8px;
+    border-radius: 100px;
+    border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .pill-dot { width: 6px; height: 6px; border-radius: 50%; flex: none; }
+  .pill-everyone { background: var(--accent-soft); color: var(--accent); }
+  .pill-everyone .pill-dot { background: var(--accent); }
+  .pill-pm { background: var(--pm-soft); color: var(--pm); }
+  .pill-pm .pill-dot { background: var(--pm); }
+  .pill-admin { background: var(--admin-soft); color: var(--admin); }
+  .pill-admin .pill-dot { background: var(--admin); }
+
+  /* ---------- Jump nav ---------- */
+  .jumpnav {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: color-mix(in oklab, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .jumpnav-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 10px 24px;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .jumpnav a {
+    flex: none;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    padding: 6px 12px;
+    border-radius: 8px;
+    transition: color 0.12s, background 0.12s;
+  }
+  .jumpnav a:hover { color: var(--ink); background: var(--line-soft); }
+  .jumpnav a.active { color: var(--accent-ink); background: var(--accent); }
+
+  /* ---------- Sections ---------- */
+  section.chapter { padding-top: 56px; scroll-margin-top: 64px; }
+  section.chapter:first-of-type { padding-top: 40px; }
+
+  .chapter-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    flex-wrap: wrap;
+    border-bottom: 2px solid var(--line);
+    padding-bottom: 12px;
+    margin-bottom: 20px;
+  }
+  .chapter-head h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: -0.01em;
+  }
+  .chapter-num {
+    font-family: var(--font-mono);
+    color: var(--muted-2);
+    font-size: 15px;
+  }
+
+  h3 { font-size: 17px; font-weight: 600; margin: 28px 0 8px; }
+  h3:first-child { margin-top: 0; }
+  p { color: var(--ink); }
+  p.lead { color: var(--muted); font-size: 15px; }
+  .prose p { margin: 0 0 12px; max-width: 68ch; }
+  .prose ul, .prose ol { max-width: 68ch; margin: 0 0 12px; padding-left: 22px; }
+  .prose li { margin-bottom: 5px; }
+  .prose strong { color: var(--ink); }
+
+  /* ---------- Callouts ---------- */
+  .note {
+    border: 1px solid var(--line);
+    background: var(--paper-raised);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 16px 0;
+    font-size: 14.5px;
+    box-shadow: var(--shadow);
+  }
+  .note-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    display: block;
+  }
+  .note.flag { border-left: 3px solid var(--flag); }
+  .note.flag .note-label { color: var(--flag); }
+  .note.tip { border-left: 3px solid var(--accent); }
+  .note.tip .note-label { color: var(--accent); }
+  .note.admin-note { border-left: 3px solid var(--admin); }
+  .note.admin-note .note-label { color: var(--admin); }
+
+  /* ---------- Steps ---------- */
+  ol.steps { list-style: none; padding: 0; margin: 14px 0 20px; counter-reset: step; }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 38px;
+    margin-bottom: 12px;
+    max-width: 66ch;
+  }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 0;
+    width: 24px; height: 24px;
+    border-radius: 7px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  /* ---------- Field table ---------- */
+  .field-table { width: 100%; border-collapse: collapse; margin: 14px 0 22px; font-size: 14px; }
+  .field-table th {
+    text-align: left;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--muted-2);
+    border-bottom: 1px solid var(--line);
+    padding: 8px 12px 8px 0;
+  }
+  .field-table td {
+    padding: 10px 12px 10px 0;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  .field-table td:first-child { white-space: nowrap; color: var(--ink); font-weight: 500; }
+  .field-table td.desc { color: var(--muted); max-width: 46ch; }
+  .table-scroll { overflow-x: auto; }
+
+  /* ---------- Screen card (mock of app UI referenced in text) ---------- */
+  .screen {
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--paper-raised);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    margin: 16px 0 22px;
+  }
+  .screen-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    border-bottom: 1px solid var(--line);
+    background: var(--code-bg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--muted-2);
+  }
+  .screen-body { padding: 16px; font-size: 14px; }
+  .screen-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .screen-row:last-child { border-bottom: none; }
+  .screen-row .k { color: var(--muted); }
+  .screen-row .v { font-family: var(--font-mono); font-size: 13px; text-align: right; }
+
+  /* ---------- Badges (mirror real app status pills) ---------- */
+  .b { display: inline-block; padding: 1px 8px; border-radius: 100px; font-family: var(--font-mono); font-size: 11.5px; }
+  .b-flag { background: var(--flag-soft); color: var(--flag); }
+  .b-good { background: var(--good-soft); color: var(--good); }
+  .b-neutral { background: var(--line-soft); color: var(--muted); }
+
+  /* ---------- Two-up grid ---------- */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 16px 0 20px; }
+  @media (max-width: 700px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .cardlet {
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px 16px;
+    background: var(--paper-raised);
+  }
+  .cardlet h4 { margin: 0 0 6px; font-size: 14.5px; }
+  .cardlet p { margin: 0; font-size: 13.5px; color: var(--muted); }
+
+  /* ---------- Admin registry ---------- */
+  .registry { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 16px 0 22px; }
+  .registry-row {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 16px;
+    padding: 13px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    background: var(--paper-raised);
+  }
+  .registry-row:last-child { border-bottom: none; }
+  .registry-row .name { font-weight: 600; font-size: 14px; }
+  .registry-row .desc { color: var(--muted); font-size: 13.5px; }
+  @media (max-width: 620px) { .registry-row { grid-template-columns: 1fr; gap: 4px; } }
+
+  /* ---------- Glossary ---------- */
+  dl.glossary { margin: 0; }
+  dl.glossary dt {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 18px;
+    font-size: 14.5px;
+  }
+  dl.glossary dt:first-child { margin-top: 0; }
+  dl.glossary dd { margin: 4px 0 0; color: var(--muted); font-size: 14px; max-width: 64ch; }
+
+  /* ---------- Footer ---------- */
+  footer {
+    max-width: 920px;
+    margin: 64px auto 0;
+    padding: 20px 24px 0;
+    border-top: 1px solid var(--line);
+    color: var(--muted-2);
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+
+<div class="masthead">
+  <div class="masthead-inner">
+    <span class="kicker">SVG IT · Internal Guide</span>
+    <h1>TimeSheet Handbook</h1>
+    <p>How to log time, get it approved, invoice it, and administer the app — written against the app as it actually
+      works today. Every screen shown here is the real one.</p>
+    <div class="legend">
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+      <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
+      <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
+    </div>
+  </div>
+</div>
+
+<nav class="jumpnav" id="jumpnav">
+  <div class="jumpnav-inner">
+    <a href="#quickstart">Quick Start</a>
+    <a href="#log-time">Log Time</a>
+    <a href="#calendar">Calendar</a>
+    <a href="#overview">Your Overview</a>
+    <a href="#export">Export</a>
+    <a href="#expenses">Expenses</a>
+    <a href="#approvals">Approvals</a>
+    <a href="#flags">Entry Flags</a>
+    <a href="#my-invoices">My Invoices</a>
+    <a href="#payroll">Payroll Periods</a>
+    <a href="#invoicing">Invoicing</a>
+    <a href="#reports">Reports</a>
+    <a href="#admin">Admin</a>
+    <a href="#glossary">Glossary</a>
+  </div>
+</nav>
+
+<div class="wrap">
+
+  <section class="chapter" id="quickstart">
+    <div class="chapter-head">
+      <span class="chapter-num">§0</span>
+      <h2>Quick Start</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>Sign in at the TimeSheet login page — either <strong>Sign in with Microsoft</strong> (your normal SVG IT
+        account) or a local email/password if one was set up for you. First time on a local account? Use the
+        one-time temporary password an Admin gave you; you'll be asked to set your own on first sign-in.</p>
+    </div>
+    <ol class="steps">
+      <li><strong>Log your first entry.</strong> Go to <strong>Log Time</strong> (it's the page you land on) and
+        click <strong>+ Log Time</strong>, top right.</li>
+      <li><strong>Pick Client → Project</strong> in that order — the project list only shows what that client has.
+        If a project has Entry Types configured, a third dropdown appears; otherwise it stays hidden.</li>
+      <li><strong>Enter hours and a description</strong>, then <strong>Log</strong>. It appears immediately at the
+        top of your grid on Log Time.</li>
+    </ol>
+    <div class="note tip">
+      <span class="note-label">Worth knowing on day one</span>
+      Every entry you save counts immediately — toward reports, invoicing, payroll, everywhere. Nothing you log is
+      held back pending review. See <a href="#flags">Entry Flags</a> for what actually happens if someone has a
+      question about one of your entries.
+    </div>
+  </section>
+
+  <section class="chapter" id="log-time">
+    <div class="chapter-head">
+      <span class="chapter-num">§1</span>
+      <h2>Log Time</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>Your working grid — every entry you've logged, across every project you're assigned to, newest first.
+        Search narrows by client or project name; nothing here is paginated away, so a broad grid genuinely holds
+        your whole history.</p>
+    </div>
+
+    <h3>Fields when you log or edit an entry</h3>
+    <div class="table-scroll">
+      <table class="field-table">
+        <thead><tr><th>Field</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Client / Project</td><td class="desc">Only projects you're assigned to appear. Picking a client filters the project list.</td></tr>
+          <tr><td>Entry Type</td><td class="desc">Only shows once a project has at least one type configured (Admin sets these up per project). Left as "(none)" otherwise.</td></tr>
+          <tr><td>Date</td><td class="desc">Defaults to today.</td></tr>
+          <tr><td>In Work Hours / Out of Hours</td><td class="desc">Logged separately — Out of Hours is what feeds the monthly out-of-hours payroll run.</td></tr>
+          <tr><td>Bill In</td><td class="desc">Time &amp; Materials projects only. <span class="b b-neutral">Current</span> (default) or <span class="b b-neutral">Next</span> billing period — defers this entry to the following invoice run instead of the current one.</td></tr>
+          <tr><td>Description</td><td class="desc">Free text — this is what shows up on Approvals, Invoicing, and Reports, so make it mean something to whoever reads it next.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Reading the grid</h3>
+    <div class="screen">
+      <div class="screen-bar">Log Time — Northwind Logistics Ltd / Warehouse Ops Optimisation</div>
+      <div class="screen-body">
+        <div class="screen-row"><span class="k">Entry ID</span><span class="v">55</span></div>
+        <div class="screen-row"><span class="k">Date</span><span class="v">2026-08-26</span></div>
+        <div class="screen-row"><span class="k">W/H · O/H</span><span class="v">5 · 1</span></div>
+        <div class="screen-row"><span class="k">Description</span><span class="v">Status reporting</span></div>
+        <div class="screen-row"><span class="k">Flagged</span><span class="v"><span class="b b-flag">⚑ Flagged</span></span></div>
+        <div class="screen-row"><span class="k">Sent to Payroll</span><span class="v"><span class="b b-neutral">Edit · Duplicate · Delete</span></span></div>
+      </div>
+    </div>
+    <div class="prose">
+      <p><strong>Entry ID</strong> is the number to quote if you ever need to reference a specific entry to an
+        Admin or PM — it's the same number used in <a href="#flags">Entry Flags</a> search. A
+        <span class="b b-flag">⚑ Flagged</span> entry has an open query on it (hover it for the reason) — it stays
+        fully editable and counts everywhere as normal; a flag is never a block. <strong>Edit / Duplicate /
+        Delete</strong> disappear once an entry is approved for payroll, sent to payroll, or invoiced — at that
+        point it's <span class="b b-neutral">Locked</span>, and the label tells you which.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="calendar">
+    <div class="chapter-head">
+      <span class="chapter-num">§2</span>
+      <h2>Calendar</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>The same entries as Log Time, laid out as a month grid — one colour per client, hours per day, a running
+        month total top right. Filter to a single client to see just their pattern. Useful for spotting a day you
+        forgot to log rather than for editing (click a day's project block to jump back to Log Time for the
+        detail).</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="overview">
+    <div class="chapter-head">
+      <span class="chapter-num">§3</span>
+      <h2>Your Overview</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>Your totals rolled up by project instead of by entry: work hours, out-of-office hours, amount due to
+        payroll, and whether it's already been sent. Tick <strong>Sent to payroll only</strong> to see just what's
+        settled. This is the fastest way to answer "how much have I actually logged against Everlast this
+        period?" without counting rows by hand.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="export">
+    <div class="chapter-head">
+      <span class="chapter-num">§4</span>
+      <h2>Export</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>Downloads a CSV of logged entries. Every filter defaults to "everything" — leave a dropdown alone to
+        include that whole dimension. <strong>Last 7 Days</strong> and <strong>Last Calendar Month</strong> fill
+        the date range for you; a regular user's export is scoped to their own entries automatically, so the
+        Client / Project / User filters mainly matter for a PM or Admin pulling a wider slice.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="expenses">
+    <div class="chapter-head">
+      <span class="chapter-num">§5</span>
+      <h2>Expenses &amp; Contract Values</h2>
+      <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
+    </div>
+    <div class="prose">
+      <p>Reached from <strong>+ Expense</strong> on Log Time. An expense is logged against one of your assigned
+        projects with an amount, currency, and description — separate from hours, and rechargeable to the client
+        by default. Not assigned to anything yet? The page tells you exactly who to ask and where
+        (<span class="mono">Clients → a client → Projects → a project → Assignments</span>).</p>
+    </div>
+    <div class="note admin-note">
+      <span class="note-label">Admins only</span>
+      A second tab, <strong>Contract</strong>, logs a Contract Value instead — used only against non-invoiceable
+      projects, and not tied to your own project assignments the way an expense is.
+    </div>
+  </section>
+
+  <section class="chapter" id="approvals">
+    <div class="chapter-head">
+      <span class="chapter-num">§6</span>
+      <h2>Approvals</h2>
+      <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
+    </div>
+    <div class="prose">
+      <p>Two stages, on two tabs. A PM sees entries scoped to the project(s) they manage; an Admin sees everything.</p>
+    </div>
+    <div class="grid-2">
+      <div class="cardlet">
+        <h4>Approval Queue</h4>
+        <p>Every entry not yet approved for payroll. Tick the ones you're approving, choose or type a
+          <strong>Posting Batch</strong> name to group them, then <strong>Approve Selected</strong>.</p>
+      </div>
+      <div class="cardlet">
+        <h4>Ready for Payroll</h4>
+        <p>Approved entries waiting to be sent on. Tick, then <strong>Send Selected to Payroll</strong> — this is
+          the step that finally locks each entry against further edits.</p>
+      </div>
+    </div>
+    <div class="note tip">
+      <span class="note-label">Note</span>
+      Approving covers every entry type, not just out-of-hours — inherited from how this queue has always worked.
+      Search filters by staff name, client, or project across whichever tab you're on.
+    </div>
+  </section>
+
+  <section class="chapter" id="flags">
+    <div class="chapter-head">
+      <span class="chapter-num">§7</span>
+      <h2>Entry Flags</h2>
+      <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
+    </div>
+    <div class="prose">
+      <p><strong>A flag is a prompt to query an entry, never a gate.</strong> Flagging something never blocks it —
+        the entry stays saved, stays editable, and keeps counting toward reports, invoicing and payroll exactly as
+        before. Raise one when an entry needs a second look; clear it once that's settled.</p>
+    </div>
+
+    <h3>Raising a flag</h3>
+    <ol class="steps">
+      <li><strong>Search for the entry</strong> under "Find an entry to flag" — by staff name, client, project, or
+        the entry's own <span class="log-id">Entry ID</span> if you already have it. A numeric search matches the ID
+        exactly, so it always finds it even if the entry is old.</li>
+      <li><strong>Click the matching row</strong> to select it — shows who, what project, and when.</li>
+      <li><strong>Add a note</strong> explaining the query, then <strong>Flag Entry</strong>.</li>
+    </ol>
+    <div class="note flag">
+      <span class="note-label">Search scope</span>
+      A PM's search — and the flagged-entries list below it — is scoped to the project(s) they manage, same as
+      Approvals. An Admin's isn't scoped at all.
+    </div>
+
+    <h3>Working a flagged entry</h3>
+    <table class="field-table">
+      <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+      <tbody>
+        <tr><td>Notify Staff</td><td class="desc">Sends the entry's owner a notification (the bell icon, top left) pointing them at the note.</td></tr>
+        <tr><td>Clear</td><td class="desc">Add optional closing notes, then confirm — marks the query settled.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section class="chapter" id="my-invoices">
+    <div class="chapter-head">
+      <span class="chapter-num">§8</span>
+      <h2>My Invoices</h2>
+      <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
+    </div>
+    <div class="prose">
+      <p>A read-only view of invoices that touch a project you manage — showing only your own project's lines from
+        each one, never the whole client's invoice. If nothing's been invoiced against your project yet, the page
+        says so plainly rather than showing an empty table.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="payroll">
+    <div class="chapter-head">
+      <span class="chapter-num">§9</span>
+      <h2>Payroll Periods</h2>
+      <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
+    </div>
+    <div class="prose">
+      <p>A read-only monthly summary — out-of-hours pay aggregated per staff member, generated automatically on
+        the 1st of each month from whatever's been approved-but-not-yet-sent-to-payroll. Approving and sending
+        entries itself still happens on <a href="#approvals">Approvals</a>; this page just shows what the
+        aggregation produced. <strong>Run Now</strong> triggers that same job on demand, without waiting for the
+        1st.</p>
+    </div>
+  </section>
+
+  <section class="chapter" id="invoicing">
+    <div class="chapter-head">
+      <span class="chapter-num">§10</span>
+      <h2>Invoicing</h2>
+      <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
+    </div>
+    <ol class="steps">
+      <li><strong>Pick a client and period</strong>, then <strong>Generate Draft</strong>. Time &amp; Materials
+        lines pull straight from logged entries in that window; Fixed Fee lines use the project's own fee; expenses
+        add on top.</li>
+      <li><strong>Review the Draft</strong> — adjust a line's discount % if needed, give it an invoice number.</li>
+      <li><strong>Finalize.</strong> This is the point of no return: finalizing locks every Time &amp; Materials
+        entry the invoice was built from — they can no longer be edited, duplicated or deleted.</li>
+      <li><strong>Download PDF</strong> any time, Draft or Finalized.</li>
+    </ol>
+    <div class="note admin-note">
+      <span class="note-label">Monthly clients</span>
+      A client set to Monthly billing (their own Edit page → Billing Period) rolls forward automatically — a Draft
+      generates itself once their current period closes. <strong>Run Billing Roll-Forward Now</strong> triggers
+      that check immediately rather than waiting for the schedule. One-off clients are never touched by it; you
+      always generate their Drafts by hand.
+    </div>
+  </section>
+
+  <section class="chapter" id="reports">
+    <div class="chapter-head">
+      <span class="chapter-num">§11</span>
+      <h2>Reports</h2>
+      <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
+    </div>
+    <div class="prose">
+      <p>Pick a report, optionally narrow to one client, choose a range, <strong>Run</strong>. Nine report types,
+        on three axes:</p>
+    </div>
+    <div class="table-scroll">
+      <table class="field-table">
+        <thead><tr><th>Measure</th><th>By Client</th><th>By Project</th><th>By Role</th></tr></thead>
+        <tbody>
+          <tr><td>Time</td><td class="desc">Time on Client</td><td class="desc">Time on Project</td><td class="desc">Time on Project (by Role)</td></tr>
+          <tr><td>Cost to Business</td><td class="desc">Cost on Client</td><td class="desc">Cost on Project</td><td class="desc">Cost on Project (by Role)</td></tr>
+          <tr><td>Profit to Business</td><td class="desc">Profit on Client</td><td class="desc">Profit on Project</td><td class="desc">Profit on Project (by Role)</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead">The "by Role" reports group by each staff member's <em>current</em> job role, not whichever
+      role they held on the entry's own date — and bucket anyone with no role set under "Unassigned" rather than
+      dropping their hours. Role reports are project-scoped only, not client-scoped, since a client can span
+      Fixed Fee and Time &amp; Materials projects whose revenue can't honestly be split by role.</p>
+  </section>
+
+  <section class="chapter" id="admin">
+    <div class="chapter-head">
+      <span class="chapter-num">§12</span>
+      <h2>Admin</h2>
+      <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
+    </div>
+    <div class="prose">
+      <p>Seven screens under the <strong>Admin ▾</strong> menu, top right — the one-time setup work rather than
+        day-to-day workflow, which is why they're tucked away from the main nav.</p>
+    </div>
+    <div class="registry">
+      <div class="registry-row">
+        <div class="name">Clients</div>
+        <div class="desc">Client records, reporting currency, billing period (One-off / Monthly), rate overrides for a specific person at that client.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Projects</div>
+        <div class="desc">Per client. Payment model (Time &amp; Materials / Fixed Cost), budget hours, project manager, Can Invoice flag, staff Assignments, and Entry Types.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Rate Cards</div>
+        <div class="desc">What a role bills at by default, or narrowed to one client or one project. Every rate is effective-dated — adding a new one never edits an old one, it just takes over from its start date on.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Roles</div>
+        <div class="desc">Job-function roles (Consultant, Senior Consultant, Director…) that a person's default rate and the by-role reports both key off.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Staff</div>
+        <div class="desc">Invite, deactivate, promote to Admin, force a password reset, edit payroll number, and — per person — every project assignment with its resolved rate and where that rate came from.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Settings</div>
+        <div class="desc">Base reporting currency, default invoice month-end day, and the two firm-wide project budget-consumption thresholds that trigger a notification.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Audit Log</div>
+        <div class="desc">Who changed what, when, and who they were impersonating at the time — filterable by user and date range.</div>
+      </div>
+    </div>
+    <h3>Acting on someone's behalf</h3>
+    <p class="lead">The swap-arrows icon, top left, lets an Admin log time <em>as</em> another active staff member —
+      for backfilling something they forgot, say. It only affects new entries created while it's active (a banner
+      makes that unmistakable); it doesn't change what you can see or approve elsewhere in the app, and
+      <strong>Revert to myself</strong> switches straight back.</p>
+  </section>
+
+  <section class="chapter" id="glossary">
+    <div class="chapter-head">
+      <span class="chapter-num">§13</span>
+      <h2>Glossary</h2>
+    </div>
+    <dl class="glossary">
+      <dt>Flag</dt>
+      <dd>A query on an entry, not a hold on it. See <a href="#flags">Entry Flags</a>.</dd>
+      <dt>Posting Batch</dt>
+      <dd>A name given to a group of entries approved together on the same pass — lets payroll trace a whole batch back to one approval action.</dd>
+      <dt>Bill In: Current / Next</dt>
+      <dd>Set on an entry when logged (Time &amp; Materials projects only). <span class="mono">Current</span> counts toward the invoice period the entry's date falls in, as normal. <span class="mono">Next</span> excludes it from that period and defers it to the following one — and only that one; skip a period entirely and a deferred entry needs re-flagging by hand.</dd>
+      <dt>Locked</dt>
+      <dd>An entry that can no longer be edited, duplicated, or deleted — because it's been approved for payroll, sent to payroll, or built into a finalized invoice. The Log Time grid always says which.</dd>
+      <dt>Resolved Rate</dt>
+      <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a person-specific override, then a project-specific rate, then a client-specific rate, then the role's plain default. A later rate change never retroactively touches an entry already logged.</dd>
+    </dl>
+  </section>
+
+</div>
+
+<footer>
+  <span>SVG IT TimeSheet — internal use</span>
+  <span>Questions your Admin can't answer belong with whoever owns this app.</span>
+</footer>
+
+<script>
+  (function () {
+    var links = Array.prototype.slice.call(document.querySelectorAll('.jumpnav a'));
+    var sections = links.map(function (a) { return document.querySelector(a.getAttribute('href')); }).filter(Boolean);
+    if (!('IntersectionObserver' in window) || sections.length === 0) return;
+
+    var current = null;
+    function setActive(id) {
+      if (id === current) return;
+      current = id;
+      links.forEach(function (a) {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + id);
+      });
+    }
+
+    var io = new IntersectionObserver(function (entries) {
+      var visible = entries.filter(function (e) { return e.isIntersecting; });
+      if (visible.length === 0) return;
+      visible.sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top; });
+      setActive(visible[0].target.id);
+    }, { rootMargin: '-72px 0px -70% 0px', threshold: 0 });
+
+    sections.forEach(function (s) { io.observe(s); });
+    setActive(sections[0].id);
+  })();
+</script>
