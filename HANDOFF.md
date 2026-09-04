@@ -1,8 +1,42 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-03)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-04)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-04 — HANDOFF cleanup, per-role nav check, one small audit-log fix
+
+The FDD-numbered backlog was already down to one item (Blob Storage) coming into this session, so this round
+was mostly about closing out the "Known loose ends" list from the bottom of this file rather than finding new
+gaps - several of those turned out to be stale.
+
+- **Re-confirmed with the user: Blob Storage stays parked.** Still no Azure Storage account - not revisited.
+- **Two stale loose-end notes corrected, not re-fixed** (they were already fixed, the note just never got
+  updated): "PM can't reach Entry Flags" was actually resolved by the nav reorg (`2aa6693`, the previous
+  session) - confirmed by reading current `app.html`/`app.routes.ts`. "`ProjectsAdminService.listByClient` uses
+  backslashes" doesn't match the current code (forward slashes) or any point in the file's `git log -p`
+  history - whatever this referred to no longer exists (or never did).
+- **Per-role nav check done by code review, not a live browser pass** (Claude in Chrome wasn't connected this
+  session - the user started installing it but didn't finish). Cross-checked every `app.html` nav item's `@if`
+  condition against its route's guard in `app.routes.ts`: fully consistent for Admin/PM/regular User, no dead
+  links, no nav-hidden-but-guard-open gaps beyond the one already-deliberate `My Invoices` case (hidden from
+  Admins since they have the full Invoicing page instead). This closes the "worth a quick pass next session"
+  flag from the previous session's nav-reorg entry.
+- **Fixed: `AdminUsersFunctions.ResetPassword` now writes a real `AuditLog` row**, not just an `ILogger` line.
+  The dedicated `AuditLog` table this note said would be "a natural future enhancement" already existed (added
+  the session before last) - the comment just predated that migration and nobody had come back to wire this one
+  Function into it. Added the same `IAuditLogService`/`IUnitOfWork` pattern already used by
+  `EntryFlagsFunctions`/`TimesheetEntriesFunctions`/etc.: a `User.PasswordReset` row (entity `User`, details =
+  target email + local/SSO). The pre-existing `ILogger.LogWarning` call was left in place alongside it.
+- Backend builds clean, 44/44 tests pass (unchanged - no new test, matching this codebase's existing bar for
+  thin audit-logging wiring). API host restarted for the new constructor dependencies, confirmed no startup
+  errors. Dev servers (Azurite, API on `:7071`, Angular on `:3000`) all started fresh this session and left
+  running.
+- **Not touched, deliberately** - the rest of the "known loose ends" list is either genuinely external
+  (`User.Read.All` Entra consent, no Azure Storage account), environmental/data setup (no default RateCard
+  rows for the newer roles, no `EntryType` rows on any project yet), or a real but small UX nice-to-have
+  (`EntryFlagsFunctions.RaiseManual`'s raw-Entry-Id input instead of a picker) that wasn't asked for this round
+  - flagging it again below in case it's wanted next.
 
 ## Done still later in this session, 2026-09-03 — loading-state consistency pass (20 pages)
 
@@ -131,6 +165,19 @@ tradeoffs involved (grouping strategy, dropdown vs. flat, what to bundle in).
 laptop screen and a larger monitor. The nav reorg itself wasn't explicitly walked through against the full
 per-role checklist below (Admin/PM/regular User) - the user moved on to the width issue before confirming each
 item - worth a quick pass next session if it hasn't come up by then.
+
+**Per-role nav check done 2026-09-04, by code review not live browser** (Claude in Chrome wasn't connected this
+session): cross-checked every `app.html` nav item's `@if` visibility condition against its route's guard in
+`app.routes.ts`. Result - fully consistent, nothing to fix: `Log Time`/`Calendar`/`Your Overview`/`Export` show
+unconditionally and their routes carry only `authGuard`; `Approvals`/`Entry Flags` show for
+`isAdmin() || isProjectManager()` and their routes also carry only `authGuard` (by design - the backend scopes
+a PM to their own managed projects rather than the route blocking them, per each route's own comment);
+`My Invoices` shows only for `!isAdmin()` even though its route has no `adminGuard` either - deliberate, since
+an Admin already has the full `/admin/invoicing` page and doesn't need the PM-scoped personal view; everything
+under the `Admin ▾` dropdown plus `Payroll Periods`/`Invoicing`/`Reports` shows only for `isAdmin()` and every
+one of those routes does carry `adminGuard`. No dead nav links, no nav-hidden-but-guard-open gaps beyond the
+one already-documented, deliberate `My Invoices` case. This closes the "worth a quick pass" flag from the
+previous entry - genuinely done now, just via reading the code rather than clicking through three logins.
 
 ## Done last in this session, 2026-09-03 — Project Health removed entirely
 
@@ -611,12 +658,15 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
-- **A Project Manager has no way to reach the Entry Flags screen at all.** The backend already allows it -
-  `RequireAdminOrProjectManager` gates `EntryFlags_RaiseManual`/`Clear`/`NotifyStaff` for a PM acting on their
-  own project(s) - but `app.html`'s nav only shows the "Flags" link to Admins, and the Log Time grid's new
-  click-through (this session) is also Admin-only for the same reason. So a PM's already-granted backend
-  permission is practically unreachable today. Noticed while adding the click-through, not fixed this session -
-  needs either a PM-visible nav entry or another way in (e.g. surfaced from a project's own page).
+- ~~A Project Manager has no way to reach the Entry Flags screen at all~~ — **stale, already fixed.** This was
+  raised when the click-through was added, but the very next round of work the same session (the nav reorg,
+  `2aa6693`) fixed it as a side effect: `app.html` now shows "Entry Flags" as a flat top-level link to
+  Admin-or-PM (confirmed in code, 2026-09-04), and `admin/entry-flags`'s route lost `adminGuard` (kept
+  `authGuard` only, per `app.routes.ts`'s own comment there). Left this line struck through rather than deleted
+  so a future read of this file doesn't wonder whether it was ever addressed. The one still-real remaining gap
+  in this area is narrower: the Log Time grid's flag-indicator click-through to `/admin/entry-flags?flagId=...`
+  is still Admin-only (see the "Done in a follow-up round" section's item 4 above) - a PM can now reach the
+  Entry Flags page directly via nav, just not by clicking the indicator on their own grid.
 - **SQLite/EF can't translate `ORDER BY` on a `DateTimeOffset` column — hit again this session** for
   `ProjectAttachmentRepository.GetByProjectAsync` (silently 500'd every list call; the fix is already
   applied — see the project-attachments entry above). This is a *recurring* trap in this codebase,
@@ -664,15 +714,29 @@ session's earlier entry above respectively. They are not part of the new numbere
     rows** — role-based fallback resolution will fail for any staff/client/project combo not
     already covered by a person-level override, until someone adds one via the Rate Cards admin
     page.
-  - `ProjectsAdminService.listByClient` (frontend) has a pre-existing bug using backslashes instead
-    of forward slashes in its URL template — noted, not fixed, out of scope.
+  - ~~`ProjectsAdminService.listByClient` (frontend) has a pre-existing bug using backslashes instead
+    of forward slashes in its URL template~~ — **stale, checked 2026-09-04**: the current
+    `listByClient` builds `` `${baseUrl}/clients/${clientId}/projects` `` with forward slashes, and a
+    full `git log -p --follow` of the file never shows a backslash version at any point in its
+    history. Whatever this referred to no longer exists (or never did) - not chasing further since
+    there's nothing left to fix.
   - `EntryFlagsFunctions.RaiseManual` UI (entry-flags-page) takes a raw Timesheet Entry Id typed in
     by hand rather than a picker.
   - No projects have `EntryType` rows yet — the "Entry Type" picker on Add Entry only appears once
     an admin adds at least one via a project's "Entry Types" page.
   - Tenant directory search (`AdminUsers_SearchTenantDirectory`) will 500/error until
     `User.Read.All` is Entra-admin-consented on the `GraphAdmin` app registration.
-  - `AdminUsersFunctions.ResetPassword` only logs password resets via `ILogger`, not `AuditLog`.
+  - ~~`AdminUsersFunctions.ResetPassword` only logs password resets via `ILogger`, not `AuditLog`~~ —
+    **fixed 2026-09-04**. The dedicated `AuditLog` table this note said would be "a natural future
+    enhancement" already existed (added in `20260827155728_AddEntryFlagAndAuditLog`, used by
+    `EntryFlagsFunctions`/`TimesheetEntriesFunctions`/etc.) - the comment predated that migration and
+    was never updated. Wired `AdminUsersFunctions` into the existing `IAuditLogService`/`IUnitOfWork`
+    exactly like those other Functions classes: a `User.PasswordReset` row (entity `User`, details =
+    target email + local/SSO) alongside the pre-existing `ILogger.LogWarning` call, which was left in
+    place rather than removed. Backend builds clean, 44/44 tests pass (unchanged - matches this
+    codebase's bar of no dedicated test for thin audit-logging wiring, same as the `EntryFlag.Raised`/
+    `Cleared` precedent it copies). API host restarted for the new constructor dependencies
+    (`IAuditLogService`, `IUnitOfWork`).
   - Live-verification-only leftovers in demo data from prior sessions: an inactive test project
     "Notif Threshold Test (verification - can be deleted)" (project id 9), and project 3's
     `ProjectManagerUserId` nominating `sarah.chen` (this is now load-bearing — this session's PM

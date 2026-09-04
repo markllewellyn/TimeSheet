@@ -16,6 +16,8 @@ public class AdminUsersFunctions(
     IUserRepository users,
     IAdminUserService adminUserService,
     ILocalUserPasswordService localUserPasswordService,
+    IAuditLogService auditLog,
+    IUnitOfWork uow,
     ICurrentUserAccessor currentUser,
     ILogger<AdminUsersFunctions> logger)
 {
@@ -32,11 +34,13 @@ public class AdminUsersFunctions(
             ? await localUserPasswordService.ResetPasswordAsync(targetUser.Id, ct)
             : await adminUserService.ForcePasswordResetAsync(targetUser.EntraObjectId!, ct);
 
-        // Audit trail: who reset whose password, when. A dedicated AuditLog table would be a natural future
-        // enhancement; structured logging is the audit record for now.
+        var admin = currentUser.RequireUser();
         logger.LogWarning(
             "Admin {AdminUserId} force-reset the password for user {TargetUserId} ({TargetEmail}, {AccountType}) at {TimestampUtc}",
-            currentUser.RequireUser().UserId, targetUser.Id, targetUser.Email, targetUser.IsLocalAccount ? "local" : "SSO", DateTimeOffset.UtcNow);
+            admin.UserId, targetUser.Id, targetUser.Email, targetUser.IsLocalAccount ? "local" : "SSO", DateTimeOffset.UtcNow);
+        await auditLog.LogAsync(admin, "User.PasswordReset", "User", targetUser.Id,
+            $"{targetUser.Email} ({(targetUser.IsLocalAccount ? "local" : "SSO")})", impersonatedUserId: null, ct);
+        await uow.SaveChangesAsync(ct);
 
         return new OkObjectResult(new { temporaryPassword });
     }
