@@ -13,6 +13,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/login/bootstrap-local-page/bootstrap-local-page').then((m) => m.BootstrapLocalPage),
   },
   {
+    path: 'auth/complete',
+    loadComponent: () => import('./features/login/entra-complete-page/entra-complete-page').then((m) => m.EntraCompletePage),
+  },
+  {
     path: 'setup',
     canActivate: [authGuard],
     loadComponent: () => import('./features/setup/setup-page/setup-page').then((m) => m.SetupPage),

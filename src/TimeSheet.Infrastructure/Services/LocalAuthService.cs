@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
+using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 
@@ -18,6 +19,11 @@ public class LocalAuthService(IUserRepository users, IPasswordHasher passwordHas
         if (user is null || !user.IsActive || user.PasswordHash is null) return null;
         if (!passwordHasher.Verify(password, user.PasswordHash)) return null;
 
+        return IssueSessionToken(user);
+    }
+
+    public LocalLoginResult IssueSessionToken(User user)
+    {
         var signingKey = configuration["LocalAuth:JwtSigningKey"]
             ?? throw new InvalidOperationException("Missing LocalAuth:JwtSigningKey configuration.");
         var credentials = new SigningCredentials(

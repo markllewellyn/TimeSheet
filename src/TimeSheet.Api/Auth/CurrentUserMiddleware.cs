@@ -35,7 +35,9 @@ namespace TimeSheet.Api.Auth;
 ///    fallback path when Entra SSO isn't set up/working yet, so it can't require an Entra token itself.
 /// A third, always-on exception: the local-login route itself (AuthFunctions.LocalLogin) must be reachable
 /// with no token, at any time - it's the endpoint that ISSUES the token, so requiring one first would make it
-/// impossible to ever call.
+/// impossible to ever call. The two Entra sign-in routes (EntraAuthFunctions.EntraLogin/EntraCallback) are the
+/// same kind of exception, for the same reason - Entra SSO is now a server-side authorization-code exchange
+/// (not browser-side MSAL), and neither of these two requests ever carries our own bearer token.
 /// </summary>
 public class CurrentUserMiddleware : IFunctionsWorkerMiddleware
 {
@@ -43,6 +45,8 @@ public class CurrentUserMiddleware : IFunctionsWorkerMiddleware
     private const string BootstrapPath = "/api/bootstrap/first-admin";
     private const string LocalBootstrapPath = "/api/bootstrap/first-local-admin";
     private const string LocalLoginPath = "/api/auth/local-login";
+    private const string EntraLoginPath = "/api/auth/entra-login";
+    private const string EntraCallbackPath = "/api/auth/callback/microsoft-entra-id";
 
     public async Task Invoke(FunctionContext context, FunctionExecutionDelegate next)
     {
@@ -60,7 +64,9 @@ public class CurrentUserMiddleware : IFunctionsWorkerMiddleware
         // though this middleware's own httpContext.Items assignment below succeeded.
         httpContext.RequestServices.GetRequiredService<IHttpContextAccessor>().HttpContext = httpContext;
 
-        if (httpContext.Request.Path.Equals(LocalLoginPath, StringComparison.OrdinalIgnoreCase))
+        if (httpContext.Request.Path.Equals(LocalLoginPath, StringComparison.OrdinalIgnoreCase)
+            || httpContext.Request.Path.Equals(EntraLoginPath, StringComparison.OrdinalIgnoreCase)
+            || httpContext.Request.Path.Equals(EntraCallbackPath, StringComparison.OrdinalIgnoreCase))
         {
             await next(context);
             return;

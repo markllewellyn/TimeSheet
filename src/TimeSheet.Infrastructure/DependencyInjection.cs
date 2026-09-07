@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Identity.Client;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 using TimeSheet.Infrastructure.Data;
@@ -67,6 +68,23 @@ public static class DependencyInjection
         services.AddSingleton<IPasswordHasher, Pbkdf2PasswordHasher>();
         services.AddScoped<ILocalAuthService, LocalAuthService>();
         services.AddScoped<ILocalUserPasswordService, LocalUserPasswordService>();
+
+        services.AddSingleton<IConfidentialClientApplication>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var tenantId = config["AzureAd:TenantId"] ?? throw new InvalidOperationException("Missing AzureAd:TenantId.");
+            var clientId = config["AzureAd:ClientId"] ?? throw new InvalidOperationException("Missing AzureAd:ClientId.");
+            var clientSecret = config["AzureAd:ClientSecret"] ?? throw new InvalidOperationException("Missing AzureAd:ClientSecret.");
+            var instance = config["AzureAd:Instance"] ?? "https://login.microsoftonline.com/";
+            var redirectUri = config["AzureAd:RedirectUri"] ?? throw new InvalidOperationException("Missing AzureAd:RedirectUri.");
+
+            return ConfidentialClientApplicationBuilder.Create(clientId)
+                .WithClientSecret(clientSecret)
+                .WithAuthority(new Uri($"{instance.TrimEnd('/')}/{tenantId}"))
+                .WithRedirectUri(redirectUri)
+                .Build();
+        });
+        services.AddScoped<IEntraAuthService, EntraAuthService>();
 
         services.AddHttpClient<ICurrencyRateProvider, FrankfurterCurrencyRateProvider>(client =>
         {

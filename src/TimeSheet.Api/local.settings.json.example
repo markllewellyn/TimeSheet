@@ -6,8 +6,12 @@
 
         "AzureAd:Instance": "https://login.microsoftonline.com/",
         "AzureAd:TenantId": "<your-entra-tenant-id>",
-        "AzureAd:ClientId": "<the-API-app-registration-client-id>",
-        "AzureAd:Audience": "api://<the-API-app-registration-client-id>",
+        "AzureAd:ClientId": "<the-app-registration-client-id>",
+        "AzureAd:Audience": "api://<the-app-registration-client-id>",
+        "AzureAd:ClientSecret": "<the-app-registration-client-secret>",
+        "AzureAd:RedirectUri": "http://localhost:3000/api/auth/callback/microsoft-entra-id",
+
+        "Frontend:BaseUrl": "http://localhost:3000",
 
         "ConnectionStrings:TimesheetDb": "Data Source=timesheet.db",
 

@@ -13,8 +13,13 @@ public class UserRepository(TimesheetDbContext db) : IUserRepository
     public Task<User?> GetByEntraObjectIdAsync(string entraObjectId, CancellationToken ct) =>
         db.Users.FirstOrDefaultAsync(u => u.EntraObjectId == entraObjectId, ct);
 
+    // Case-insensitive: an email's casing isn't something callers (a local-login form, an Entra token's
+    // preferred_username claim) can be relied on to match byte-for-byte against however it was originally
+    // typed into this table - e.g. Entra returned "Mark.Llewellyn@svgit.co.uk" for a row stored as
+    // "mark.llewellyn@svgit.co.uk", which a plain == silently never matches (SQLite string comparison is
+    // case-sensitive by default).
     public Task<User?> GetByEmailAsync(string email, CancellationToken ct) =>
-        db.Users.FirstOrDefaultAsync(u => u.Email == email, ct);
+        db.Users.FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower(), ct);
 
     public async Task<IReadOnlyList<User>> GetAllAsync(bool includeInactive, CancellationToken ct)
     {

@@ -1,8 +1,126 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-04)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-07)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done later still in this session, 2026-09-07 — Entra SSO login actually working end-to-end, replaced browser-side MSAL
+
+**Entra ID SSO login now genuinely works, live-verified end-to-end** - the biggest open item across every
+prior session's "known loose ends" list is closed. Local email/password login is untouched and still works
+exactly as before, verified side-by-side in the same session.
+
+**What was wrong**: the app's existing MSAL Angular SSO implementation (built in earlier sessions, never live-
+tested until this one) failed with `AADSTS9002326: Cross-origin token redemption is permitted only for the
+'Single-Page Application' client-type` the moment it was actually exercised in a browser. This is enforced by
+Entra's own token endpoint, not app code - the shared Entra app registration's redirect URI is registered
+under the "Web" platform, not "Single-Page Application", so a browser directly redeeming an authorization code
+(what MSAL Angular's public-client/PKCE flow does) is rejected outright regardless of any client-side fix.
+Confirmed by reading MSAL Angular's actual library source (not guessing from the error text alone) and by a
+live test that reached the real Microsoft login page correctly (right tenant, right client ID, right redirect
+URI - no AADSTS50011) and failed specifically at the in-browser token-redemption step.
+
+**Why not just fix the Entra app registration**: the user was firm this had to be solved entirely in this
+app's own code, since a colleague has SSO genuinely working today in their own Angular app against this exact
+same shared registration. That's real, useful evidence, not a contradiction: their app must not be doing
+browser-side redemption either - a "Web"-platform registration is exactly what a server-side (confidential-
+client) OAuth exchange expects. So the fix adopted is a server-side authorization-code exchange, using the
+client secret already sitting in this app's config - the same fundamental pattern NextAuth/any traditional
+server-rendered web app uses, just implemented in this app's own Azure Functions backend instead of assuming a
+portal change. Still 100% real Entra SSO from the user's perspective (same Microsoft login page, same tenant,
+same account) - only the internal plumbing of the last step moved from the browser to the server.
+
+- **New backend endpoints** (`EntraAuthFunctions.cs`): `Auth_EntraLogin` (`GET /api/auth/entra-login`) mints a
+  CSRF `state`, stores it in a short-lived `HttpOnly`/`SameSite=Lax` cookie, 302s to Entra's `/authorize`.
+  `Auth_EntraCallback` (`GET /api/auth/callback/microsoft-entra-id` - the exact already-registered redirect
+  URI, now a real backend route instead of being proxy-bypassed to Angular's `index.html`) validates the state
+  cookie, exchanges the code via a new `IEntraAuthService`/`EntraAuthService` (MSAL.NET's
+  `IConfidentialClientApplication`, `Microsoft.Identity.Client` 4.88.0 pinned explicitly in
+  `TimeSheet.Infrastructure.csproj`), resolves/auto-links the app `User` by email (same rule as the existing
+  per-request Entra path - deliberately duplicated rather than shared, to avoid any risk to that already-
+  working code), and mints a session token via a new `ILocalAuthService.IssueSessionToken(User)` (the JWT-
+  construction code extracted out of `LocalAuthService.LoginAsync`, so an Entra-derived session and a local-
+  password session are byte-identical `"LocalBearer"` JWTs afterward - fully indistinguishable to
+  `CurrentUserMiddleware` and everything downstream). Redirects to `/auth/complete#token=...&expiresAtUtc=...`
+  (URL fragment - never sent to/logged by any server) on success, or `/login?error=...` on failure.
+  `CurrentUserMiddleware` needed exactly one addition: both new routes bypass auth the same way
+  `/api/auth/local-login` already does (neither request ever carries a bearer token) - a 4-line addition to an
+  already-existing pattern, nothing else in that file changed.
+- **A real, separate bug found and fixed live, not by design**: the very first live attempt correctly completed
+  the whole OAuth exchange (no more AADSTS9002326) but returned "not provisioned" for the user's own account,
+  which should have auto-linked. Root cause, confirmed by temporary debug logging then reverted: Entra's
+  `preferred_username` claim came back as `Mark.Llewellyn@svgit.co.uk`, but the `Staff` table stores
+  `mark.llewellyn@svgit.co.uk` - `UserRepository.GetByEmailAsync`'s plain `==` comparison is case-sensitive in
+  SQLite by default, so the two never matched. **Fixed generically** (`u.Email.ToLower() == email.ToLower()`),
+  not special-cased for this one row - this was a latent bug in the *existing* `CurrentUserMiddleware` auto-
+  link path too (same method, same casing assumption), just never triggered before since nothing had
+  exercised a real Entra login with mismatched casing until now. Also fixes any future local-login email-
+  casing mismatch, for the same reason.
+- **MSAL Angular removed from the frontend entirely** (`@azure/msal-angular`, `@azure/msal-browser` dropped
+  from `package.json`; `msal.factories.ts`/`msal-auth.interceptor.ts` deleted; `main.ts`/`app.config.ts`/
+  `current-user.service.ts`/`auth.guard.ts` simplified) - approved explicitly, since it's now genuinely dead
+  weight: MSAL's only remaining job would have been the browser-side redemption that doesn't work for this
+  registration. `signInWithMicrosoft()` is now a plain `window.location.href` navigation to
+  `/api/auth/entra-login` (not an HttpClient call, which would follow the redirect chain in the background
+  instead of navigating the tab). New `entra-complete-page` (routed at `/auth/complete`, public/no guard)
+  reads the token from the URL fragment and calls the same `LocalAuthService.setSession(...)` local login
+  already uses - Entra-derived and local sessions are now genuinely one mechanism end-to-end, not two parallel
+  ones. `proxy.conf.js`'s special-case bypass for the callback path was removed (it's a real backend route now).
+  Bundle size dropped ~270KB confirming MSAL is fully gone.
+- Backend and Angular build clean throughout, 44/44 tests pass (unchanged - the only behavior change with test
+  coverage, `GetByEmailAsync`'s case-insensitivity, wasn't given a dedicated new test, consistent with this
+  codebase's bar for thin repository-method fixes). API host restarted three times this session for the new
+  endpoints/config/case-fix in turn - confirmed clean startup and the two new Functions registered each time.
+- **Live-verified in the browser, both paths, side by side, in the same session**: (1) Entra SSO - clicked
+  "Sign in with Microsoft", completed a real Microsoft login (the user's own credentials/MFA - not something
+  this session could do on its own), landed on `/timesheet` with `/api/me` returning 200 and real data loaded.
+  (2) Local login - reset James O'Brien's password via the Staff page for a fresh one-time temp password (same
+  no-real-password-handling pattern prior sessions used), signed in as him locally, confirmed his own data and
+  the correct regular-user nav layout. Both fully independent and unaffected by each other.
+- **Config**: `local.settings.json` gained `AzureAd:ClientSecret` (same value as the pre-existing
+  `GraphAdmin:ClientSecret` - confirmed by the user to be the same underlying app registration),
+  `AzureAd:RedirectUri`, `Frontend:BaseUrl`. Mirrored into `local.settings.json.example` with placeholders.
+  Frontend `environment.ts`/`environment.development.ts`(`.example`) lost their `entra: {...}` block entirely -
+  the frontend no longer talks to Entra directly at all, so it needs no Entra config of its own.
+- **Not touched, deliberately**: the pre-existing `"Bearer"` (Entra token validation via
+  `AddMicrosoftIdentityWebApi`) JWT scheme in `Program.cs`, and `CurrentUserMiddleware`'s own Entra-token/oid
+  auto-link branch, are both left fully in place even though they become unreachable in practice now (the SPA
+  never again sends a raw Entra access token to the API) - removing them is a safe, optional future cleanup,
+  not part of this fix. Logout stays app-only (confirmed with the user) - doesn't also end the tenant-wide
+  Entra session, matching how local logout already behaves.
+
+## Done in this session, 2026-09-07 — PM flag-indicator click-through (last narrow gap in that area)
+
+The FDD-numbered backlog is still down to just Blob Storage (parked, see below), so this round picked the one
+concrete, well-scoped item off the "known loose ends" list rather than a business-decision one (EntryType rows
+across more projects, the unreproduced "own entries missing from search" report) or an externally-blocked one
+(Blob Storage, `User.Read.All` consent) — asked the user to choose between these via `AskUserQuestion` rather
+than guessing, and this is what they picked.
+
+- **A Project Manager can now click the "⚑ Flagged" indicator on their own Log Time grid** and land on the
+  Entry Flags page, same as an Admin. Previously this only worked for Admins (`log-time-page.ts`'s
+  `cellClass`/`goToFlag` both gated on `currentUser.isAdmin()` alone) even though a PM has been able to reach
+  the Entry Flags page via top-level nav since the nav reorg (`2aa6693`, 2026-09-03) and the backend
+  (`EntryFlagsFunctions`, gated `RequireAdminOrProjectManager`) already scopes a PM to their own managed
+  projects' flags correctly — the click-through was the one place still checking the wrong (narrower) gate.
+  Fixed by extracting a `canOpenFlag()` helper (`isAdmin() || isProjectManager()`) used by both the cell's
+  clickable-styling check and the actual navigation guard, instead of duplicating the two-role check inline.
+- Confirmed via code review that this can't land a PM on a broken/empty page: `EntryFlagsFunctions`'s own doc
+  comment and every one of its endpoints already call `RequireAdminOrProjectManager(entry.Project!)`, the same
+  precedent `EntryFlags_SearchEntries` follows (see the 2026-09-04 entry below) — a PM clicking through to
+  `/admin/entry-flags?flagId=...` gets that flag if it's on one of their own managed projects, exactly like
+  reaching the page via nav and finding it in the list normally would.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Not live-verified this round** — Claude in Chrome's extension reported not connected this session (the user
+  hadn't started it), so this is a code-review-only pass, not a real click-through as Sarah Chen (the PM used
+  for this kind of check in earlier sessions, per the 2026-09-04 nav-check entry). Worth a quick live pass next
+  time Chrome is connected, same as the "worth a quick pass" pattern this file has flagged before for other
+  nav-adjacent changes.
+- Dev servers were NOT running at the start of this session (nothing survived) — started fresh: Azurite (data
+  dir `C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\`), API host on `:7071` (`func start` from
+  `src/TimeSheet.Api`, confirmed 0 build errors and a clean startup log — the only exceptions logged are the
+  pre-existing, expected-in-local-dev `DailyTimesheetReminder` timer's Graph email-send failure, unrelated to
+  this change), Angular on `:3000` (`npm start`). All three left running at the end of this session.
 
 ## Done later again in this session, 2026-09-04 — Entry Flags ID search, user-facing handbook, committed
 
@@ -828,10 +946,11 @@ session's earlier entry above respectively. They are not part of the new numbere
   `2aa6693`) fixed it as a side effect: `app.html` now shows "Entry Flags" as a flat top-level link to
   Admin-or-PM (confirmed in code, 2026-09-04), and `admin/entry-flags`'s route lost `adminGuard` (kept
   `authGuard` only, per `app.routes.ts`'s own comment there). Left this line struck through rather than deleted
-  so a future read of this file doesn't wonder whether it was ever addressed. The one still-real remaining gap
+  so a future read of this file doesn't wonder whether it was ever addressed. ~~The one still-real remaining gap
   in this area is narrower: the Log Time grid's flag-indicator click-through to `/admin/entry-flags?flagId=...`
-  is still Admin-only (see the "Done in a follow-up round" section's item 4 above) - a PM can now reach the
-  Entry Flags page directly via nav, just not by clicking the indicator on their own grid.
+  is still Admin-only~~ — **fixed 2026-09-07**: `log-time-page.ts`'s `canOpenFlag()` now allows a PM too, same
+  gate the page itself and its backend already use — see this session's own "Done" entry above. Code-review
+  verified only (Chrome wasn't connected this session) — worth a real click-through as a PM next time it is.
 - **SQLite/EF can't translate `ORDER BY` on a `DateTimeOffset` column — hit again this session** for
   `ProjectAttachmentRepository.GetByProjectAsync` (silently 500'd every list call; the fix is already
   applied — see the project-attachments entry above). This is a *recurring* trap in this codebase,

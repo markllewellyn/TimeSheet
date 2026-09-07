@@ -1,3 +1,5 @@
+using TimeSheet.Domain.Entities;
+
 namespace TimeSheet.Domain.Services;
 
 /// <summary>Shared between Program.cs (registers the "LocalBearer" JWT scheme), CurrentUserMiddleware (tries
@@ -21,4 +23,9 @@ public interface ILocalAuthService
 {
     /// <summary>Null if the email/password don't match an active local account.</summary>
     Task<LocalLoginResult?> LoginAsync(string email, string password, CancellationToken ct);
+
+    /// <summary>Mints a "LocalBearer" session token for an already-resolved User - shared by LoginAsync (after
+    /// password verification) and EntraAuthService (after Entra code redemption), so both session origins
+    /// produce byte-identical tokens, indistinguishable to CurrentUserMiddleware and everything downstream.</summary>
+    LocalLoginResult IssueSessionToken(User user);
 }

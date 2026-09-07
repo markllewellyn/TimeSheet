@@ -86,14 +86,13 @@ export class LogTimePage {
       // A flag is never a gate (FDD) - purely informational, doesn't affect editability - so this is a plain
       // indicator, not a blocked/locked state like the entry-actions column's "Locked" text. Hover shows why
       // it's flagged (plain-text tooltip - reliable across browsers, unlike an interactive ag-grid tooltip);
-      // clicking jumps to the Entry Flags admin page, but only for Admins - that page is Admin-only today, so
-      // offering the click-through to anyone else would just lead them to a screen they can't use.
+      // clicking jumps to the Entry Flags page, which both Admins and PMs can reach via nav - matches that gate.
       headerName: 'Flagged',
       field: 'openFlags',
       width: 100,
       valueFormatter: (p) => (p.value?.length > 0 ? '⚑ Flagged' : ''),
       tooltipValueGetter: (p) => this.flagTooltipText(p.data),
-      cellClass: (p) => (p.value?.length > 0 ? 'text-[var(--destructive)] font-medium' + (this.currentUser.isAdmin() ? ' cursor-pointer underline' : '') : ''),
+      cellClass: (p) => (p.value?.length > 0 ? 'text-[var(--destructive)] font-medium' + (this.canOpenFlag() ? ' cursor-pointer underline' : '') : ''),
       onCellClicked: (p) => this.goToFlag(p.data),
     },
     { headerName: 'To Payroll', field: 'toPayroll', width: 110, type: 'numericColumn', valueFormatter: (p) => (p.value ?? 0).toFixed(2) },
@@ -147,8 +146,12 @@ export class LogTimePage {
       .join('\n');
   }
 
+  private canOpenFlag(): boolean {
+    return this.currentUser.isAdmin() || this.currentUser.isProjectManager();
+  }
+
   private goToFlag(entry: TimesheetEntry | undefined): void {
-    if (!entry || entry.openFlags.length === 0 || !this.currentUser.isAdmin()) return;
+    if (!entry || entry.openFlags.length === 0 || !this.canOpenFlag()) return;
     this.router.navigate(['/admin/entry-flags'], { queryParams: { flagId: entry.openFlags[0].id } });
   }
 
