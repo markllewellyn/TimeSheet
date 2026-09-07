@@ -34,6 +34,13 @@ export class NotificationsService {
     });
   }
 
+  /** For callers that just took an action which might have created a notification for the current user (e.g.
+   * an Admin using "Notify Staff" on their own entry) - the bell would otherwise only catch up on the next
+   * 90s poll or tab-focus event. */
+  refresh(): void {
+    this.poll();
+  }
+
   private poll(): void {
     this.http.get<AppNotification[]>(`${this.baseUrl}/unread`).subscribe({
       next: (notifications) => this.unreadSignal.set(notifications),

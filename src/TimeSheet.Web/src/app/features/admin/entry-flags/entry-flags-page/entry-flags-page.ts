@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { EntryFlagsService, EntryFlag, EntryFlagSearchResult } from '../../../../core/services/entry-flags.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
+import { NotificationsService } from '../../../../core/services/notifications.service';
 
 @Component({
   selector: 'app-entry-flags-page',
@@ -13,6 +14,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 })
 export class EntryFlagsPage {
   private readonly entryFlagsService = inject(EntryFlagsService);
+  private readonly notificationsService = inject(NotificationsService);
   private readonly route = inject(ActivatedRoute);
   protected readonly flags = signal<EntryFlag[]>([]);
   // Only ever set true->false, on the very first refresh() call - never reset for subsequent reloads after an
@@ -151,7 +153,12 @@ export class EntryFlagsPage {
     this.error.set(null);
     this.successMessage.set(null);
     this.entryFlagsService.notifyStaff(f.id).subscribe({
-      next: () => this.successMessage.set(`Notified the staff member for entry #${f.timesheetEntryId}.`),
+      next: () => {
+        this.successMessage.set(`Notified the staff member for entry #${f.timesheetEntryId}.`);
+        // The recipient could be the current user (e.g. an Admin notifying themselves about their own
+        // entry) - the bell otherwise wouldn't catch up until its next 90s poll or tab-focus refresh.
+        this.notificationsService.refresh();
+      },
       error: (err) => this.error.set(err?.error?.error ?? 'Could not notify the staff member.'),
     });
   }
