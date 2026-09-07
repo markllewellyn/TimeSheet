@@ -4,6 +4,23 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
+
+User-reported bug, found live right after the SSO work above: clicked "Notify Staff" on a flagged entry that
+happened to be their own, saw the success banner, but the bell showed no red dot.
+
+- **Not a data/logic bug** - traced the whole chain (`EntryFlagsFunctions.NotifyStaff` →
+  `EntryFlagService.NotifyStaffAsync` → `NotificationService.RaiseAsync`, targeting `entry.UserId` correctly)
+  and confirmed directly in the browser that the `Notification` row was created and correctly scoped to the
+  signed-in user - it just wasn't visible yet.
+- **Real cause**: `NotificationsService` (frontend) only re-polls `/api/notifications/unread` every 90 seconds,
+  on tab-focus, and once at app boot - nothing re-polls after an in-app action that might create a
+  notification for the current user (an Admin/PM using "Notify Staff" on their own entry is exactly that
+  case). Added a public `refresh()` method (calls the same private `poll()`), called from
+  `entry-flags-page.ts`'s `notifyStaff()` success handler. **Live-verified**: marked all notifications read,
+  clicked "Notify Staff" again, the red dot appeared instantly with no reload and no wait.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+
 ## Done later still in this session, 2026-09-07 — Entra SSO login actually working end-to-end, replaced browser-side MSAL
 
 **Entra ID SSO login now genuinely works, live-verified end-to-end** - the biggest open item across every
