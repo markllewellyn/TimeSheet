@@ -4,6 +4,24 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done very last in this session, 2026-09-08 — fixed a real gap found while verifying the polish sweep
+
+While live-verifying the polish sweep below, tried to click through to `/admin/projects/:id/entry-types` (to
+test Entry Types' new deactivate-confirmation) and found there was genuinely no way to reach that page from the
+flat "Admin → Projects" list (`projects-all-page.html`) — only the per-client Projects list
+(`projects-list-page.html`) had an "Entry Types" link next to "Assignments". Not just a verification
+inconvenience — a real, standalone navigation gap: an Admin using the flat list had no way to discover or
+reach Entry Types at all.
+
+- Added the same `Entry Types` link, same spot, same route (`/admin/projects/:id/entry-types`), matching the
+  per-client list's own already-correct pattern exactly.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified**: clicked the new link for ERP Migration Phase 2, landed on its Entry Types page correctly,
+  clicked "Deactivate" on "Development" — confirmed the "Deactivate Development?" dialog from the polish
+  sweep below now works there too, cancelled it, confirmed all three entry types are still Active (no change).
+  This also closes out that sweep entry's "not separately live-verified" note for the Entry Types half of the
+  deactivate-confirmation fix.
+
 ## Done last in this session, 2026-09-08 — UI polish pass: 5 consistency fixes, not FDD-related
 
 With the FDD backlog fully closed, the user asked for a general UI polish pass. Started with a concrete item
@@ -43,11 +61,11 @@ no dead links or leftover scaffolding).
   Project Documents (project 8) - uploaded a test file, confirmed the card resolves past its new loading gate
   correctly with no functional regression, confirmed the "Delete" confirm dialog and its new color, deleted
   the file, confirmed clean end-to-end round-trip, no artifact left. Entry Types page's identical
-  confirm-before-deactivate fix was **not** separately live-verified - no nav link currently reaches
-  `/admin/projects/:id/entry-types` in the running app (pre-existing, unrelated to this fix) and a direct URL
-  load redirects away, same as several other admin sub-routes when navigated to cold rather than via an in-app
-  link - low risk given it's a mechanical, near-identical copy of the Roles fix already proven live. The two
-  empty-state changes weren't triggered live either (would require deleting real projects/invoices data to
+  confirm-before-deactivate fix was **not** separately live-verified this round - no nav link reached
+  `/admin/projects/:id/entry-types` from the flat "Admin → Projects" list at the time (see the follow-up entry
+  below, fixed the same session) and a direct URL load redirects away, same as several other admin sub-routes
+  when navigated to cold rather than via an in-app link. The two empty-state changes weren't triggered live
+  either (would require deleting real projects/invoices data to
   produce a genuinely empty list) - low risk, both reuse an already-proven `.empty-state` structure verbatim.
 
 ## Done later still in this session, 2026-09-08 — "Save & Attach" button, so a brand-new entry can be attached to in one step
