@@ -20,11 +20,13 @@ public class ExpenseEntryRepository(TimesheetDbContext db) : IExpenseEntryReposi
         if (to is not null) query = query.Where(e => e.Date <= to);
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var term = searchText.Trim();
-            query = query.Where(e =>
-                EF.Functions.Like(e.Project!.Client!.Name, $"%{term}%") ||
-                EF.Functions.Like(e.Project!.Client!.AccountCode, $"%{term}%") ||
-                EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+            foreach (var word in searchText.Trim().Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                query = query.Where(e =>
+                    EF.Functions.Like(e.Project!.Client!.Name, $"%{word}%") ||
+                    EF.Functions.Like(e.Project!.Client!.AccountCode, $"%{word}%") ||
+                    EF.Functions.Like(e.Project!.Name, $"%{word}%"));
+            }
         }
 
         return await query.OrderByDescending(e => e.Date).ToListAsync(ct);

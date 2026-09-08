@@ -55,14 +55,26 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         if (to is not null) query = query.Where(e => e.Date <= to);
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var term = searchText.Trim();
-            query = query.Where(e =>
-                EF.Functions.Like(e.Project!.Client!.Name, $"%{term}%") ||
-                EF.Functions.Like(e.Project!.Client!.AccountCode, $"%{term}%") ||
-                EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+            query = ApplyClientProjectSearch(query, searchText.Trim());
         }
 
         return await query.OrderByDescending(e => e.Date).ToListAsync(ct);
+    }
+
+    /// <summary>Requires each whitespace-separated word in the search term to match somewhere across client
+    /// name/account code or project name - independently, not as one literal phrase - so e.g. "Everlast
+    /// migration" finds an entry even when "Everlast" is the client and "migration" only appears in the
+    /// project name.</summary>
+    private static IQueryable<TimesheetEntry> ApplyClientProjectSearch(IQueryable<TimesheetEntry> query, string term)
+    {
+        foreach (var word in term.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            query = query.Where(e =>
+                EF.Functions.Like(e.Project!.Client!.Name, $"%{word}%") ||
+                EF.Functions.Like(e.Project!.Client!.AccountCode, $"%{word}%") ||
+                EF.Functions.Like(e.Project!.Name, $"%{word}%"));
+        }
+        return query;
     }
 
     public async Task<IReadOnlyList<TimesheetEntry>> GetAllInRangeAsync(
