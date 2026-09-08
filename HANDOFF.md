@@ -4,6 +4,48 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later in this session, 2026-09-08 — built the missing UI for entry-level attachments
+
+Not an FDD gap (the FDD-numbered backlog is fully closed already this session) — a pre-existing loose end
+flagged during the Blob Storage work above: `AttachmentsFunctions.cs`'s upload/download/delete endpoints have
+existed since entry attachments were first built, and the Angular side even had a partial `uploadAttachment`
+stub and the `Attachment` model already defined — but no page ever rendered or called any of it. User asked to
+close this gap now that it'd been noticed.
+
+- **Mirrors project-level attachments' "Documents" card pattern closely**, on the Add/Edit Entry page
+  (`add-entry-page.ts`/`.html`), with two deliberate differences confirmed from the actual code before building
+  anything: (1) no separate list call is needed — an entry's attachments already come back embedded in
+  `TimesheetEntryDto.Attachments`, which the Edit page's existing fetch already loads; (2) no "Uploaded By"
+  column — `AttachmentDto` (entry-scoped) has no uploader field at all, unlike `ProjectAttachment`'s DTO, since
+  an entry already has a single owner.
+- **`TimesheetEntriesService`** gained `downloadAttachment`/`deleteAttachment` (flat `attachments/{id}` routes
+  via `environment.apiBaseUrl`, not `this.baseUrl` which is scoped to `.../timesheet-entries` — matches how
+  `ProjectsAdminService` already does this for `project-attachments/{id}`), and `uploadAttachment`'s return
+  type was corrected from `Observable<unknown>` to `Observable<Attachment>` (it was never actually typed
+  correctly, just never noticed since nothing consumed the response before now).
+- **New "Attachments" card, Edit-mode only** — same reasoning as the project template's own `@if (isEditMode)`
+  gate: `save()` navigates away immediately on success, so there's no "just-created, still on the page" moment
+  to attach a file to on a brand-new entry. Confirmed live: the card is genuinely absent on the Add-mode form.
+- **Delete goes through `ConfirmService`** here (destructive-styled confirm dialog), unlike the project
+  Documents card's own delete, which has no confirmation prompt at all — a real, pre-existing inconsistency in
+  that template (confirmed by reading it), not something worth copying given every other destructive action in
+  this app (`log-time-page.ts`, `users-list-page.ts`, `clients-list-page.ts`) already uses `ConfirmService`.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified end-to-end with real proof**: uploaded a test file to an existing entry through the new UI —
+  appeared in the list immediately (state updated locally from the upload response, no re-fetch). Queried the
+  dev DB directly and confirmed a new `Attachment` row, then confirmed via a throwaway script
+  (`Azure.Storage.Blobs` against `UseDevelopmentStorage=true`) that the exact blob genuinely exists in
+  Azurite's `attachments` container with the correct size (54 bytes, matching the test file). Deleted it
+  through the UI — the `ConfirmService` dialog appeared correctly ("Delete \"entry-attachment-test.txt\"?"),
+  confirmed, and the row/blob were both gone afterward (re-queried the DB — no matching row). **Did not click
+  the in-app "Download" button** — verified upload/delete round-trip only, per the hard rule already
+  established this session (downloading any file needs explicit chat permission first); the download wiring
+  itself is a direct copy of the project-attachments' already-proven-working blob-download pattern, so this is
+  low risk left unverified live.
+- **Handbook updated**: Log Time chapter (§1) now mentions the new Attachments card. Also backfilled a
+  pre-existing, unrelated documentation gap noticed while in this file: the Admin → Projects registry row never
+  mentioned the project-level Documents card either, despite that feature existing since an earlier session.
+
 ## Done still later in this session, 2026-09-08 — Blob Storage for invoice PDFs too (Blob Storage now fully closed)
 
 Immediately after the attachments round (below), the user asked to close the other half of the Blob Storage
@@ -116,12 +158,10 @@ no real reason to keep waiting on a real Azure account for local dev.
 - **Not touched, deliberately**: invoice PDF storage (see Scope above); `AttachmentsRootPath`'s config key and
   its existing local files (see Existing local files above) — both left exactly as they were, matching the
   agreed clean-cutover approach.
-- **New loose end, pre-existing, just newly relevant**: entry-level attachments
-  (`AttachmentsFunctions.cs`) have full backend support but **no consuming UI anywhere** — unlike project
-  attachments' "Documents" card, there's no equivalent on the Add/Edit Entry page. This predates this session
-  entirely (noted for project attachments' own build, "Angular's entry-attachment feature had upload plumbing
-  but literally zero consuming UI anywhere") and wasn't asked to be built now — flagging since it's the reason
-  entry attachments couldn't be live-verified through their own UI this round.
+- ~~**New loose end, pre-existing, just newly relevant**: entry-level attachments
+  (`AttachmentsFunctions.cs`) have full backend support but **no consuming UI anywhere**~~ — **built later the
+  same session**: see this file's own "Done" entry above ("built the missing UI for entry-level attachments") —
+  a new Attachments card on the Add/Edit Entry page, live-verified end to end. Fully closed now.
 
 ## Done earlier in this session, 2026-09-08 — live-verified the PM flag-indicator click-through, closing the last open flag in that area
 
