@@ -115,8 +115,9 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
     }
 
     /// <summary>Requires each whitespace-separated word in the search term to match somewhere across staff/
-    /// client/project name - independently, not as one literal phrase - so e.g. "Sarah migration" finds an
-    /// entry even when "Sarah" is the staff name and "migration" only appears in the project name.</summary>
+    /// client/project name or the entry's own description - independently, not as one literal phrase - so
+    /// e.g. "Sarah migration" finds an entry even when "Sarah" is the staff name and "migration" only appears
+    /// in the project name, and "mark ltd fast" finds one where "fast" only appears in its description.</summary>
     private static IQueryable<TimesheetEntry> ApplyStaffClientProjectSearch(IQueryable<TimesheetEntry> query, string term)
     {
         foreach (var word in term.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
@@ -124,7 +125,8 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             query = query.Where(e =>
                 EF.Functions.Like(e.User!.DisplayName, $"%{word}%") ||
                 EF.Functions.Like(e.Client!.Name, $"%{word}%") ||
-                EF.Functions.Like(e.Project!.Name, $"%{word}%"));
+                EF.Functions.Like(e.Project!.Name, $"%{word}%") ||
+                EF.Functions.Like(e.Description, $"%{word}%"));
         }
         return query;
     }
