@@ -75,6 +75,33 @@ didn't check at all (only staff/client/project name).
 - Handbook's §7 Entry Flags "Raising a flag" step updated to mention description is now searched too, and that
   a multi-word search matches each word independently regardless of which field it lands in.
 
+## Done still later the same session, 2026-09-08 — the same search bug, found a third and fourth time
+
+User found the identical root bug in a third place: on Log Time (their own entries, signed in as Admin),
+searching "everlast migration" returned nothing, even though real entries matched both words ("Everlast" the
+client, "migration" only in the project name "D365 Migration").
+
+- **Fixed `TimesheetEntryRepository.GetForUserAsync`** (Log Time's own search box) the same way - new
+  `ApplyClientProjectSearch` helper, same word-independent-AND-across-fields pattern as
+  `ApplyStaffClientProjectSearch` (client name/account code/project name, no staff name here since this query
+  is already scoped to one user).
+- **Proactively fixed `ExpenseEntryRepository.GetForUserAsync` too** (Add Expense's own project/client search) -
+  identical bug shape, not yet reported by the user but certain to exhibit the same problem given the exact
+  same code pattern. Fixed inline (only caller in that class, didn't warrant extracting a helper there).
+- This is now the **fourth** call site with this exact root-cause bug found this session (Entry Flags picker,
+  Approvals search, Log Time search, Add Expense search) - all four now fixed. No other `EF.Functions.Like`
+  call sites remain in the codebase (confirmed by search) - this class of bug is fully closed for now, but
+  worth remembering as a pattern: **any future free-text search over multiple fields needs the same
+  word-independent-AND treatment from the start**, not a single-literal-phrase check, the same way the
+  `DateTimeOffset`-ordering trap was already flagged as a recurring gotcha below.
+- Backend builds clean, 44/44 tests pass (unchanged). API host restarted - confirmed clean startup.
+- **Live-verified in the browser**: searching "everlast migration" on Log Time (as Admin) now correctly
+  narrows to the Everlast/D365 Migration entries (Total Work Hours tile dropped to 27h, matching only those
+  rows), where it previously returned nothing.
+- Add Expense's identical fix was not separately live-verified (no reported symptom to reproduce against,
+  and it's the same code shape already proven live on three other call sites this session) - low risk, but
+  worth a quick real check next time Add Expense search comes up.
+
 ## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
 
 User-reported bug, found live right after the SSO work above: clicked "Notify Staff" on a flagged entry that
