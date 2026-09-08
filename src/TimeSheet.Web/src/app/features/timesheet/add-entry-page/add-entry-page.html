@@ -107,5 +107,40 @@
       <button class="btn-primary" [disabled]="saving()" (click)="save()">{{ saving() ? 'Saving…' : 'Log' }}</button>
       <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
     </div>
+
+    @if (isEditMode) {
+      <div class="card-padded mt-6">
+        <h2 class="mb-3 text-sm font-semibold text-foreground">Attachments</h2>
+        @if (attachmentsError(); as ae) {
+          <div class="banner-error mb-3">{{ ae }}</div>
+        }
+        <label class="btn-secondary inline-block cursor-pointer">
+          {{ uploadingAttachment() ? 'Uploading…' : '+ Upload Attachment' }}
+          <input type="file" class="hidden" [disabled]="uploadingAttachment()" (change)="onAttachmentSelected($event)" />
+        </label>
+        @if (attachments().length === 0) {
+          <p class="mt-3 text-sm text-muted-foreground">No attachments on this entry yet.</p>
+        } @else {
+          <table class="table-clean mt-3">
+            <thead>
+              <tr><th>File</th><th>Uploaded</th><th>Size</th><th></th></tr>
+            </thead>
+            <tbody>
+              @for (a of attachments(); track a.id) {
+                <tr>
+                  <td class="font-medium text-foreground">{{ a.fileName }}</td>
+                  <td class="text-muted-foreground">{{ a.uploadedAtUtc | date: 'medium' }}</td>
+                  <td class="text-muted-foreground">{{ a.sizeBytes / 1024 | number: '1.0-1' }} KB</td>
+                  <td class="text-right">
+                    <button class="btn-link mr-3" (click)="downloadAttachment(a)">Download</button>
+                    <button class="btn-link text-red-600" (click)="deleteAttachment(a)">Delete</button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        }
+      </div>
+    }
   }
 </div>

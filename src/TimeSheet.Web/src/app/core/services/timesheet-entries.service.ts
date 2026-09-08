@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import {
+  Attachment,
   CreateTimesheetEntryRequest,
   TimesheetEntriesResponse,
   TimesheetEntry,
@@ -57,9 +58,17 @@ export class TimesheetEntriesService {
     return this.http.post<TimesheetEntry>(`${this.baseUrl}/${id}/duplicate`, { date: date ?? null, onBehalfOfUserId: onBehalfOfUserId ?? null });
   }
 
-  uploadAttachment(entryId: number, file: File): Observable<unknown> {
+  uploadAttachment(entryId: number, file: File): Observable<Attachment> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post(`${this.baseUrl}/${entryId}/attachments`, formData);
+    return this.http.post<Attachment>(`${this.baseUrl}/${entryId}/attachments`, formData);
+  }
+
+  downloadAttachment(attachmentId: number): Observable<Blob> {
+    return this.http.get(`${environment.apiBaseUrl}/attachments/${attachmentId}`, { responseType: 'blob' });
+  }
+
+  deleteAttachment(attachmentId: number): Observable<void> {
+    return this.http.delete<void>(`${environment.apiBaseUrl}/attachments/${attachmentId}`);
   }
 }

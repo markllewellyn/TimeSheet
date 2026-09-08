@@ -1,3 +1,4 @@
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -5,20 +6,23 @@ import { ProjectsService } from '../../../core/services/projects.service';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
 import { EntryTypesService, EntryType } from '../../../core/services/entry-types.service';
 import { Project } from '../../../core/models/project.models';
+import { Attachment } from '../../../core/models/timesheet-entry.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
+import { ConfirmService } from '../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
   selector: 'app-add-entry-page',
   standalone: true,
-  imports: [FormsModule, LoadingSpinner],
+  imports: [FormsModule, DatePipe, DecimalPipe, LoadingSpinner],
   templateUrl: './add-entry-page.html',
 })
 export class AddEntryPage {
   private readonly projectsService = inject(ProjectsService);
   private readonly timesheetEntries = inject(TimesheetEntriesService);
   private readonly entryTypesService = inject(EntryTypesService);
+  private readonly confirmService = inject(ConfirmService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly currentUser = inject(CurrentUserService);
@@ -66,6 +70,10 @@ export class AddEntryPage {
   protected readonly showBillingPeriodChoice = computed(() => this.selectedProject()?.paymentModel === 'TimeAndMaterials');
   protected readonly billingPeriodChoice = signal<'Current' | 'Next'>('Current');
 
+  protected readonly attachments = signal<Attachment[]>([]);
+  protected readonly uploadingAttachment = signal(false);
+  protected readonly attachmentsError = signal<string | null>(null);
+
   constructor() {
     // Impersonation applies to both logging a brand-new entry and editing an existing one - an Admin can
     // impersonate a user and edit that user's timesheet entries while impersonating (FDD). Enforced
@@ -104,6 +112,7 @@ export class AddEntryPage {
         this.description.set(entry.description ?? '');
         this.selectedEntryTypeId.set(entry.entryTypeId);
         this.billingPeriodChoice.set(entry.billingPeriodChoice);
+        this.attachments.set(entry.attachments);
         this.entryLoaded.set(true);
       },
       error: (err) => {
@@ -185,5 +194,50 @@ export class AddEntryPage {
 
   protected cancel(): void {
     this.router.navigate(['/timesheet']);
+  }
+
+  protected onAttachmentSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !this.editId) return;
+
+    this.uploadingAttachment.set(true);
+    this.attachmentsError.set(null);
+    this.timesheetEntries.uploadAttachment(Number(this.editId), file).subscribe({
+      next: (attachment) => {
+        this.uploadingAttachment.set(false);
+        input.value = '';
+        this.attachments.update((list) => [...list, attachment]);
+      },
+      error: (err) => {
+        this.uploadingAttachment.set(false);
+        input.value = '';
+        this.attachmentsError.set(err?.error?.error ?? 'Could not upload the attachment.');
+      },
+    });
+  }
+
+  protected downloadAttachment(attachment: Attachment): void {
+    this.timesheetEntries.downloadAttachment(attachment.id).subscribe((blob) => {
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = attachment.fileName;
+      link.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  protected async deleteAttachment(attachment: Attachment): Promise<void> {
+    const confirmed = await this.confirmService.confirm(`Delete "${attachment.fileName}"?`, {
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
+    this.timesheetEntries.deleteAttachment(attachment.id).subscribe({
+      next: () => this.attachments.update((list) => list.filter((a) => a.id !== attachment.id)),
+      error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not delete the attachment.'),
+    });
   }
 }
