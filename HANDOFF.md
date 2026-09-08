@@ -25,8 +25,37 @@ code-reviewed since Chrome wasn't connected then.
   Admin/local session was ended earlier in the session too, when switching between accounts to test this; sign
   back in as yourself next time you pick this up.
 - **This closes the last remaining loose end from the 2026-09-07 PM click-through fix** — struck through below.
-- No code changes this session — this was purely the live-verification pass the previous session's HANDOFF entry
-  flagged as still outstanding.
+- Also documented, in the same session: the end-user handbook's §1 Log Time chapter never mentioned that an
+  Admin/PM can click a "⚑ Flagged" badge to jump to Entry Flags — a real gap noticed while verifying that
+  click-through live. Added a sentence covering it.
+
+## Done later the same session, 2026-09-08 — fixed multi-word staff/client/project search
+
+User-reported, while asking how to flag another user's entry from Entry Flags: searching "Sarah migration"
+returned nothing, even though a real entry matched both words (staff name "Sarah Chen", project name "ERP
+Migration Phase 2").
+
+- **Root cause**: `TimesheetEntryRepository`'s search (used by both the Entry Flags picker's
+  `SearchForFlaggingAsync` and Approvals' `GetPendingApprovalAsync`) treated the whole typed string as one
+  literal substring, checked against `User.DisplayName`/`Client.Name`/`Project.Name` independently via three
+  OR'd `LIKE` clauses — so it only ever matched when one single field happened to contain the entire phrase
+  verbatim. A genuinely multi-word search where each word lives in a different field could never match.
+- **Fixed generically**, not just for this one report: new shared `ApplyStaffClientProjectSearch` helper splits
+  the search text on whitespace and requires each word to match somewhere across the three fields
+  independently (chained `.Where()` calls, translating to an `AND` of `OR`s in SQL) — applied to both call
+  sites, since `GetPendingApprovalAsync` (Approvals' own search box) had the identical bug and nobody had
+  reported it yet. A numeric search is now a pure exact-`Id`-match (previously OR'd with the same broken text
+  check, which could never usefully match a number against a name field anyway).
+- Backend builds clean, 44/44 tests pass (unchanged — no new test; this is the same "thin query-shape fix" bar
+  as other search corrections in this codebase's history, e.g. the SQLite `DateTimeOffset` ordering fixes).
+  API host restarted (repository method body changed) — confirmed clean startup, no new errors (the
+  pre-existing `Bearer`-scheme-then-`LocalBearer`-fallback `IDX10517` log noise on every authenticated request
+  is unrelated and pre-dates this session, not a regression).
+- **Live-verified in the browser**: searching "Sarah migration" on Entry Flags (as Admin) now returns 7 matching
+  entries (all Sarah Chen's ERP Migration Phase 2 entries) where it previously returned zero.
+- **Unrelated thing noticed while there, not touched**: entry #120 has a genuinely inappropriate pre-existing
+  open-flag note ("Because the user is a f***ing muppet!") sitting in the dev DB, visible to anyone with Entry
+  Flags access. Flagged to the user; not cleared since it wasn't asked for and isn't this session's data.
 
 ## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
 
