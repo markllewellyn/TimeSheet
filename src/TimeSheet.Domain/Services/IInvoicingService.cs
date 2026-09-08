@@ -22,7 +22,7 @@ public interface IInvoicingService
     /// invoice number appears on the document) and freezes the record - no further edits possible after.</summary>
     Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct);
 
-    Task<byte[]> GetPdfAsync(int invoiceId, CancellationToken ct);
+    Task<Stream> GetPdfAsync(int invoiceId, CancellationToken ct);
 }
 
 public record InvoiceDocumentModel(

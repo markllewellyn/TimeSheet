@@ -63,7 +63,7 @@ public class InvoicingServiceTests
         new InvoiceGenerationService(
             new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
             new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
-        new StubPdfRenderer(), new RecordingNotificationService(), db);
+        new StubPdfRenderer(), new RecordingNotificationService(), db, new InMemoryFileStorageService());
 
     [Fact]
     public async Task FinalizeInvoiceAsync_TimeAndMaterialsLine_LocksTheEntriesItWasBuiltFrom()
@@ -129,6 +129,29 @@ public class InvoicingServiceTests
     private class StubPdfRenderer : IPdfInvoiceRenderer
     {
         public Task<byte[]> RenderAsync(InvoiceDocumentModel model, CancellationToken ct) => Task.FromResult(new byte[] { 1, 2, 3 });
+    }
+
+    private class InMemoryFileStorageService : IFileStorageService
+    {
+        private readonly Dictionary<string, byte[]> blobs = new();
+
+        public Task<string> SaveAsync(string suggestedFileName, Stream content, CancellationToken ct)
+        {
+            using var buffer = new MemoryStream();
+            content.CopyTo(buffer);
+            var key = $"{Guid.NewGuid():N}-{suggestedFileName}";
+            blobs[key] = buffer.ToArray();
+            return Task.FromResult(key);
+        }
+
+        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct) =>
+            Task.FromResult<Stream>(new MemoryStream(blobs[storageKey]));
+
+        public Task DeleteAsync(string storageKey, CancellationToken ct)
+        {
+            blobs.Remove(storageKey);
+            return Task.CompletedTask;
+        }
     }
 
     private class ThrowingRateProvider : ICurrencyRateProvider

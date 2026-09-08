@@ -57,6 +57,7 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.ReportingCurrency).HasMaxLength(3).IsRequired();
         builder.Property(i => i.ExchangeRate).HasPrecision(18, 8);
         builder.Property(i => i.InvoiceNumber).HasMaxLength(50);
+        builder.Property(i => i.PdfStorageKey).HasMaxLength(1000);
         builder.Property(i => i.TotalAmount).HasPrecision(18, 2);
         builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
 

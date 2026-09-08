@@ -41,7 +41,8 @@ public class BillingRollForwardServiceTests
                 new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
             new ThrowingPdfRenderer(),
             new RecordingNotificationService(),
-            db);
+            db,
+            new InMemoryFileStorageService());
 
         if (failingClientId is { } clientId) invoicing = new SelectivelyFailingInvoicingService(invoicing, clientId);
 
@@ -183,7 +184,7 @@ public class BillingRollForwardServiceTests
         public Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct) =>
             inner.FinalizeInvoiceAsync(invoiceId, invoiceNumber, finalizedByUserId, ct);
 
-        public Task<byte[]> GetPdfAsync(int invoiceId, CancellationToken ct) => inner.GetPdfAsync(invoiceId, ct);
+        public Task<Stream> GetPdfAsync(int invoiceId, CancellationToken ct) => inner.GetPdfAsync(invoiceId, ct);
     }
 
     private class RecordingNotificationService : INotificationService
@@ -199,6 +200,29 @@ public class BillingRollForwardServiceTests
     {
         public Task<byte[]> RenderAsync(InvoiceDocumentModel model, CancellationToken ct) =>
             throw new InvalidOperationException("Not expected to be called by GenerateDraftInvoiceAsync.");
+    }
+
+    private class InMemoryFileStorageService : IFileStorageService
+    {
+        private readonly Dictionary<string, byte[]> blobs = new();
+
+        public Task<string> SaveAsync(string suggestedFileName, Stream content, CancellationToken ct)
+        {
+            using var buffer = new MemoryStream();
+            content.CopyTo(buffer);
+            var key = $"{Guid.NewGuid():N}-{suggestedFileName}";
+            blobs[key] = buffer.ToArray();
+            return Task.FromResult(key);
+        }
+
+        public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct) =>
+            Task.FromResult<Stream>(new MemoryStream(blobs[storageKey]));
+
+        public Task DeleteAsync(string storageKey, CancellationToken ct)
+        {
+            blobs.Remove(storageKey);
+            return Task.CompletedTask;
+        }
     }
 
     private class ThrowingRateProvider : ICurrencyRateProvider

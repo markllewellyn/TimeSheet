@@ -27,8 +27,9 @@ public class Invoice
     public DateTimeOffset? FinalizedAtUtc { get; set; }
     public int? FinalizedByUserId { get; set; }
 
-    /// <summary>Only populated at Finalize time (so the invoice number appears on the rendered document).</summary>
-    public byte[]? PdfContent { get; set; }
+    /// <summary>Opaque key into IFileStorageService. Only populated at Finalize time (so the invoice number
+    /// appears on the rendered document).</summary>
+    public string? PdfStorageKey { get; set; }
 
     public List<InvoiceLineItem> LineItems { get; set; } = [];
 }

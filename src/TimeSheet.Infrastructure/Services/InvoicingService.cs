@@ -12,7 +12,8 @@ public class InvoicingService(
     IInvoiceGenerationService generation,
     IPdfInvoiceRenderer pdfRenderer,
     INotificationService notificationService,
-    IUnitOfWork uow) : IInvoicingService
+    IUnitOfWork uow,
+    IFileStorageService fileStorage) : IInvoicingService
 {
     public async Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct)
     {
@@ -100,7 +101,9 @@ public class InvoicingService(
             invoice.LineItems.Select(l => new InvoiceDocumentLine(l.Description, l.Hours, l.Amount)).ToList(),
             invoice.TotalAmount);
 
-        invoice.PdfContent = await pdfRenderer.RenderAsync(document, ct);
+        var pdfBytes = await pdfRenderer.RenderAsync(document, ct);
+        using var pdfStream = new MemoryStream(pdfBytes);
+        invoice.PdfStorageKey = await fileStorage.SaveAsync($"invoice-{invoice.Id}.pdf", pdfStream, ct);
         invoice.InvoiceNumber = invoiceNumber;
         invoice.Status = InvoiceStatus.Finalized;
         invoice.FinalizedAtUtc = DateTimeOffset.UtcNow;
@@ -118,17 +121,17 @@ public class InvoicingService(
         return invoice;
     }
 
-    public async Task<byte[]> GetPdfAsync(int invoiceId, CancellationToken ct)
+    public async Task<Stream> GetPdfAsync(int invoiceId, CancellationToken ct)
     {
         var invoice = await invoices.GetByIdAsync(invoiceId, ct)
             ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
 
-        if (invoice.Status != InvoiceStatus.Finalized || invoice.PdfContent is null)
+        if (invoice.Status != InvoiceStatus.Finalized || invoice.PdfStorageKey is null)
         {
             throw new InvalidOperationException("The PDF is only available once the invoice has been finalized.");
         }
 
-        return invoice.PdfContent;
+        return await fileStorage.OpenReadAsync(invoice.PdfStorageKey, ct);
     }
 
     /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Nothing persists which

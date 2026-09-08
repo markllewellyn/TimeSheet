@@ -123,8 +123,8 @@ public class InvoicesFunctions(
 
         try
         {
-            var pdfBytes = await invoicing.GetPdfAsync(id, ct);
-            return new FileContentResult(pdfBytes, "application/pdf") { FileDownloadName = $"invoice-{id}.pdf" };
+            var pdfStream = await invoicing.GetPdfAsync(id, ct);
+            return new FileStreamResult(pdfStream, "application/pdf") { FileDownloadName = $"invoice-{id}.pdf" };
         }
         catch (InvalidOperationException ex)
         {
