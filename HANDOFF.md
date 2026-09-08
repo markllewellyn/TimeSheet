@@ -4,6 +4,24 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done very last in this session, 2026-09-08 — the Log Time grid itself still showed the notional billing amount
+
+Immediate follow-up to the Reports fix below: after Reports stopped counting a non-invoiceable project's
+revenue, the user pointed out entry #132 (Everlast / Training) still showed "To Payroll" = 1500.00 on the Log
+Time grid itself - correct per the old logic, but still confusing for a project that will never be invoiced.
+
+- `TimesheetEntriesFunctions.ComputePayrollAmountsAsync` now takes a `canInvoice` flag (`project.CanInvoice ==
+  true`, threaded through the same 3 call sites as `isCostExempt`) and zeroes `ToPayroll` when false, rather
+  than only masking the figure downstream in Reports. This is the field entries are actually stamped from, so
+  it also keeps the CSV export, Approvals list, and staff weekly overview consistent - all read the stored
+  `ToPayroll` value directly. `ResolvedCustomerRate` is untouched (still the real resolved rate, meaningful if
+  `CanInvoice` is later turned on); `ToCompany`/cost is completely unaffected by this - unrelated to
+  `IsCostExempt`.
+- Per this codebase's existing snapshot design, this only affects entries saved from now on - an older entry
+  keeps its old stamped value until it's itself re-saved.
+- **Live-verified**: re-saved entry #132 via Edit -> Log with no changes - "To Payroll" changed from 1500.00 to
+  0.00 on the Log Time grid.
+
 ## Done very last in this session, 2026-09-08 — Reports were still counting revenue/profit for non-invoiceable projects
 
 Found immediately after the Cost-Exempt Projects work below: the user logged a real entry against their new
