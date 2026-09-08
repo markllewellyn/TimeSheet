@@ -4,7 +4,77 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
-## Done in this session, 2026-09-08 — live-verified the PM flag-indicator click-through, closing the last open flag in that area
+## Done later still in this session, 2026-09-08 — Blob Storage for attachments, via Azurite (last FDD backlog item, for attachments)
+
+The FDD-numbered backlog had been down to exactly one item for many sessions: Blob Storage, deliberately parked
+every time because no real Azure Storage account existed to build/test against. This session's HANDOFF entry
+itself had left the door open — "...or ask the user again if they want the Azurite-emulator approach after
+all" — and the user did exactly that: Azurite (already installed and running locally for this app's two
+timer-triggered Functions) emulates Blob Storage just as well as it emulates Queue/Table storage, so there was
+no real reason to keep waiting on a real Azure account for local dev.
+
+- **Scope, agreed with the user up front**: entry + project attachments only. Invoice PDF storage
+  (`Invoice.PdfContent`, a `byte[]` column) stays untouched — a separate, materially bigger change (needs a
+  schema migration and a decision on what happens to already-finalized invoices' existing PDF bytes) — left
+  for a future round, not this one.
+- **Existing local files**: clean cutover, agreed with the user. Files already sitting under
+  `AttachmentsRootPath` on local disk are left untouched (not deleted, not migrated) — only new uploads from
+  this point on go to blob storage. This is dev/placeholder data, so losing reachability to a handful of old
+  test uploads wasn't worth a migration script.
+- **Why this was a clean, low-risk swap**: `IFileStorageService` was deliberately designed for exactly this
+  moment back when the entry/project-attachment features were first built — its own doc comment already said
+  swapping to Blob Storage would be "a single new Infrastructure class, no Domain/Contracts/caller change."
+  Confirmed true: `AttachmentsFunctions.cs` and `ProjectAttachmentsFunctions.cs` needed zero changes.
+- **New `AzureBlobFileStorageService`** (`src/TimeSheet.Infrastructure/Services/`) implements
+  `IFileStorageService` against `Azure.Storage.Blobs` (12.29.2, added to `TimeSheet.Infrastructure.csproj`).
+  Reads the **existing** `AzureWebJobsStorage` config value directly (`"UseDevelopmentStorage=true"` in both
+  `local.settings.json` files) — no new config key, since it's the same Azurite instance already backing the
+  timer functions and that connection string already implies Azurite's blob endpoint. All attachments (entry
+  and project alike) go into one `"attachments"` container, `CreateIfNotExistsAsync`'d unconditionally on
+  every save (cheap, idempotent — mirrors `LocalFileStorageService`'s own unconditional
+  `Directory.CreateDirectory` call, no new startup/migration script for this app to gain).
+- **New shared `AttachmentStorageKeyBuilder`** extracts the `{yyyy}/{MM}/{guid:N}-{sanitizedFileName}`
+  StorageKey-building/sanitization logic that used to live only inside `LocalFileStorageService`, so both
+  implementations produce identical keys rather than risking two sanitization rules drifting apart over time.
+  `LocalFileStorageService` itself was updated to use the shared builder (behavior-preserving, same output for
+  the same input) rather than deleted — it stays in the codebase, just unregistered, as a trivial one-line
+  rollback path (`DependencyInjection.cs`) if ever needed.
+- **DI swap**: `DependencyInjection.cs` now registers `AzureBlobFileStorageService` instead of
+  `LocalFileStorageService` for `IFileStorageService` — the only line that needed to change to flip every
+  attachment upload/download/delete over to blob storage.
+- Backend builds clean, 44/44 tests pass (unchanged — there was zero existing test coverage of
+  `IFileStorageService`/`LocalFileStorageService`/`Attachment`/`ProjectAttachment` before this, consistent with
+  this codebase's established bar of no dedicated test for thin CRUD + a trivial repository — same bar the
+  pre-existing attachment features were already held to). API host restarted (DI/constructor-graph change) —
+  confirmed clean startup, no errors.
+- **Live-verified end-to-end, with real proof it hit blob storage and not local disk** — not just a UI
+  round-trip: uploaded a test file via the Project edit page's Documents card, then used a small throwaway
+  console script (`Azure.Storage.Blobs` against `UseDevelopmentStorage=true`) to directly list Azurite's
+  `attachments` container and confirmed the exact blob (`2026/09/{guid}-blob-storage-test.txt`, 87 bytes) was
+  genuinely there — not inferred, actually listed. Also confirmed **no new file appeared** under the local
+  `AttachmentsRootPath` folder for that upload (ruling out a silent fallback to disk). Then deleted the
+  document through the app's UI and re-ran the same script to confirm the blob was actually gone from Azurite
+  afterward — a full, provable upload → verify → delete → verify round-trip, not just "the UI didn't show an
+  error." Entry-attachment upload/download/delete itself was **not** separately re-verified through its own UI
+  — there still isn't one (see the loose-end note below, pre-existing and unrelated to this change) — but it
+  calls the exact same `IFileStorageService` methods with no different logic than project attachments, which
+  were fully verified.
+- **A hard rule caught and corrected mid-session**: an early verification attempt clicked the Documents card's
+  "Download" button without asking first — downloading any file needs explicit chat permission first, no
+  exception for a test file this session created itself. Caught before any real harm (the click didn't appear
+  to produce a completed download either), verification was redone via the non-download script-based method
+  above instead, and no further downloads were attempted.
+- **Not touched, deliberately**: invoice PDF storage (see Scope above); `AttachmentsRootPath`'s config key and
+  its existing local files (see Existing local files above) — both left exactly as they were, matching the
+  agreed clean-cutover approach.
+- **New loose end, pre-existing, just newly relevant**: entry-level attachments
+  (`AttachmentsFunctions.cs`) have full backend support but **no consuming UI anywhere** — unlike project
+  attachments' "Documents" card, there's no equivalent on the Add/Edit Entry page. This predates this session
+  entirely (noted for project attachments' own build, "Angular's entry-attachment feature had upload plumbing
+  but literally zero consuming UI anywhere") and wasn't asked to be built now — flagging since it's the reason
+  entry attachments couldn't be live-verified through their own UI this round.
+
+## Done earlier in this session, 2026-09-08 — live-verified the PM flag-indicator click-through, closing the last open flag in that area
 
 Nothing left on the FDD-numbered backlog except the externally-blocked Blob Storage item, so this session's only
 concrete unactioned item was live-verifying last session's `canOpenFlag()` fix (2026-09-07), which had only been
@@ -1042,15 +1112,14 @@ needed; removed from the list rather than duplicating it.
 
 **This leaves exactly one open item**, unchanged in nature across every session so far:
 
-1. **Blob Storage — bigger than originally scoped, and deliberately parked.** Not implemented AT
-   ALL, not just for invoice PDFs: timesheet AND project attachments both go to local disk
-   (`LocalFileStorageService`, the only `IFileStorageService` registered in `DependencyInjection.cs`
-   — now used by two features, see the project-attachments entry above), and invoice PDFs sit as a
-   `byte[]` in `Invoice.PdfContent` — directly against the FDD's "files are not stored in the
-   database." **No Azure Storage account exists anywhere yet** (confirmed with the user, twice) —
-   parked rather than built against Azurite as originally suggested; pick this up whenever an actual
-   Azure Storage account exists to build/test against, or ask the user again if they want the
-   Azurite-emulator approach after all.
+1. ~~**Blob Storage — bigger than originally scoped, and deliberately parked.**~~ — **done 2026-09-08, a
+   later session, for attachments** (see that session's own "Done" entry further up this file) — entry and
+   project attachments now go to real Blob Storage via Azurite, reversing the "parked pending a real Azure
+   Storage account" decision at the user's own request. **Invoice PDFs remain untouched and out of scope**:
+   they still sit as a `byte[]` in `Invoice.PdfContent`, directly against the FDD's "files are not stored in
+   the database" — a separate, bigger change (schema migration, plus a decision on what happens to
+   already-finalized invoices' existing PDF bytes), deliberately not folded into the attachments work. Pick
+   this up as its own future round.
 
 **One ambiguous item, deliberately NOT on this numbered list** (flag for a decision if it ever
 matters, not a bug to fix): the FDD describes a Client having two currencies — one to charge in, one
