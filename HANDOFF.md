@@ -1,8 +1,32 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-07)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-08)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-08 — live-verified the PM flag-indicator click-through, closing the last open flag in that area
+
+Nothing left on the FDD-numbered backlog except the externally-blocked Blob Storage item, so this session's only
+concrete unactioned item was live-verifying last session's `canOpenFlag()` fix (2026-09-07), which had only been
+code-reviewed since Chrome wasn't connected then.
+
+- Dev servers were NOT running at the start of this session (nothing survived) — started fresh: Azurite, API host
+  on `:7071` (clean build, 0 warnings/errors, all Functions registered including the three timers), Angular on
+  `:3000` (clean build). All three left running at the end.
+- **Live-verified end-to-end as Sarah Chen (PM, manages ERP Migration Phase 2)**: used Admin → Staff → Reset
+  Password to get a one-time temp password for her (the user typed it in themselves — this session never handles
+  a password directly, same hard rule prior sessions followed), signed in as her, confirmed the PM nav (Log
+  Time/Calendar/Your Overview/Export/Approvals/Entry Flags/My Invoices, no Payroll Periods/Invoicing/Reports/
+  Admin). Raised a manual flag (as Sarah, via the Entry Flags picker) on her own entry #29, confirmed the
+  "⚑ Flagged" indicator appeared on her Log Time grid, clicked it, and confirmed it navigated to
+  `/admin/entry-flags?flagId=6` with entry #29 correctly highlighted — exactly the fix `log-time-page.ts`'s
+  `canOpenFlag()` was meant to enable for a PM, not just an Admin. Cleared the test flag afterward, no artifact
+  left behind. Signed back out of Sarah Chen's session at the end (left on the login page) — the user's own
+  Admin/local session was ended earlier in the session too, when switching between accounts to test this; sign
+  back in as yourself next time you pick this up.
+- **This closes the last remaining loose end from the 2026-09-07 PM click-through fix** — struck through below.
+- No code changes this session — this was purely the live-verification pass the previous session's HANDOFF entry
+  flagged as still outstanding.
 
 ## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
 
@@ -966,8 +990,9 @@ session's earlier entry above respectively. They are not part of the new numbere
   so a future read of this file doesn't wonder whether it was ever addressed. ~~The one still-real remaining gap
   in this area is narrower: the Log Time grid's flag-indicator click-through to `/admin/entry-flags?flagId=...`
   is still Admin-only~~ — **fixed 2026-09-07**: `log-time-page.ts`'s `canOpenFlag()` now allows a PM too, same
-  gate the page itself and its backend already use — see this session's own "Done" entry above. Code-review
-  verified only (Chrome wasn't connected this session) — worth a real click-through as a PM next time it is.
+  gate the page itself and its backend already use — see this session's own "Done" entry above. ~~Code-review
+  verified only (Chrome wasn't connected this session) — worth a real click-through as a PM next time it is.~~
+  **Live-verified 2026-09-08** as Sarah Chen (PM) — see this session's own "Done" entry above. Fully closed now.
 - **SQLite/EF can't translate `ORDER BY` on a `DateTimeOffset` column — hit again this session** for
   `ProjectAttachmentRepository.GetByProjectAsync` (silently 500'd every list call; the fix is already
   applied — see the project-attachments entry above). This is a *recurring* trap in this codebase,
