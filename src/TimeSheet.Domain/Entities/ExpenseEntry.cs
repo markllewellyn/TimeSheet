@@ -25,4 +25,6 @@ public class ExpenseEntry
 
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? ModifiedUtc { get; set; }
+
+    public List<ExpenseAttachment> Attachments { get; set; } = [];
 }

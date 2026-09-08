@@ -37,7 +37,17 @@ export const routes: Routes = [
     loadComponent: () => import('./features/timesheet/add-entry-page/add-entry-page').then((m) => m.AddEntryPage),
   },
   {
+    path: 'expenses',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/expenses/expenses-list-page/expenses-list-page').then((m) => m.ExpensesListPage),
+  },
+  {
     path: 'expenses/new',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/expenses/add-expense-page/add-expense-page').then((m) => m.AddExpensePage),
+  },
+  {
+    path: 'expenses/:id/edit',
     canActivate: [authGuard],
     loadComponent: () => import('./features/expenses/add-expense-page/add-expense-page').then((m) => m.AddExpensePage),
   },

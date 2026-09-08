@@ -18,6 +18,16 @@ public class ExpenseEntriesFunctions(
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
+    [Function("ExpenseEntries_GetById")]
+    public async Task<IActionResult> GetById(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "expense-entries/{id:int}")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var entry = await expenses.GetByIdAsync(id, ct);
+        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        return new OkObjectResult(ToDto(entry));
+    }
+
     [Function("ExpenseEntries_List")]
     public async Task<IActionResult> List(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "expense-entries")] HttpRequest req, CancellationToken ct)
@@ -155,5 +165,6 @@ public class ExpenseEntriesFunctions(
 
     private static ExpenseEntryDto ToDto(ExpenseEntry e) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.Project?.ClientId ?? 0, e.Project?.Client?.Name ?? "",
-        e.Date, e.Amount, e.Currency, e.Description, e.IsBillable, e.Kind.ToString());
+        e.Date, e.Amount, e.Currency, e.Description, e.IsBillable, e.Kind.ToString(),
+        e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList());
 }

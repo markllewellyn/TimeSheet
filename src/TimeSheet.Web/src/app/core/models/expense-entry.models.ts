@@ -1,5 +1,7 @@
 // Mirrors TimeSheet.Contracts.ExpenseEntryDto (C#) 1:1.
 
+import { Attachment } from './timesheet-entry.models';
+
 export type ExpenseEntryKind = 'Expense' | 'Contract';
 
 export interface ExpenseEntry {
@@ -14,6 +16,7 @@ export interface ExpenseEntry {
   description: string | null;
   isBillable: boolean;
   kind: ExpenseEntryKind;
+  attachments: Attachment[];
 }
 
 export interface CreateExpenseEntryRequest {

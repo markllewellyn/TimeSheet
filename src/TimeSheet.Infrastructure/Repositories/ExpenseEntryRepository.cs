@@ -8,12 +8,13 @@ namespace TimeSheet.Infrastructure.Repositories;
 public class ExpenseEntryRepository(TimesheetDbContext db) : IExpenseEntryRepository
 {
     public Task<ExpenseEntry?> GetByIdAsync(int id, CancellationToken ct) =>
-        db.ExpenseEntries.Include(e => e.Project).ThenInclude(p => p!.Client).FirstOrDefaultAsync(e => e.Id == id, ct);
+        db.ExpenseEntries.Include(e => e.Project).ThenInclude(p => p!.Client).Include(e => e.Attachments).FirstOrDefaultAsync(e => e.Id == id, ct);
 
     public async Task<IReadOnlyList<ExpenseEntry>> GetForUserAsync(int userId, string? searchText, DateOnly? from, DateOnly? to, CancellationToken ct)
     {
         var query = db.ExpenseEntries
             .Include(e => e.Project).ThenInclude(p => p!.Client)
+            .Include(e => e.Attachments)
             .Where(e => e.UserId == userId);
 
         if (from is not null) query = query.Where(e => e.Date >= from);
