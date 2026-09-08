@@ -4,6 +4,42 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done very last in this session, 2026-09-08 — Cost-Exempt Projects, closing a real legacy-parity gap
+
+User asked directly: the legacy system has a client (SVG) with a "Training" project where logged hours carry
+**no cost and no revenue at all** - pure hour-tracking. `Project.CanInvoice` already suppresses revenue, but
+nothing suppressed cost - worse, `RateResolver` unconditionally required a resolvable `StaffCost` for every
+timesheet entry, throwing a 409 if none existed. So there was genuinely no way to replicate the legacy
+Training project's behavior in the new app at all, not even as a workaround - staff simply couldn't log time
+against a project with no cost rate configured.
+
+- **New `Project.IsCostExempt` flag** (plain non-nullable `bool`, defaulting `false`) - unlike `CanInvoice`
+  there's no legacy column to stay null-compatible with, so no reason to carry extra nullable state. New EF
+  migration `AddProjectIsCostExempt`.
+- **`RateResolver.ResolveAsync`** takes a new `isCostExempt` parameter. Customer-rate resolution (the 5-tier
+  lookup) is completely unchanged - a cost-exempt project still resolves a real customer rate normally (matters
+  if it's also invoiceable, and for the Estimate panel). Only the cost half changes: when `isCostExempt` is
+  true, it returns `$0` cost with a `null StaffCostId` instead of requiring a `StaffCost` row.
+- Threaded `isCostExempt` through every call site that had a `Project` in scope: timesheet entry
+  create/update/duplicate, the project Estimated Cost/Profit panel, and both project-assignment
+  eligibility-check call sites - so behavior is consistent everywhere the rate resolver runs, not just on save.
+- Added `IsCostExempt` to the `Project` DTOs and the admin project edit page (new "Cost Exempt" checkbox next
+  to "Can Invoice", with an explanatory caption).
+- **Tests**: updated all 5 existing `RateResolverTests` for the new parameter, added a test for the new
+  zero-cost path, and a test confirming the *previously-untested* "no StaffCost, not exempt" throw path still
+  works (a real coverage gap the existing suite never exercised). 46/46 passing.
+- **Live-verified** end-to-end: set "Internal Contract Test" to `CanInvoice=false, IsCostExempt=true`, logged a
+  timesheet entry against it as a staff member with no configured `StaffCost` for that client - saved
+  successfully (would have 409'd before this change). Confirmed directly against the dev DB that the saved
+  entry had `ResolvedHourlyCost=0`, `ResolvedOutOfHoursCost=0`, `StaffCostId=NULL`, while `ResolvedCustomerRate`
+  resolved normally (140.00) proving the customer-rate path is untouched. Temporarily set Budget Hours to
+  confirm the Estimated Cost/Profit panel shows `Estimated Cost: 0.00` with no warning banner, then reverted
+  Budget Hours back to empty. The "no StaffCost, not cost-exempt still 409s" regression path is covered by the
+  new unit test above (exact same `RateResolver` code path) rather than re-verified live, to avoid manufacturing
+  a broken-rate staff/project combination in real data just for the test. Cleaned up afterward: deleted the
+  test timesheet entry and ended the test project assignment (kept as an "Ended" record rather than a hard
+  delete, consistent with how the rest of the app treats assignment history).
+
 ## Done very last in this session, 2026-09-08 — fixed a real gap found while verifying the polish sweep
 
 While live-verifying the polish sweep below, tried to click through to `/admin/projects/:id/entry-types` (to
