@@ -1,6 +1,7 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RolesService, Role } from '../../../../core/services/roles.service';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
@@ -11,6 +12,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 })
 export class RolesPage {
   private readonly rolesService = inject(RolesService);
+  private readonly confirmService = inject(ConfirmService);
 
   protected readonly roles = signal<Role[]>([]);
   protected readonly newName = signal('');
@@ -54,7 +56,11 @@ export class RolesPage {
     });
   }
 
-  protected toggleActive(role: Role): void {
+  protected async toggleActive(role: Role): Promise<void> {
+    if (role.isActive) {
+      const confirmed = await this.confirmService.confirm(`Deactivate ${role.name}?`, { confirmLabel: 'Deactivate', destructive: true });
+      if (!confirmed) return;
+    }
     this.rolesService.update(role.id, { name: role.name, isActive: !role.isActive }).subscribe(() => this.refresh());
   }
 }

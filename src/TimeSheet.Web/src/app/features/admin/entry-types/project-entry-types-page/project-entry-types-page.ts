@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { EntryTypesService, EntryType } from '../../../../core/services/entry-types.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
@@ -14,6 +15,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 export class ProjectEntryTypesPage {
   private readonly entryTypesService = inject(EntryTypesService);
   private readonly projectsAdmin = inject(ProjectsAdminService);
+  private readonly confirmService = inject(ConfirmService);
   private readonly route = inject(ActivatedRoute);
 
   protected readonly projectId = Number(this.route.snapshot.paramMap.get('id'));
@@ -64,7 +66,11 @@ export class ProjectEntryTypesPage {
     });
   }
 
-  protected toggleActive(entryType: EntryType): void {
+  protected async toggleActive(entryType: EntryType): Promise<void> {
+    if (entryType.isActive) {
+      const confirmed = await this.confirmService.confirm(`Deactivate ${entryType.name}?`, { confirmLabel: 'Deactivate', destructive: true });
+      if (!confirmed) return;
+    }
     this.entryTypesService.update(entryType.id, { name: entryType.name, isActive: !entryType.isActive }).subscribe(() => this.refresh());
   }
 }
