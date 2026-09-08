@@ -136,7 +136,7 @@
                   <td class="text-muted-foreground">{{ a.sizeBytes / 1024 | number: '1.0-1' }} KB</td>
                   <td class="text-right">
                     <button class="btn-link mr-3" (click)="downloadAttachment(a)">Download</button>
-                    <button class="btn-link text-red-600" (click)="deleteAttachment(a)">Delete</button>
+                    <button class="btn-link text-[var(--destructive)]" (click)="deleteAttachment(a)">Delete</button>
                   </td>
                 </tr>
               }

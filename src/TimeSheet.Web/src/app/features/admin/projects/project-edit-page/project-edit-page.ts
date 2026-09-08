@@ -49,6 +49,9 @@ export class ProjectEditPage {
   protected readonly estimate = signal<ProjectEstimate | null>(null);
 
   protected readonly attachments = signal<ProjectAttachment[]>([]);
+  // Only ever false->true, on the first loadAttachments() call - later reloads (after upload/delete) don't
+  // reset it, so those don't flash the spinner/empty-state over an already-visible list.
+  protected readonly attachmentsLoaded = signal(false);
   protected readonly uploading = signal(false);
   protected readonly attachmentsError = signal<string | null>(null);
 
@@ -146,8 +149,14 @@ export class ProjectEditPage {
 
   private loadAttachments(projectId: number): void {
     this.projectsAdmin.listAttachments(projectId).subscribe({
-      next: (a) => this.attachments.set(a),
-      error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not load the project documents.'),
+      next: (a) => {
+        this.attachments.set(a);
+        this.attachmentsLoaded.set(true);
+      },
+      error: (err) => {
+        this.attachmentsLoaded.set(true);
+        this.attachmentsError.set(err?.error?.error ?? 'Could not load the project documents.');
+      },
     });
   }
 
