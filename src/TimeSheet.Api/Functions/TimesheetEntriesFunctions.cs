@@ -109,7 +109,7 @@ public class TimesheetEntriesFunctions(
         var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, body.ProjectId, project.ProjectType, ct);
         if (entryTypeError is not null) return entryTypeError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(effectiveUserId, project!.ClientId, body.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, project.IsCostExempt, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(effectiveUserId, project!.ClientId, body.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, project.IsCostExempt, project.CanInvoice == true, ct);
         if (payrollError is not null) return payrollError;
 
         var entry = new TimesheetEntry
@@ -218,7 +218,7 @@ public class TimesheetEntriesFunctions(
         var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, entry.ProjectId, entry.Project!.ProjectType, ct);
         if (entryTypeError is not null) return entryTypeError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, entry.Project!.IsCostExempt, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, entry.Project!.IsCostExempt, entry.Project!.CanInvoice == true, ct);
         if (payrollError is not null) return payrollError;
 
         entry.Date = body.Date;
@@ -288,7 +288,7 @@ public class TimesheetEntriesFunctions(
         var valuesError = await ValidateEntryValuesAsync(project!.ClientId, source.UserId, targetDate, source.WorkHours, source.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(source.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, project.IsCostExempt, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(source.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, project.IsCostExempt, project.CanInvoice == true, ct);
         if (payrollError is not null) return payrollError;
 
         // Deliberately does NOT carry over the source's ApprovedPayroll/SentToPayroll/audit fields - the legacy
@@ -420,14 +420,22 @@ public class TimesheetEntriesFunctions(
     /// "now" - so a later rate/cost change never retroactively affects an entry unless it's itself re-saved.
     /// A RateNotConfiguredException is a real data-entry gap (no Role/override, or no StaffCost when the
     /// project isn't cost-exempt) - returned as a clean 409, never silently defaulted to zero. A cost-exempt
-    /// project (isCostExempt) is the one deliberate exception - see Project.IsCostExempt.</summary>
+    /// project (isCostExempt) is the one deliberate exception - see Project.IsCostExempt.
+    /// ToPayroll is additionally zeroed when the project isn't invoiceable (canInvoice false) - despite its
+    /// name it's priced at the client-facing CustomerRate (see PayrollAggregationService's own comment on why
+    /// it's not actually staff pay), so a non-invoiceable project's entries would otherwise still show a
+    /// confusing non-zero "To Payroll" figure on the Log Time grid/exports/staff overview for revenue that will
+    /// never actually be billed - InvoiceGenerationService already skips these projects entirely, and Reports
+    /// zeroes the same BilledAmountNative figure (see ReportingRepository) for the identical reason.
+    /// ResolvedCustomerRate itself is left untouched - it's the real rate snapshot, still meaningful if
+    /// CanInvoice is later turned on, or for a cost-exempt-but-still-invoiceable project.</summary>
     private async Task<(IActionResult? Error, PayrollAmounts? Amounts)> ComputePayrollAmountsAsync(
-        int staffId, int clientId, int projectId, DateOnly date, decimal workHours, decimal outOfHoursHours, bool isCostExempt, CancellationToken ct)
+        int staffId, int clientId, int projectId, DateOnly date, decimal workHours, decimal outOfHoursHours, bool isCostExempt, bool canInvoice, CancellationToken ct)
     {
         try
         {
             var resolution = await rateResolver.ResolveAsync(staffId, clientId, projectId, date, isCostExempt, ct);
-            var toPayroll = (workHours + outOfHoursHours) * resolution.CustomerRate;
+            var toPayroll = canInvoice ? (workHours + outOfHoursHours) * resolution.CustomerRate : 0m;
             var toCompany = workHours * resolution.HourlyCost + outOfHoursHours * resolution.OutOfHoursCost;
             return (null, new PayrollAmounts(
                 toPayroll, toCompany, resolution.CustomerRate, resolution.HourlyCost, resolution.OutOfHoursCost,
