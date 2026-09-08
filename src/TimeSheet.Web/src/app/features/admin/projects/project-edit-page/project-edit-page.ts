@@ -6,6 +6,7 @@ import { ProjectsAdminService } from '../../../../core/services/projects-admin.s
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { PaymentModel, ProjectAttachment, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
 import { AppUser } from '../../../../core/models/user.models';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
@@ -17,6 +18,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 export class ProjectEditPage {
   private readonly projectsAdmin = inject(ProjectsAdminService);
   private readonly usersAdmin = inject(UsersAdminService);
+  private readonly confirmService = inject(ConfirmService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
 
@@ -181,8 +183,15 @@ export class ProjectEditPage {
     });
   }
 
-  protected deleteAttachment(attachment: ProjectAttachment): void {
+  protected async deleteAttachment(attachment: ProjectAttachment): Promise<void> {
     if (!this.editId) return;
+
+    const confirmed = await this.confirmService.confirm(`Delete "${attachment.fileName}"?`, {
+      confirmLabel: 'Delete',
+      destructive: true,
+    });
+    if (!confirmed) return;
+
     this.projectsAdmin.deleteAttachment(attachment.id).subscribe({
       next: () => this.loadAttachments(Number(this.editId)),
       error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not delete the document.'),
