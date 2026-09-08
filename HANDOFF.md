@@ -57,6 +57,24 @@ Migration Phase 2").
   open-flag note ("Because the user is a f***ing muppet!") sitting in the dev DB, visible to anyone with Entry
   Flags access. Flagged to the user; not cleared since it wasn't asked for and isn't this session's data.
 
+## Done still later the same session, 2026-09-08 — search also needed to cover the entry's own description
+
+Immediately after the fix above, the user found a second, related gap: searching "mark ltd fast" also returned
+nothing, even though a real entry matched all three words - "Mark" (staff name), "Ltd" (client name), but "fast"
+only appeared in that entry's own **description** ("admin fast track"), a field `ApplyStaffClientProjectSearch`
+didn't check at all (only staff/client/project name).
+
+- **Fixed**: `ApplyStaffClientProjectSearch` now also checks `TimesheetEntry.Description` alongside staff/
+  client/project name, for both the Entry Flags picker and Approvals' search - the entry's description is
+  plainly visible in the picker's own result rows, so it's a reasonable field to expect a match against.
+- Backend builds clean, 44/44 tests pass (unchanged - same query-shape-only bar as the fix above). API host
+  restarted (repository body changed again) - confirmed clean startup.
+- **Live-verified in the browser**: searching "mark ltd fast" on Entry Flags (as Admin) now returns exactly the
+  one matching entry (Mark Llewellyn / Northwind Logistics Ltd / Warehouse Ops Optimisation / "admin fast
+  track"), where it previously returned zero.
+- Handbook's §7 Entry Flags "Raising a flag" step updated to mention description is now searched too, and that
+  a multi-word search matches each word independently regardless of which field it lands in.
+
 ## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
 
 User-reported bug, found live right after the SSO work above: clicked "Notify Staff" on a flagged entry that
