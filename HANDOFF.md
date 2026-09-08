@@ -4,6 +4,29 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-08 — "Save & Attach" button, so a brand-new entry can be attached to in one step
+
+Follow-up to the entry-attachments UI below: the user pointed out the two-step "log it, then find it in the
+grid, then reopen it" flow was real friction if you already have a file ready to attach at creation time.
+Discussed two options (redirect every "Log" to the entry's own Edit page afterward, vs. a separate opt-in
+button) - user chose the latter, keeping "Log"'s existing behavior completely untouched.
+
+- **New "Save & Attach" button** on the Add-mode form only (`add-entry-page.html`, `@if (!isEditMode)`) -
+  saves the entry exactly like "Log" (same validation, same request), but on success navigates to
+  `/timesheet/{newId}/edit` instead of back to `/timesheet`, landing directly on the just-built Attachments
+  card with zero extra navigation. Not shown in Edit mode - the Attachments card is already right there on the
+  same page, so a redirect-to-self would be pointless.
+- **`save()`'s validation/request-building logic extracted into a private `performSave(onSuccess)`** - `save()`
+  and the new `saveAndAttach()` both call it, differing only in the success callback (navigate to `/timesheet`
+  vs. navigate to the new entry's edit route). No duplicated validation logic between the two buttons.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified in the browser**: filled in a new entry, clicked "Save & Attach" with no description first -
+  confirmed the existing server-side validation error ("Description is required.") surfaced correctly and
+  nothing navigated; added a description, clicked "Save & Attach" again - landed on `/timesheet/129/edit` with
+  the Attachments card immediately visible, all fields correctly persisted. Confirmed Edit mode still shows
+  only "Log"/"Cancel" (no "Save & Attach"), unchanged. Deleted the test entry afterward, no artifact left.
+- Handbook's new Attachments paragraph (from the entry below) updated to mention this button.
+
 ## Done still later in this session, 2026-09-08 — built the missing UI for entry-level attachments
 
 Not an FDD gap (the FDD-numbered backlog is fully closed already this session) — a pre-existing loose end
