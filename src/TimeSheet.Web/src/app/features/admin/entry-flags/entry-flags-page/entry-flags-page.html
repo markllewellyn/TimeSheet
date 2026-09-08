@@ -30,20 +30,16 @@
         <button class="btn-secondary" [disabled]="raising()" (click)="raise()">{{ raising() ? 'Flagging…' : 'Flag Entry' }}</button>
       </div>
     } @else {
-      <div class="flex flex-wrap items-end gap-3">
-        <label class="field flex-1">
-          <span class="field-label">Find an entry to flag</span>
-          <input
-            type="text"
-            class="input"
-            placeholder="Search by staff, client, project, or Entry ID…"
-            [ngModel]="entrySearchQuery()"
-            (ngModelChange)="entrySearchQuery.set($event)"
-            (keyup.enter)="searchEntries()"
-          />
-        </label>
-        <button class="btn-secondary" [disabled]="entrySearching()" (click)="searchEntries()">{{ entrySearching() ? 'Searching…' : 'Search' }}</button>
-      </div>
+      <label class="field">
+        <span class="field-label">Find an entry to flag</span>
+        <input
+          type="text"
+          class="input"
+          placeholder="Search by staff, client, project, description, or Entry ID…"
+          [ngModel]="entrySearchQuery()"
+          (ngModelChange)="onEntrySearchChange($event)"
+        />
+      </label>
       @if (entrySearchResults().length > 0) {
         <div class="flex max-h-64 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-1">
           @for (r of entrySearchResults(); track r.id) {

@@ -26,9 +26,9 @@ export class EntryFlagsPage {
   // deep link of its own.
   protected readonly highlightedFlagId = signal<number | null>(null);
 
-  // Entry picker for "raise a flag" - a free-text search over staff/client/project name (explicit action, not
-  // live-as-you-type, matching this app's existing directory-search convention in users-list-page.ts) rather
-  // than requiring the raw numeric Timesheet Entry Id to be typed in by hand.
+  // Entry picker for "raise a flag" - a free-text search over staff/client/project/description or Entry Id,
+  // live-as-you-type (same convention as Log Time's own search) rather than requiring the raw numeric
+  // Timesheet Entry Id to be typed in by hand.
   protected readonly entrySearchQuery = signal('');
   protected readonly entrySearchResults = signal<EntryFlagSearchResult[]>([]);
   protected readonly entrySearching = signal(false);
@@ -67,22 +67,36 @@ export class EntryFlagsPage {
     });
   }
 
-  protected searchEntries(): void {
+  protected onEntrySearchChange(value: string): void {
+    this.entrySearchQuery.set(value);
+    this.searchEntries();
+  }
+
+  private searchEntries(): void {
     const query = this.entrySearchQuery().trim();
-    if (query.length < 2) {
-      this.error.set('Enter at least 2 characters to search.');
+    // Same minimum-length rule as the backend's own gate: a numeric query is an exact Entry Id lookup, so
+    // even a single digit is meaningful; a text query needs 2+ characters to avoid a distractingly broad
+    // match while the user is still mid-word. Below that, just show nothing rather than an error - this is
+    // normal mid-typing state now that search runs live, not a mistake worth a banner for.
+    const minLength = /^\d+$/.test(query) ? 1 : 2;
+    if (query.length < minLength) {
+      this.entrySearchResults.set([]);
+      this.entrySearched.set(false);
+      this.entrySearching.set(false);
       return;
     }
 
     this.entrySearching.set(true);
     this.entryFlagsService.searchEntries(query).subscribe({
       next: (results) => {
+        if (this.entrySearchQuery().trim() !== query) return; // a newer keystroke's request already landed
         this.entrySearching.set(false);
         this.entrySearched.set(true);
         this.error.set(null);
         this.entrySearchResults.set(results);
       },
       error: (err) => {
+        if (this.entrySearchQuery().trim() !== query) return;
         this.entrySearching.set(false);
         this.entrySearched.set(true);
         this.entrySearchResults.set([]);
