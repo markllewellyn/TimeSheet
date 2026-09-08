@@ -4,6 +4,42 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done very last in this session, 2026-09-08 — Expense Entry Attachments, and a real expense list/edit view
+
+User re-read the FDD requirements list directly and flagged a line that looked unmet: *"Staff members must be
+able to put lines regarding expenses and add relevant attachments."* Investigation confirmed it: `ExpenseEntry`
+had zero attachment support anywhere (no entity/table, no upload/download endpoints, no UI) - and, worse, no
+way to view, edit, or delete an expense once logged at all. `+ Expense` only ever reached a create-only form;
+unlike timesheet entries (fully manageable via the Log Time grid), an expense simply vanished from view the
+moment it was saved. User confirmed they wanted full parity with timesheet entries built now, not just a
+minimal "attach at creation only" patch, since attachments need somewhere to be revisited/managed afterward.
+
+- **New `ExpenseAttachment` entity/table**, cascade-deleting with its parent `ExpenseEntry` - a direct mirror of
+  the existing timesheet-entry `Attachment`/`AttachmentsFunctions` stack (same ownership check, same
+  `IFileStorageService` calls, no impersonation support - matches `ExpenseEntriesFunctions`' own current lack
+  of it). New `ExpenseAttachmentsFunctions` (Upload/Download/Delete). `ExpenseEntryDto` now carries its
+  `Attachments` list, reusing the existing generic `AttachmentDto` rather than a new type.
+- **New `ExpenseEntries_GetById` endpoint** - the one CRUD gap needed to support an edit page (List/Create/
+  Update/Delete already existed, but nothing let you fetch a single expense by id).
+- **`add-expense-page` now supports edit mode**, exactly like `add-entry-page` does for timesheet entries:
+  Client/Project/Kind lock once editing (an expense's project can't change), a "Save & Attach" button on
+  create jumps straight to the new entry's own edit page, and the edit page gains an Attachments card
+  (upload/download/delete) - ported directly from `add-entry-page`'s equivalent block.
+- **New `expenses-list-page`** - a simple table + empty-state (matching `my-invoices-page`'s pattern, not the
+  Log Time grid's AG Grid, since this is a small personal list) giving Edit/Delete on every past expense,
+  reachable via a new always-visible **Expenses** nav link. This closes the "expenses are invisible after
+  creation" gap that attachments alone would have run straight into.
+- **Live-verified** end-to-end: logged an expense via Save & Attach, uploaded a receipt file, confirmed its
+  content matches byte-for-byte via a direct Blob Storage read (not by clicking the in-app Download button -
+  kept to this session's established permission-safe verification method), reopened the entry from the new
+  Expenses list to confirm the upload persisted, downloaded/deleted the attachment (confirmed both the DB row
+  and the blob were removed), then deleted the whole test entry. Regression-checked the Log Time grid and its
+  own entry-level attachments are unaffected.
+- Noted but deliberately left alone: `ExpenseEntry.IsBillable` (also mentioned by the same FDD line - "an
+  indication of whether it is rechargeable to the client") has no UI toggle anywhere; Create always sends
+  `true`. The new edit page now round-trips whatever value is loaded rather than re-forcing `true` on every
+  save, but doesn't add a new checkbox - a separate, smaller gap from the attachments ask actually raised.
+
 ## Done very last in this session, 2026-09-08 — the Log Time grid itself still showed the notional billing amount
 
 Immediate follow-up to the Reports fix below: after Reports stopped counting a non-invoiceable project's
