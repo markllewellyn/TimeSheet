@@ -90,11 +90,7 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
 
         if (!string.IsNullOrWhiteSpace(searchText))
         {
-            var term = searchText.Trim();
-            query = query.Where(e =>
-                EF.Functions.Like(e.User!.DisplayName, $"%{term}%") ||
-                EF.Functions.Like(e.Client!.Name, $"%{term}%") ||
-                EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+            query = ApplyStaffClientProjectSearch(query, searchText.Trim());
         }
 
         return await query.OrderBy(e => e.Date).ToListAsync(ct);
@@ -111,14 +107,26 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         if (projectIds is not null) query = query.Where(e => projectIds.Contains(e.ProjectId));
 
         var term = searchText.Trim();
-        var isEntryId = int.TryParse(term, out var entryId);
-        query = query.Where(e =>
-            (isEntryId && e.Id == entryId) ||
-            EF.Functions.Like(e.User!.DisplayName, $"%{term}%") ||
-            EF.Functions.Like(e.Client!.Name, $"%{term}%") ||
-            EF.Functions.Like(e.Project!.Name, $"%{term}%"));
+        query = int.TryParse(term, out var entryId)
+            ? query.Where(e => e.Id == entryId)
+            : ApplyStaffClientProjectSearch(query, term);
 
         return await query.OrderByDescending(e => e.Date).Take(take).ToListAsync(ct);
+    }
+
+    /// <summary>Requires each whitespace-separated word in the search term to match somewhere across staff/
+    /// client/project name - independently, not as one literal phrase - so e.g. "Sarah migration" finds an
+    /// entry even when "Sarah" is the staff name and "migration" only appears in the project name.</summary>
+    private static IQueryable<TimesheetEntry> ApplyStaffClientProjectSearch(IQueryable<TimesheetEntry> query, string term)
+    {
+        foreach (var word in term.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            query = query.Where(e =>
+                EF.Functions.Like(e.User!.DisplayName, $"%{word}%") ||
+                EF.Functions.Like(e.Client!.Name, $"%{word}%") ||
+                EF.Functions.Like(e.Project!.Name, $"%{word}%"));
+        }
+        return query;
     }
 
     public async Task<IReadOnlyList<TimesheetEntry>> GetReadyForPayrollAsync(IReadOnlyCollection<int>? projectIds, CancellationToken ct)
