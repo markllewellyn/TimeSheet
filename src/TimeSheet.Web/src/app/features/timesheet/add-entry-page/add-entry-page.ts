@@ -6,7 +6,7 @@ import { ProjectsService } from '../../../core/services/projects.service';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
 import { EntryTypesService, EntryType } from '../../../core/services/entry-types.service';
 import { Project } from '../../../core/models/project.models';
-import { Attachment } from '../../../core/models/timesheet-entry.models';
+import { Attachment, TimesheetEntry } from '../../../core/models/timesheet-entry.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
@@ -134,6 +134,17 @@ export class AddEntryPage {
   }
 
   protected save(): void {
+    this.performSave(() => this.router.navigate(['/timesheet']));
+  }
+
+  // Create-mode only (see the template's [!isEditMode] gate) - lets a brand-new entry go straight to its own
+  // Edit page instead of back to the grid, since that's the only place the Attachments card lives (it needs
+  // a real entry Id, which doesn't exist until this save completes).
+  protected saveAndAttach(): void {
+    this.performSave((entry) => this.router.navigate(['/timesheet', entry.id, 'edit']));
+  }
+
+  private performSave(onSuccess: (entry: TimesheetEntry) => void): void {
     const projectId = this.selectedProjectId();
     if (!projectId) {
       this.error.set('Please select a client and project.');
@@ -184,7 +195,7 @@ export class AddEntryPage {
 
     this.saving.set(true);
     save$.subscribe({
-      next: () => this.router.navigate(['/timesheet']),
+      next: (entry) => onSuccess(entry),
       error: (err) => {
         this.saving.set(false);
         this.error.set(err?.error?.error ?? 'Could not save the entry.');
