@@ -39,7 +39,7 @@ public class ProjectEstimateService(
 
             try
             {
-                var resolution = await rateResolver.ResolveAsync(staff.Id, project.ClientId, projectId, today, ct);
+                var resolution = await rateResolver.ResolveAsync(staff.Id, project.ClientId, projectId, today, project.IsCostExempt, ct);
                 var cost = share * resolution.HourlyCost;
                 var revenue = share * resolution.CustomerRate;
                 lines.Add(new ProjectEstimateLine(

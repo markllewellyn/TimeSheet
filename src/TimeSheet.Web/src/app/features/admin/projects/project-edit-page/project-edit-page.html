@@ -79,6 +79,16 @@
       Can Invoice
     </label>
 
+    <div class="col-span-2">
+      <label class="flex items-center gap-2 text-sm">
+        <input type="checkbox" [ngModel]="isCostExempt()" (ngModelChange)="isCostExempt.set($event)" />
+        Cost Exempt
+      </label>
+      <p class="mt-1 text-xs text-muted-foreground">Time logged against this project carries no cost - for
+        internal, non-billable work (e.g. training) where staff shouldn't need a configured cost rate to log
+        hours here.</p>
+    </div>
+
     @if (isEditMode) {
       <label class="flex items-center gap-2 text-sm">
         <input type="checkbox" [ngModel]="isActive()" (ngModelChange)="isActive.set($event)" />

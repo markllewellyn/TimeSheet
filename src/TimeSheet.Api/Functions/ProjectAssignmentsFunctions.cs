@@ -48,7 +48,7 @@ public class ProjectAssignmentsFunctions(
         {
             try
             {
-                var resolution = await rateResolver.ResolveAsync(userId, a.Project!.ClientId, a.ProjectId, today, ct);
+                var resolution = await rateResolver.ResolveAsync(userId, a.Project!.ClientId, a.ProjectId, today, a.Project!.IsCostExempt, ct);
                 dtos.Add(ToStaffAssignmentDto(a, resolution.CustomerRate, ToRateSourceLabel(resolution.Tier), null));
             }
             catch (RateNotConfiguredException ex)
@@ -77,7 +77,7 @@ public class ProjectAssignmentsFunctions(
         // project (a role-tier default counts) - not that a specific person-level override already exists.
         try
         {
-            await rateResolver.ResolveAsync(body.UserId, project.ClientId, body.ProjectId, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
+            await rateResolver.ResolveAsync(body.UserId, project.ClientId, body.ProjectId, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), project.IsCostExempt, ct);
         }
         catch (RateNotConfiguredException ex)
         {

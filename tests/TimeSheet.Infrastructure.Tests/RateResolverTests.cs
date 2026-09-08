@@ -60,7 +60,7 @@ public class RateResolverTests
         db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 100m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
 
-        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None);
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None);
 
         Assert.Equal(100m, resolution.CustomerRate);
         Assert.Equal(40m, resolution.HourlyCost);
@@ -83,7 +83,7 @@ public class RateResolverTests
         db.RateCards.Add(new RateCard { RoleId = role.Id, Rate = 75m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
 
-        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None);
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None);
 
         Assert.Equal(75m, resolution.CustomerRate);
         Assert.Equal(RateCardTier.RoleDefault, resolution.Tier);
@@ -99,7 +99,7 @@ public class RateResolverTests
         await db.SaveChangesAsync();
 
         await Assert.ThrowsAsync<RateNotConfiguredException>(() =>
-            CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None));
+            CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None));
     }
 
     [Fact]
@@ -112,7 +112,7 @@ public class RateResolverTests
         db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 100m, DiscountPercent = 10m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
 
-        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None);
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None);
 
         Assert.Equal(90m, resolution.CustomerRate);
         Assert.Equal(40m, resolution.HourlyCost);
@@ -129,8 +129,41 @@ public class RateResolverTests
         db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 200m, EffectiveFrom = new DateOnly(2026, 12, 1), CreatedUtc = DateTimeOffset.UtcNow });
         await db.SaveChangesAsync();
 
-        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), CancellationToken.None);
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None);
 
         Assert.Equal(100m, resolution.CustomerRate);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CostExemptProject_ReturnsZeroCostWithoutStaffCost()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedClientProjectUserAsync(db);
+
+        // Deliberately no StaffCost seeded - a cost-exempt project must not need one.
+        db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 100m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+
+        var resolution = await CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), true, CancellationToken.None);
+
+        Assert.Equal(100m, resolution.CustomerRate);
+        Assert.Equal(0m, resolution.HourlyCost);
+        Assert.Equal(0m, resolution.OutOfHoursCost);
+        Assert.Null(resolution.StaffCostId);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_NotCostExempt_NoStaffCost_ThrowsRateNotConfigured()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedClientProjectUserAsync(db);
+
+        // Same seed as the cost-exempt test above (RateCard, no StaffCost) but isCostExempt: false - confirms
+        // the missing-StaffCost throw path (previously untested) still fires when a project isn't exempt.
+        db.RateCards.Add(new RateCard { StaffId = user.Id, ClientId = client.Id, Rate = 100m, EffectiveFrom = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow });
+        await db.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<RateNotConfiguredException>(() =>
+            CreateResolver(db).ResolveAsync(user.Id, client.Id, project.Id, new DateOnly(2026, 8, 10), false, CancellationToken.None));
     }
 }

@@ -24,8 +24,14 @@ public class Project
     /// EntryType may be configured against this project - see EntryType.</summary>
     public ProjectType ProjectType { get; set; }
 
-    /// <summary>Legacy [Projects].CanInvoice - present for schema fidelity, not yet wired to any invoicing logic.</summary>
+    /// <summary>Legacy [Projects].CanInvoice - false excludes this project from invoicing entirely. See
+    /// InvoiceGenerationService.BuildDraftAsync.</summary>
     public bool? CanInvoice { get; set; }
+
+    /// <summary>When set, timesheet entries on this project skip cost-rate resolution entirely and store $0
+    /// cost - for internal/non-billable projects (e.g. "Training") where staff can log hours with zero cost
+    /// impact. See RateResolver.ResolveAsync.</summary>
+    public bool IsCostExempt { get; set; }
 
     /// <summary>FDD: "A project manager is nominated against each project." Null until an admin sets one.
     /// Grants extra (non-admin) visibility: querying/clearing this project's EntryFlags, viewing this

@@ -109,7 +109,7 @@ public class TimesheetEntriesFunctions(
         var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, body.ProjectId, project.ProjectType, ct);
         if (entryTypeError is not null) return entryTypeError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(effectiveUserId, project!.ClientId, body.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(effectiveUserId, project!.ClientId, body.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, project.IsCostExempt, ct);
         if (payrollError is not null) return payrollError;
 
         var entry = new TimesheetEntry
@@ -218,7 +218,7 @@ public class TimesheetEntriesFunctions(
         var entryTypeError = await ValidateEntryTypeAsync(body.EntryTypeId, entry.ProjectId, entry.Project!.ProjectType, ct);
         if (entryTypeError is not null) return entryTypeError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(entry.UserId, entry.ClientId, entry.ProjectId, body.Date, body.WorkHours, body.OutOfHoursHours, entry.Project!.IsCostExempt, ct);
         if (payrollError is not null) return payrollError;
 
         entry.Date = body.Date;
@@ -288,7 +288,7 @@ public class TimesheetEntriesFunctions(
         var valuesError = await ValidateEntryValuesAsync(project!.ClientId, source.UserId, targetDate, source.WorkHours, source.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
 
-        var (payrollError, amounts) = await ComputePayrollAmountsAsync(source.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, ct);
+        var (payrollError, amounts) = await ComputePayrollAmountsAsync(source.UserId, project!.ClientId, source.ProjectId, targetDate, source.WorkHours, source.OutOfHoursHours, project.IsCostExempt, ct);
         if (payrollError is not null) return payrollError;
 
         // Deliberately does NOT carry over the source's ApprovedPayroll/SentToPayroll/audit fields - the legacy
@@ -418,14 +418,15 @@ public class TimesheetEntriesFunctions(
     /// ResolvedOutOfHoursCost fields directly rather than re-resolving, so they always agree with what an entry
     /// was actually saved at) and the snapshot fields themselves, resolved as of the entry's own Date - never
     /// "now" - so a later rate/cost change never retroactively affects an entry unless it's itself re-saved.
-    /// A RateNotConfiguredException is a real data-entry gap (no Role/override, or no StaffCost) - returned as
-    /// a clean 409, never silently defaulted to zero.</summary>
+    /// A RateNotConfiguredException is a real data-entry gap (no Role/override, or no StaffCost when the
+    /// project isn't cost-exempt) - returned as a clean 409, never silently defaulted to zero. A cost-exempt
+    /// project (isCostExempt) is the one deliberate exception - see Project.IsCostExempt.</summary>
     private async Task<(IActionResult? Error, PayrollAmounts? Amounts)> ComputePayrollAmountsAsync(
-        int staffId, int clientId, int projectId, DateOnly date, decimal workHours, decimal outOfHoursHours, CancellationToken ct)
+        int staffId, int clientId, int projectId, DateOnly date, decimal workHours, decimal outOfHoursHours, bool isCostExempt, CancellationToken ct)
     {
         try
         {
-            var resolution = await rateResolver.ResolveAsync(staffId, clientId, projectId, date, ct);
+            var resolution = await rateResolver.ResolveAsync(staffId, clientId, projectId, date, isCostExempt, ct);
             var toPayroll = (workHours + outOfHoursHours) * resolution.CustomerRate;
             var toCompany = workHours * resolution.HourlyCost + outOfHoursHours * resolution.OutOfHoursCost;
             return (null, new PayrollAmounts(
@@ -440,7 +441,7 @@ public class TimesheetEntriesFunctions(
 
     private record PayrollAmounts(
         decimal ToPayroll, decimal ToCompany, decimal ResolvedCustomerRate, decimal ResolvedHourlyCost, decimal ResolvedOutOfHoursCost,
-        int RateCardId, int StaffCostId, RateCardTier Tier);
+        int RateCardId, int? StaffCostId, RateCardTier Tier);
 
     private static TimesheetEntrySummaryDto BuildSummary(IReadOnlyList<TimesheetEntry> result)
     {

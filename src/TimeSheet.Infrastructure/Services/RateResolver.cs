@@ -7,7 +7,7 @@ namespace TimeSheet.Infrastructure.Services;
 
 public class RateResolver(IRateCardRepository rateCards, IStaffCostRepository staffCosts, IUserRepository users) : IRateResolver
 {
-    public async Task<RateResolution> ResolveAsync(int staffId, int clientId, int projectId, DateOnly asOfDate, CancellationToken ct)
+    public async Task<RateResolution> ResolveAsync(int staffId, int clientId, int projectId, DateOnly asOfDate, bool isCostExempt, CancellationToken ct)
     {
         var staff = await users.GetByIdAsync(staffId, ct);
         var roleId = staff?.JobRoleId;
@@ -40,13 +40,18 @@ public class RateResolver(IRateCardRepository rateCards, IStaffCostRepository st
             throw RateNotConfiguredException.NoRateCard(staffId, clientId, projectId);
         }
 
-        var cost = await staffCosts.GetCurrentAsync(staffId, asOfDate, ct)
-            ?? throw RateNotConfiguredException.NoStaffCost(staffId);
-
         // FDD: a RateCard discount applies "before the invoice is produced" - baked in here, at resolution
         // time, since invoicing only ever sums each entry's already-frozen ResolvedCustomerRate and never
         // re-resolves rates (see InvoiceGenerationService). Applying it again there would double-discount.
         var customerRate = rateCard.DiscountPercent is { } discount ? rateCard.Rate * (1 - discount / 100m) : rateCard.Rate;
+
+        if (isCostExempt)
+        {
+            return new RateResolution(customerRate, 0m, 0m, rateCard.Id, null, tier);
+        }
+
+        var cost = await staffCosts.GetCurrentAsync(staffId, asOfDate, ct)
+            ?? throw RateNotConfiguredException.NoStaffCost(staffId);
 
         return new RateResolution(customerRate, cost.HourlyCost, cost.OutOfHoursCost, rateCard.Id, cost.Id, tier);
     }

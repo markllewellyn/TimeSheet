@@ -2,17 +2,17 @@ namespace TimeSheet.Contracts;
 
 public record ProjectDto(
     int Id, int ClientId, string ClientName, string Name, string Code, string? Description,
-    string PaymentModel, string ProjectType, bool? CanInvoice, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
+    string PaymentModel, string ProjectType, bool? CanInvoice, bool IsCostExempt, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, bool IsActive,
     int? ProjectManagerUserId, string? ProjectManagerName, int AssignedStaffCount);
 
 public record CreateProjectRequest(
     int ClientId, string Name, string Code, string? Description,
-    string PaymentModel, string ProjectType, bool? CanInvoice, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
+    string PaymentModel, string ProjectType, bool? CanInvoice, bool IsCostExempt, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, int? ProjectManagerUserId);
 
 public record UpdateProjectRequest(
-    string Name, string? Description, string ProjectType, bool? CanInvoice, string? CurrencyOverride, DateOnly? EndDate,
+    string Name, string? Description, string ProjectType, bool? CanInvoice, bool IsCostExempt, string? CurrencyOverride, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, bool IsActive, int? ProjectManagerUserId);
 
 /// <summary>FDD: "Attachments and documents can be held against a project." UploadedByName is included (unlike

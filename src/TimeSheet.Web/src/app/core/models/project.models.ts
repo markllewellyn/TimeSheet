@@ -37,6 +37,7 @@ export interface Project {
   paymentModel: PaymentModel;
   projectType: ProjectType;
   canInvoice: boolean | null;
+  isCostExempt: boolean;
   currencyOverride: string | null;
   startDate: string;
   endDate: string | null;

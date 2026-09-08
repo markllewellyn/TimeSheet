@@ -144,6 +144,7 @@ public class ProjectsFunctions(
             PaymentModel = paymentModel,
             ProjectType = projectType,
             CanInvoice = body.CanInvoice,
+            IsCostExempt = body.IsCostExempt,
             CurrencyOverride = body.CurrencyOverride,
             StartDate = body.StartDate,
             EndDate = body.EndDate,
@@ -183,6 +184,7 @@ public class ProjectsFunctions(
         project.Description = body.Description;
         project.ProjectType = projectType;
         project.CanInvoice = body.CanInvoice;
+        project.IsCostExempt = body.IsCostExempt;
         project.CurrencyOverride = body.CurrencyOverride;
         project.EndDate = body.EndDate;
         project.BudgetHours = body.BudgetHours;
@@ -211,7 +213,7 @@ public class ProjectsFunctions(
 
     private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null, int assignedStaffCount = 0) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
-        p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.CurrencyOverride, p.StartDate, p.EndDate,
+        p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.IsCostExempt, p.CurrencyOverride, p.StartDate, p.EndDate,
         p.BudgetHours, p.FixedFeeAmount, p.IsActive,
         p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName, assignedStaffCount);
 }

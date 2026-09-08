@@ -37,6 +37,7 @@ export class ProjectEditPage {
   protected readonly projectManagerUserId = signal<number | null>(null);
   protected readonly users = signal<AppUser[]>([]);
   protected readonly canInvoice = signal(true);
+  protected readonly isCostExempt = signal(false);
   protected readonly currencyOverride = signal('');
   protected readonly startDate = signal(new Date().toISOString().slice(0, 10));
   protected readonly endDate = signal('');
@@ -75,6 +76,7 @@ export class ProjectEditPage {
           // picker/gate use `canInvoice !== true`) - defaulting an ambiguous null to true here would silently
           // flip a project's invoicing eligibility as a side effect of an unrelated edit.
           this.canInvoice.set(p.canInvoice ?? false);
+          this.isCostExempt.set(p.isCostExempt);
           this.currencyOverride.set(p.currencyOverride ?? '');
           this.startDate.set(p.startDate);
           this.endDate.set(p.endDate ?? '');
@@ -101,6 +103,7 @@ export class ProjectEditPage {
           description: this.description() || null,
           projectType: this.projectType(),
           canInvoice: this.canInvoice(),
+          isCostExempt: this.isCostExempt(),
           currencyOverride: this.currencyOverride() || null,
           endDate: this.endDate() || null,
           budgetHours: this.budgetHours(),
@@ -127,6 +130,7 @@ export class ProjectEditPage {
         paymentModel: this.paymentModel(),
         projectType: this.projectType(),
         canInvoice: this.canInvoice(),
+        isCostExempt: this.isCostExempt(),
         currencyOverride: this.currencyOverride() || null,
         startDate: this.startDate(),
         endDate: this.endDate() || null,
