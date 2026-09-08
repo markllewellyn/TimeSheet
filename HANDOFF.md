@@ -4,6 +4,34 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done very last in this session, 2026-09-08 — Reports were still counting revenue/profit for non-invoiceable projects
+
+Found immediately after the Cost-Exempt Projects work below: the user logged a real entry against their new
+"Training" project and its Log Time grid "To Payroll" figure showed $1,500, which looked wrong for a project
+meant to carry zero billing and zero cost. Investigation showed the cost side was correct (IsCostExempt worked
+- `ResolvedHourlyCost`/`ToCompany` were 0), and the $1,500 - despite the confusing legacy "To Payroll" column
+name - is the would-be client revenue (hours × customer rate), which `Reports` had never filtered by
+`Project.CanInvoice`: `ReportingRepository` summed `BilledAmountNative` for every project regardless of
+`CanInvoice`, and `RevenueRecognitionService`'s Fixed Project Cost path had the identical gap. So **any**
+non-invoiceable project - not just Training - already inflated its client's reported revenue and profit, even
+though `InvoiceGenerationService` itself has always correctly excluded non-invoiceable projects from real
+invoices. The Log Time grid's dollar figure itself has no real cost/billing impact - it's purely this one
+downstream Reports leak that mattered.
+
+- `ReportingRepository.GetTimeEntryAggregatesAsync` now zeroes `BilledAmountNative` per entry when its
+  project's `CanInvoice` isn't true, computed before the existing group-by (`CanInvoice` isn't part of the
+  grouping key). `CostAmountNative` is untouched - a non-invoiceable project can still carry a real cost unless
+  it's also `IsCostExempt`.
+- `RevenueRecognitionService.GetRecognizedRevenueAsync` returns 0 under the same condition, closing the
+  equivalent gap for Fixed Project Cost projects.
+- Updated the 3 existing `ReportingServiceTests` project fixtures to set `CanInvoice = true` explicitly - they
+  were unknowingly relying on billed amounts showing for a project that, per the app's own invoicing rule, was
+  never actually invoiceable to begin with (the same bug, now fixed). Added 2 new tests for the non-invoiceable
+  T&M and Fixed Fee paths. 48/48 passing.
+- **Live-verified**: restarted the API host, ran "Profit to Business on Client" for Everlast (the client the
+  user's real Training project sits under) - Training now shows Billed 0 / Cost 0 / Profit 0, where it
+  previously would have shown 1500 / 0 / 1500.
+
 ## Done very last in this session, 2026-09-08 — Cost-Exempt Projects, closing a real legacy-parity gap
 
 User asked directly: the legacy system has a client (SVG) with a "Training" project where logged hours carry
