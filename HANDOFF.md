@@ -102,6 +102,35 @@ client, "migration" only in the project name "D365 Migration").
   and it's the same code shape already proven live on three other call sites this session) - low risk, but
   worth a quick real check next time Add Expense search comes up.
 
+## Done still later the same session, 2026-09-08 — Entry Flags picker made live-as-you-type
+
+User liked Log Time's search-as-you-type and asked for the same on Entry Flags' "Find an entry to flag" picker,
+which previously required pressing Enter or clicking a Search button (a deliberate choice at the time, matching
+the tenant-directory-search convention - see below for why that one's staying as-is).
+
+- **`entry-flags-page.ts`**: `searchEntries()` is now called automatically from a new `onEntrySearchChange()` on
+  every keystroke (`(ngModelChange)`, matching Log Time's `(input)` pattern) instead of `(keyup.enter)`/a button
+  click. The "Enter at least 2 characters" error banner is gone for this path - a query below the minimum
+  length now just silently shows no results (matches the backend's own minimum-length gate: 1 digit for a
+  numeric Entry Id search, 2+ characters for text) rather than flashing an error on every early keystroke, since
+  that's normal mid-typing state now, not a mistake. Added a stale-response guard (compares the in-flight
+  request's query text against the current `entrySearchQuery()` when the response lands) since multiple
+  requests can now be in flight - without it, a slower response for an earlier, broader keystroke could
+  overwrite a newer, narrower result set that already arrived.
+- **`entry-flags-page.html`**: removed the now-redundant "Search" button and `(keyup.enter)` handler; input's
+  `(ngModelChange)` now calls `onEntrySearchChange($event)` directly. Placeholder text updated to also mention
+  "description" now that it's a searched field.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified in the browser**: typing "sarah" into the picker now returns matching entries immediately,
+  no Enter/click needed; backspacing down to a single character quietly clears the result list with no error
+  banner flash.
+- **Deliberately NOT changed**: the tenant directory search on the Staff page (Admin → Staff → "Invite User")
+  stays explicit-action (Search button/Enter), since unlike Entry Flags it calls out to Microsoft Graph - an
+  external, rate-limited API not yet even consented (`User.Read.All`) - rather than this app's own local DB.
+  Converting that one to fire on every keystroke would multiply external calls for no real benefit and risks
+  throttling once consent is granted. Flagged to the user as a deliberate difference, not an oversight; can be
+  revisited if they want it anyway.
+
 ## Done even later still in this session, 2026-09-07 — notification bell not refreshing after "Notify Staff"
 
 User-reported bug, found live right after the SSO work above: clicked "Notify Staff" on a flagged entry that
