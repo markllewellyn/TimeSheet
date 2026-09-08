@@ -48,7 +48,7 @@ public static class DependencyInjection
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IProjectEstimateService, ProjectEstimateService>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
-        services.AddScoped<IFileStorageService, LocalFileStorageService>();
+        services.AddScoped<IFileStorageService, AzureBlobFileStorageService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
         services.AddSingleton<GraphClientFactory>();
         services.AddScoped<IEmailSender, GraphEmailSender>();

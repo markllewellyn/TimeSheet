@@ -16,21 +16,16 @@ public class LocalFileStorageService(IConfiguration configuration) : IFileStorag
 
     public async Task<string> SaveAsync(string suggestedFileName, Stream content, CancellationToken ct)
     {
-        var now = DateTimeOffset.UtcNow;
-        var relativeDir = Path.Combine(now.Year.ToString(), now.Month.ToString("D2"));
-        var sanitized = SanitizeFileName(suggestedFileName);
-        var relativePath = Path.Combine(relativeDir, $"{Guid.NewGuid():N}-{sanitized}");
+        var storageKey = AttachmentStorageKeyBuilder.Build(suggestedFileName);
+        var fullPath = Path.GetFullPath(Path.Combine(RootPath, storageKey));
+        Directory.CreateDirectory(Path.GetDirectoryName(fullPath)!);
 
-        var fullDir = Path.Combine(RootPath, relativeDir);
-        Directory.CreateDirectory(fullDir);
-
-        var fullPath = Path.Combine(RootPath, relativePath);
         await using (var fileStream = new FileStream(fullPath, FileMode.CreateNew, FileAccess.Write))
         {
             await content.CopyToAsync(fileStream, ct);
         }
 
-        return relativePath.Replace('\\', '/');
+        return storageKey;
     }
 
     public Task<Stream> OpenReadAsync(string storageKey, CancellationToken ct)
@@ -57,15 +52,5 @@ public class LocalFileStorageService(IConfiguration configuration) : IFileStorag
             throw new UnauthorizedAccessException("Invalid storage key.");
         }
         return fullPath;
-    }
-
-    private static string SanitizeFileName(string fileName)
-    {
-        var name = Path.GetFileName(fileName);
-        foreach (var c in Path.GetInvalidFileNameChars())
-        {
-            name = name.Replace(c, '_');
-        }
-        return name;
     }
 }
