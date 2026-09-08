@@ -18,7 +18,7 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
             where e.Date >= start && e.Date <= end
                   && (scope.ClientId == null || p.ClientId == scope.ClientId)
                   && (scope.ProjectId == null || p.Id == scope.ProjectId)
-            group e by new
+            select new
             {
                 ProjectId = p.Id,
                 ProjectName = p.Name,
@@ -29,14 +29,25 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
                 RoleId = u.JobRoleId,
                 RoleName = role != null ? role.Name : "Unassigned",
                 e.Date,
+                e.WorkHours,
+                e.OutOfHoursHours,
+                // A project with CanInvoice not true is never invoiced (see InvoiceGenerationService) - reports
+                // must agree, or a non-invoiceable project's hours would still show as real revenue/profit here.
+                BilledAmount = p.CanInvoice == true ? (e.WorkHours + e.OutOfHoursHours) * (e.ResolvedCustomerRate ?? 0) : 0m,
+                CostAmount = e.WorkHours * (e.ResolvedHourlyCost ?? 0) + e.OutOfHoursHours * (e.ResolvedOutOfHoursCost ?? 0),
+            }
+            into flat
+            group flat by new
+            {
+                flat.ProjectId, flat.ProjectName, flat.ClientId, flat.ClientName,
+                flat.UserId, flat.UserName, flat.RoleId, flat.RoleName, flat.Date,
             }
             into g
             select new TimeEntryAggregateRow(
                 g.Key.ProjectId, g.Key.ProjectName, g.Key.ClientId, g.Key.ClientName,
                 g.Key.UserId, g.Key.UserName, g.Key.RoleId, g.Key.RoleName, g.Key.Date,
                 g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours),
-                g.Sum(x => (x.WorkHours + x.OutOfHoursHours) * (x.ResolvedCustomerRate ?? 0)),
-                g.Sum(x => x.WorkHours * (x.ResolvedHourlyCost ?? 0) + x.OutOfHoursHours * (x.ResolvedOutOfHoursCost ?? 0)),
+                g.Sum(x => x.BilledAmount), g.Sum(x => x.CostAmount),
                 g.Count());
 
         return await query.ToListAsync(ct);

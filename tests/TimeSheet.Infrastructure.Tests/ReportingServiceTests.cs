@@ -35,7 +35,7 @@ public class ReportingServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
         };
         db.Projects.Add(project);
         await db.SaveChangesAsync();
@@ -80,6 +80,110 @@ public class ReportingServiceTests
         Assert.Equal(600m, report.Breakdown[0].Profit);
     }
 
+    /// <summary>A project InvoiceGenerationService will never actually invoice (CanInvoice not true) must not
+    /// show as revenue/profit in reports either - otherwise a project like "Training" (not billed, not costed)
+    /// would still inflate a client's reported revenue and profit. Cost is deliberately unaffected here - a
+    /// non-invoiceable project can still have a real cost impact unless it's also Project.IsCostExempt.</summary>
+    [Fact]
+    public async Task GetProfitOnProjectReportAsync_ProjectNotInvoiceable_BilledIsZeroButCostIsNot()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "Training", Code = "TRAINING", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = false,
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 10m, OutOfHoursHours = 0m, Description = "Training", CreatedUtc = DateTimeOffset.UtcNow,
+            ResolvedCustomerRate = 100m, ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(0m, report.Summary.Billed);
+        Assert.Equal(400m, report.Summary.Cost); // 10h * £40 - cost still applies, this project isn't cost-exempt
+        Assert.Equal(-400m, report.Summary.Profit);
+    }
+
+    /// <summary>Same rule as above, for the Fixed Project Cost revenue-recognition path (RevenueRecognitionService)
+    /// rather than the Time & Materials BilledAmountNative sum - a non-invoiceable Fixed Fee project must not
+    /// recognize revenue off its budget/fee either.</summary>
+    [Fact]
+    public async Task GetProfitOnProjectReportAsync_FixedFeeProjectNotInvoiceable_RecognizesNoRevenue()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "Fixed Retainer", Code = "FIXED-01", PaymentModel = PaymentModel.FixedProjectCost,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = false,
+            BudgetHours = 20m, FixedFeeAmount = 2000m,
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 10m, OutOfHoursHours = 0m, Description = "Retainer work", CreatedUtc = DateTimeOffset.UtcNow,
+            ResolvedHourlyCost = 40m, ResolvedOutOfHoursCost = 0m,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(0m, report.Summary.Billed);
+        Assert.Equal(400m, report.Summary.Cost);
+        Assert.Equal(-400m, report.Summary.Profit);
+    }
+
     [Fact]
     public async Task GetProfitOnProjectReportAsync_MultipleEntriesSameUserAndDate_EntryCountReflectsRawEntryRows()
     {
@@ -92,7 +196,7 @@ public class ReportingServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
         };
         db.Projects.Add(project);
         var user = new User
@@ -151,7 +255,7 @@ public class ReportingServiceTests
         var project = new Project
         {
             ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
-            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
         };
         db.Projects.Add(project);
 

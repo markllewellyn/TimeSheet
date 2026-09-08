@@ -18,6 +18,9 @@ public class RevenueRecognitionService(IProjectRepository projects, ICurrencyCon
     {
         var project = await projects.GetByIdAsync(projectId, ct);
         if (project is null || project.PaymentModel != PaymentModel.FixedProjectCost) return 0;
+        // Mirrors ReportingRepository's BilledAmountNative rule for Time & Materials - a project that will
+        // never actually be invoiced (see InvoiceGenerationService) must not show recognized revenue either.
+        if (project.CanInvoice != true) return 0;
 
         var amountNative = project.BudgetHours is > 0 && project.FixedFeeAmount is not null
             ? hoursInPeriod / project.BudgetHours.Value * project.FixedFeeAmount.Value

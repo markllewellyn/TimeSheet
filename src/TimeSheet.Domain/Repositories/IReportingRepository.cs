@@ -6,6 +6,10 @@ public record ReportScope(int? ClientId, int? ProjectId);
 /// ResolvedCustomerRate/ResolvedHourlyCost/ResolvedOutOfHoursCost (see TimesheetEntry) - not re-resolved via
 /// IRateResolver at report time, so reports reflect the rate that actually applied when each entry was
 /// recorded, never "today's" rate. Entries with no snapshot (pre-migration) contribute 0 to both.
+/// BilledAmountNative is additionally forced to 0 for any entry whose project has CanInvoice not true - a
+/// project InvoiceGenerationService will never actually invoice must not show as revenue/profit in reports
+/// either. CostAmountNative is unaffected by CanInvoice (a non-invoiceable project can still have a real cost
+/// impact) - see Project.IsCostExempt for the flag that zeroes cost instead.
 /// RoleId/RoleName reflect the staff member's CURRENT User.JobRoleId/Role - not effective-dated, same accepted
 /// limitation as RateCard-tier resolution (see Role.cs). RoleName is "Unassigned" when JobRoleId is null.
 /// Adding Role to the grouping key alongside User is a no-op on row count/granularity - a user's role is a
