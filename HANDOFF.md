@@ -4,6 +4,55 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later in this session, 2026-09-08 — Blob Storage for invoice PDFs too (Blob Storage now fully closed)
+
+Immediately after the attachments round (below), the user asked to close the other half of the Blob Storage
+gap too: invoice PDFs, deliberately left out of that round as "a separate, bigger change (schema migration,
+plus a decision on what happens to already-finalized invoices' existing PDF bytes)."
+
+- **Decision, agreed with the user up front**: clean cutover, exactly matching the attachments precedent. The
+  dev database had 8 finalized invoices with real PDF bytes (`Id`s 1,2,3,4,5,6,8,12 — all trivial test data,
+  fake invoice numbers like "gg"/"jj", ~27-32KB each). These were **not** migrated/backfilled to blob storage —
+  the `PdfContent` column was simply dropped. Their PDF downloads now 404 (there's no re-finalize/regenerate
+  flow anywhere in the app to fix this even if wanted) — accepted, not a bug, since it's disposable dev data.
+- **`Invoice.PdfContent` (`byte[]`) replaced by `Invoice.PdfStorageKey`** (`string?`, max length 1000, matching
+  `Attachment`/`ProjectAttachment.StorageKey`'s exact existing convention) — an opaque key into the same
+  `IFileStorageService`/`AzureBlobFileStorageService` built for the attachments round, same `"attachments"`
+  blob container, no new config needed.
+- **`InvoicingService.FinalizeInvoiceAsync`** now renders the PDF to a `MemoryStream` and calls
+  `fileStorage.SaveAsync($"invoice-{invoice.Id}.pdf", ...)` instead of setting the `byte[]` property directly
+  (keyed off the numeric `Id`, matching the download endpoint's pre-existing `invoice-{id}.pdf` filename
+  convention — not the free-text, not-filename-safe `InvoiceNumber`, which dev data shows can be values like
+  "gg"/"jj"/"right").
+- **`GetPdfAsync`'s return type changed from `Task<byte[]>` to `Task<Stream>`** — avoids buffering a file
+  that's already fully materialized in blob storage into memory twice for no reason.
+  `InvoicesFunctions.Pdf` now returns `FileStreamResult` instead of `FileContentResult`, mirroring
+  `AttachmentsFunctions.Download`'s own pre-existing pattern exactly (found by checking that file for
+  precedent before designing this, rather than inventing a new shape).
+- **New migration `MoveInvoicePdfToBlobStorage`** — `DropColumn("PdfContent")` + `AddColumn<string>("PdfStorageKey", ...)`, applied automatically on API host startup via `Program.cs`'s existing `Database.Migrate()` call
+  (confirmed directly against the real dev DB file afterward — `PdfContent` gone, `PdfStorageKey` present).
+- **Both `InvoicingServiceTests` and `BillingRollForwardServiceTests`** needed a new 8th constructor argument
+  for `InvoicingService` — added a hand-written `InMemoryFileStorageService` fake to each (matching this
+  codebase's existing no-mocking-framework stub convention: `StubPdfRenderer`, `RecordingNotificationService`,
+  `ThrowingRateProvider`, etc.), plus a one-line signature fix to `BillingRollForwardServiceTests`'
+  `SelectivelyFailingInvoicingService.GetPdfAsync` forwarding method. Neither test file's assertions ever
+  checked `PdfContent`'s value — confirmed before starting, so both were purely mechanical fixes, zero behavior
+  changes needed.
+- Backend builds clean, 44/44 tests pass (unchanged). API host restarted (constructor/DI-graph change) —
+  confirmed clean startup, no errors.
+- **Live-verified end-to-end with real proof, same rigor as the attachments round**: generated and finalized a
+  real Draft invoice (Everlast, invoice number "BLOBTEST-1", invoice #10) through the actual UI — finalize
+  succeeded with no error, proving `SaveAsync` didn't throw and `PdfStorageKey` persisted. Queried the dev DB
+  directly and confirmed `PdfStorageKey = 2026/09/{guid}-invoice-10.pdf`. Then used a throwaway console script
+  (`Azure.Storage.Blobs` against `UseDevelopmentStorage=true`) to fetch that exact blob from Azurite directly:
+  confirmed it exists, is 27,675 bytes (consistent with the other invoices' PDF sizes), and genuinely starts
+  with the `%PDF` magic bytes — not inferred, actually downloaded and inspected. **Did not click the in-app
+  "Download PDF" button** at any point, per the hard rule already caught once in the attachments round
+  (downloading any file needs explicit chat permission first) — verified entirely through the DB query +
+  direct blob fetch instead.
+- **Blob Storage is now fully closed** — both halves (attachments and invoice PDFs) are done via Azurite. See
+  the "What's still open" section further down, updated accordingly.
+
 ## Done later still in this session, 2026-09-08 — Blob Storage for attachments, via Azurite (last FDD backlog item, for attachments)
 
 The FDD-numbered backlog had been down to exactly one item for many sessions: Blob Storage, deliberately parked
@@ -1110,16 +1159,16 @@ resolved rate and a label distinguishing role-default from person/role override 
 FDD asks for. The audit missed it by not checking the Staff screen specifically. No code change
 needed; removed from the list rather than duplicating it.
 
-**This leaves exactly one open item**, unchanged in nature across every session so far:
+**The FDD-numbered backlog is now fully closed.** The last remaining item was:
 
-1. ~~**Blob Storage — bigger than originally scoped, and deliberately parked.**~~ — **done 2026-09-08, a
-   later session, for attachments** (see that session's own "Done" entry further up this file) — entry and
-   project attachments now go to real Blob Storage via Azurite, reversing the "parked pending a real Azure
-   Storage account" decision at the user's own request. **Invoice PDFs remain untouched and out of scope**:
-   they still sit as a `byte[]` in `Invoice.PdfContent`, directly against the FDD's "files are not stored in
-   the database" — a separate, bigger change (schema migration, plus a decision on what happens to
-   already-finalized invoices' existing PDF bytes), deliberately not folded into the attachments work. Pick
-   this up as its own future round.
+1. ~~**Blob Storage — bigger than originally scoped, and deliberately parked.**~~ — **fully done 2026-09-08, a
+   later session**, in two rounds the same day (see both "Done" entries further up this file). First round:
+   entry and project attachments moved to real Blob Storage via Azurite, reversing the "parked pending a real
+   Azure Storage account" decision at the user's own request. Second round, same session: invoice PDFs too —
+   `Invoice.PdfContent` (`byte[]`) replaced by `Invoice.PdfStorageKey`, same clean-cutover approach (existing
+   finalized invoices' PDFs not migrated, dev/placeholder data only). Both halves of the FDD's "files are not
+   stored in the database" requirement are now satisfied via the same `IFileStorageService`/
+   `AzureBlobFileStorageService` abstraction and the same Azurite-backed `"attachments"` container.
 
 **One ambiguous item, deliberately NOT on this numbered list** (flag for a decision if it ever
 matters, not a bug to fix): the FDD describes a Client having two currencies — one to charge in, one
