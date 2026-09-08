@@ -4,6 +4,52 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done last in this session, 2026-09-08 — UI polish pass: 5 consistency fixes, not FDD-related
+
+With the FDD backlog fully closed, the user asked for a general UI polish pass. Started with a concrete item
+already known from building the entry-attachments UI (project Documents' delete had no confirmation at all),
+then did a read-only sweep across the whole Angular app for similar small, objective consistency gaps -
+checked native dialogs, loading-spinner coverage, raw-field-name table headers, error-banner usage, button
+styling, empty-state treatments, and dead links. Found and fixed 5 genuine items (everything else checked out
+clean - no native `confirm()`/`alert()`/`prompt()` survives anywhere, every table already uses `table-clean`,
+no dead links or leftover scaffolding).
+
+1. **Project Documents' Delete had zero confirmation** (`project-edit-page.ts`) - every other destructive
+   action in the app (`log-time-page`, `users-list-page`, `clients-list-page`, and the entry-level Attachments
+   card built earlier this session) confirms via `ConfirmService` first; this was the one place that just
+   deleted immediately. Fixed to match.
+2. **Roles and Project Entry Types could be deactivated with zero confirmation** (`roles-page.ts`,
+   `project-entry-types-page.ts`) - both `toggleActive()` methods flipped active status immediately, unlike
+   `clients-list-page.ts`'s own `deactivate()`. Fixed to confirm only on the deactivating direction (turning
+   active → inactive) - reactivating stays a single click, since that's not the destructive direction.
+3. **False-empty-state flash risk on the project Documents card** - its "No documents uploaded yet" message
+   had no loading gate of its own (only the outer form's `loaded()` gated anything), so a slow
+   `listAttachments()` call could flash the empty state before real data arrived. This is the exact bug class
+   the 2026-09-03 loading-state-consistency session fixed across 7 other pages - this card was built afterward
+   and missed it. Added an `attachmentsLoaded` signal (`true` once, never reset, same convention as everywhere
+   else) gating the whole card behind a spinner on first load.
+4. **Hardcoded `text-red-600` instead of the theme token** on both Documents/Attachments "Delete" buttons
+   (project and entry-level) - every other destructive action uses `text-[var(--destructive)]`, which shifts
+   correctly between light/dark mode; the hardcoded Tailwind color doesn't. Fixed both to the theme token.
+5. **Two different "list is empty" treatments** - most list pages use a structured `.empty-state` block (icon +
+   title + body); `projects-all-page.html` and `my-invoices-page.html` used a plain one-line message instead.
+   Brought both in line, reusing the exact icon already used for the per-client Projects list's own empty
+   state (same content type).
+- Angular build clean throughout (checked after each fix, then once more at the end). Frontend-only changes,
+  no backend/DB change, no API host restart needed.
+- **Live-verified**: Roles page - confirmed "Deactivate Consultant?" dialog appears and Cancel leaves it
+  Active; toggled Lee (pre-existing inactive test role) inactive→active→inactive again to confirm Reactivate
+  skips the dialog (single click) while Deactivate shows it, ending back at its original state, no net change.
+  Project Documents (project 8) - uploaded a test file, confirmed the card resolves past its new loading gate
+  correctly with no functional regression, confirmed the "Delete" confirm dialog and its new color, deleted
+  the file, confirmed clean end-to-end round-trip, no artifact left. Entry Types page's identical
+  confirm-before-deactivate fix was **not** separately live-verified - no nav link currently reaches
+  `/admin/projects/:id/entry-types` in the running app (pre-existing, unrelated to this fix) and a direct URL
+  load redirects away, same as several other admin sub-routes when navigated to cold rather than via an in-app
+  link - low risk given it's a mechanical, near-identical copy of the Roles fix already proven live. The two
+  empty-state changes weren't triggered live either (would require deleting real projects/invoices data to
+  produce a genuinely empty list) - low risk, both reuse an already-proven `.empty-state` structure verbatim.
+
 ## Done later still in this session, 2026-09-08 — "Save & Attach" button, so a brand-new entry can be attached to in one step
 
 Follow-up to the entry-attachments UI below: the user pointed out the two-step "log it, then find it in the
