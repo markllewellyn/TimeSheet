@@ -4,6 +4,57 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later in this session, 2026-09-09 — global 401 handling, closing the stale-session UX gap found while verifying the checkbox above
+
+Immediate follow-up to the isBillable checkbox round below: while live-verifying it, a stale JWT in
+localStorage 401'd and the app just sat there showing Add Expense's own "Could not load your assigned
+projects" error banner instead of anything indicating the session itself was the problem - looked like a real
+data bug before checking Network and finding the 401s. Not an FDD gap, but a real, generalizable app-level one
+asked to be looked at as a follow-up.
+
+- **Root cause, confirmed by reading the code, not guessed**: there was no global 401 handling anywhere.
+  `LocalAuthService.isSignedIn()` only compares the client-stored expiry timestamp against the clock - it never
+  actually confirms the token is still valid server-side. So *any* reason a token stops validating (genuine
+  expiry the client failed to notice, or - the likely actual cause of the original incident, per `Program.cs`'s
+  own existing comment - the API host being launched in a way that doesn't pick up `LocalAuth:JwtSigningKey`
+  from `local.settings.json`, generating a fresh ephemeral key for that process only) leaves the app looking
+  "signed in" (nav bar, cached `/api/me` profile) while every page's own API calls quietly fail, each with its
+  own generic, misleading error message.
+- **New `sessionExpiredInterceptor`** (`core/auth/session-expired.interceptor.ts`) - catches any `401` from an
+  authenticated call, calls the already-existing `CurrentUserService.logout()` (already does full cleanup:
+  clears the token, the cached `/api/me` profile, stops impersonation - reused as-is, no new cleanup logic
+  needed), then redirects to `/login?error=session_expired`, reusing the login page's existing `?error=...`
+  message-map pattern (`ERROR_MESSAGES`) rather than inventing a new mechanism. Registered in `app.config.ts`
+  alongside the existing token-attaching `localAuthInterceptor`.
+- **Explicitly excludes the login endpoint itself** (`req.url.endsWith('/auth/local-login')`) - a 401 from
+  *that* call means "wrong password," not "your session expired," and must keep surfacing the login page's own
+  existing error message untouched, not get reinterpreted as a session-expiry redirect.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified end-to-end, both the fix and its one edge case**, once Chrome reconnected (it dropped out
+  twice this session - see below):
+  1. Signed in normally as Mark Llewellyn (Admin), confirmed Log Time loaded real data.
+  2. Used a throwaway script to tamper the stored token in place (appended garbage to the JWT string, leaving
+     the stored expiry timestamp untouched/still-valid) - this reproduces the exact "looks signed in, fails
+     server-side" scenario without needing to actually wait 8 hours or restart the API host mid-session.
+     Reloaded the page (forces `LocalAuthService` to re-read the now-tampered token from storage) and confirmed
+     it **automatically redirected to `/login?error=session_expired`** showing "Your session has expired -
+     please sign in again." - the exact behavior this was built for. Confirmed via a second script call that
+     `localAuthToken`/`localAuthTokenExpiry` were both actually cleared from storage, not just visually hidden.
+  3. Signed back in for real afterward (the user typed their own credentials again) - confirmed the app came
+     back up completely normally with no lingering broken state.
+  4. **Checked the one deliberate exclusion doesn't regress the existing bad-password flow**: while still
+     signed in with a real session, submitted the login form with a bogus email/wrong password from `/login` -
+     confirmed the request 401'd but the page showed its own pre-existing "Invalid email or password." message
+     (not the new session-expired one), and the still-valid real session in the header was completely
+     untouched - proving the endpoint-exclusion check works and doesn't misfire on this adjacent case.
+- **Chrome connectivity was flaky throughout this whole session** (disconnected/reconnected three separate
+  times across both rounds of work) - not a code issue, just noted here in case it recurs for whoever picks
+  this up next.
+- **Noticed but not fixed, out of scope for this round**: navigating directly to `/login` while already
+  signed in shows both the signed-in header *and* the login form at the same time (seen while testing the
+  bad-password case above) - a separate, pre-existing minor UX quirk, unrelated to the 401-handling gap this
+  round actually targeted.
+
 ## Done in this session, 2026-09-09 — Expense "Rechargeable to Client" checkbox, closing the last loose end from the Expense Attachments round
 
 New session, picked up from HANDOFF's own note: the 2026-09-08 Expense Attachments work explicitly flagged
@@ -1487,12 +1538,16 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
-- **New, not resolved**: an expired session (a stale JWT in localStorage from a prior day) doesn't force a
-  redirect to `/login` when an API call 401s from the Add Expense page - the page just renders its own "Could
-  not load your assigned projects" error banner instead, which looks like a real data-loading problem rather
-  than an auth one. Found incidentally while live-verifying the isBillable checkbox (2026-09-09 session) -
-  not reproduced on every page, not investigated further (out of scope for that round), but worth a proper look
-  if it recurs: does every page handle a 401 this way, or just this one?
+- **New, not resolved**: navigating directly to `/login` while already signed in shows both the signed-in
+  header (nav links, "Sign out") *and* the login form at the same time, rather than either redirecting away or
+  hiding one of the two. Noticed incidentally while live-verifying the new `sessionExpiredInterceptor`
+  (2026-09-09 session) - a separate, pre-existing minor UX quirk, unrelated to the 401-handling gap that round
+  actually targeted, not investigated or fixed.
+- ~~an expired session (a stale JWT in localStorage from a prior day) doesn't force a redirect to `/login` when
+  an API call 401s from the Add Expense page~~ - **fixed later the same session, 2026-09-09**: see that
+  session's own "Done" entry above for the new global `sessionExpiredInterceptor` - this was a real, app-wide
+  gap (any page's API call 401ing would have shown the same symptom, not just this one), not something specific
+  to Add Expense.
 - **New, not resolved**: the user reported their own logged entries missing from an Entry Flags search while
   signed in as Admin. Could not be reproduced (tested live with two different search terms - own entries
   appeared correctly both times) and no code path was found that would exclude the searcher's own entries.

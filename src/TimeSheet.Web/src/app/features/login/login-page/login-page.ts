@@ -8,6 +8,7 @@ import { LocalAuthService } from '../../../core/auth/local-auth.service';
 const ERROR_MESSAGES: Record<string, string> = {
   state_mismatch: 'Sign-in with Microsoft timed out or was interrupted - please try again.',
   not_provisioned: "Your Microsoft account isn't set up in TimeSheet yet - ask an Admin to add you.",
+  session_expired: 'Your session has expired - please sign in again.',
 };
 
 /**
