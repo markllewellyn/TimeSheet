@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
+using static TimeSheet.Api.Auth.ImpersonationAuthorization;
 using TimeSheet.Contracts;
 using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
@@ -34,7 +35,7 @@ public class TimesheetEntriesFunctions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "timesheet-entries")] HttpRequest req, CancellationToken ct)
     {
         var user = currentUser.RequireUser();
-        var (viewError, effectiveUserId) = await ResolveViewTargetAsync(user, ParseOnBehalfOfUserId(req), ct);
+        var (viewError, effectiveUserId) = await ResolveViewTargetAsync(users, user, ParseOnBehalfOfUserId(req), ct);
         if (viewError is not null) return viewError;
 
         var search = req.Query["search"].ToString();
@@ -61,9 +62,9 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null) return new NotFoundResult();
-        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
-        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
         var openFlags = (await entryFlags.GetOpenByTimesheetEntryIdsAsync([entry.Id], ct)).Select(ToFlagDto).ToList();
         return new OkObjectResult(ToDto(entry, openFlags));
     }
@@ -95,7 +96,7 @@ public class TimesheetEntriesFunctions(
                     StatusCode = StatusCodes.Status403Forbidden,
                 };
             }
-            if (await ValidateImpersonationTargetAsync(onBehalfOfUserId, ct) is { } impersonationError) return impersonationError;
+            if (await ValidateImpersonationTargetAsync(users, onBehalfOfUserId, ct) is { } impersonationError) return impersonationError;
             effectiveUserId = onBehalfOfUserId;
             createdByUserId = user.UserId;
         }
@@ -200,9 +201,9 @@ public class TimesheetEntriesFunctions(
         var body = await req.ReadFromJsonAsync<UpdateTimesheetEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
-        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, body.OnBehalfOfUserId);
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, body.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
-        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         if (string.IsNullOrWhiteSpace(body.Description))
         {
@@ -251,9 +252,9 @@ public class TimesheetEntriesFunctions(
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(id, ct);
         if (entry is null) return new NotFoundResult();
-        var (authorized, impersonatedUserId) = CheckOwnership(entry, user, ParseOnBehalfOfUserId(req));
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
-        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
         if (entry.ApprovedPayroll || entry.SentToPayroll) return SentToPayrollLockedResult();
         if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
@@ -274,9 +275,9 @@ public class TimesheetEntriesFunctions(
         if (source is null) return new NotFoundResult();
 
         var body = await req.ReadFromJsonAsync<DuplicateTimesheetEntryRequest>(ct);
-        var (authorized, impersonatedUserId) = CheckOwnership(source, user, body?.OnBehalfOfUserId);
+        var (authorized, impersonatedUserId) = CheckOwnership(source.UserId, user, body?.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
-        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(impId, ct) is { } impError) return impError;
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
         if (source.ApprovedPayroll || source.SentToPayroll) return SentToPayrollLockedResult();
         if (source.InvoiceId is not null) return InvoicedLockedResult();
 
@@ -479,58 +480,6 @@ public class TimesheetEntriesFunctions(
         {
             StatusCode = StatusCodes.Status409Conflict,
         };
-
-    /// <summary>Query-string form of impersonation context, for endpoints (Get/List/Delete) that have no JSON
-    /// body to carry OnBehalfOfUserId on.</summary>
-    private static int? ParseOnBehalfOfUserId(HttpRequest req) =>
-        req.Query.TryGetValue("onBehalfOfUserId", out var v) && int.TryParse(v, out var id) ? id : null;
-
-    /// <summary>List's "whose entries" gate - an Admin may view another user's entries by supplying their
-    /// id; anyone else is confined to their own.</summary>
-    private async Task<(IActionResult? Error, int EffectiveUserId)> ResolveViewTargetAsync(CurrentUserContext user, int? onBehalfOfUserId, CancellationToken ct)
-    {
-        if (onBehalfOfUserId is { } id && id != user.UserId)
-        {
-            if (!user.IsAdmin)
-            {
-                return (new ObjectResult(new { error = "Admin role required to view another user's timesheet." })
-                {
-                    StatusCode = StatusCodes.Status403Forbidden,
-                }, 0);
-            }
-            if (await ValidateImpersonationTargetAsync(id, ct) is { } impersonationError) return (impersonationError, 0);
-            return (null, id);
-        }
-        return (null, user.UserId);
-    }
-
-    /// <summary>FDD: only an active user can be impersonated (logged-for, edited-for, or viewed-as-if) - checked
-    /// server-side here rather than only in the Angular impersonation picker's active-only filter, matching this
-    /// codebase's general "lock in the API, not only the UI" pattern (see SentToPayrollLockedResult/
-    /// InvoicedLockedResult for the same principle applied to entry immutability).</summary>
-    private async Task<IActionResult?> ValidateImpersonationTargetAsync(int onBehalfOfUserId, CancellationToken ct)
-    {
-        var target = await users.GetByIdAsync(onBehalfOfUserId, ct);
-        if (target is null || !target.IsActive)
-        {
-            return new ObjectResult(new { error = "Only an active user can be impersonated." })
-            {
-                StatusCode = StatusCodes.Status403Forbidden,
-            };
-        }
-        return null;
-    }
-
-    /// <summary>Get/Update/Delete/Duplicate's ownership gate - the caller owns the entry outright, or is an
-    /// Admin actively impersonating its owner (onBehalfOfUserId must equal the entry's own UserId, matching
-    /// Create's existing impersonation check). Returns the impersonated user id for AuditLog when the second
-    /// branch is what authorized the call, so a plain self-edit never gets tagged as impersonation.</summary>
-    private static (bool Authorized, int? ImpersonatedUserId) CheckOwnership(TimesheetEntry entry, CurrentUserContext user, int? onBehalfOfUserId)
-    {
-        if (entry.UserId == user.UserId) return (true, null);
-        if (user.IsAdmin && onBehalfOfUserId == entry.UserId) return (true, entry.UserId);
-        return (false, null);
-    }
 
     /// <summary>Null or unrecognized (e.g. omitted by an older client) defaults to Current - the pre-existing
     /// behavior for every entry predating this feature.</summary>

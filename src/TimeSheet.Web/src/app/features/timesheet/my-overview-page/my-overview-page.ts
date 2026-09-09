@@ -1,8 +1,9 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MyOverviewService } from '../../../core/services/my-overview.service';
 import { MyOverviewLine } from '../../../core/models/my-overview.models';
+import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 @Component({
@@ -13,6 +14,7 @@ import { LoadingSpinner } from '../../../core/components/loading-spinner/loading
 })
 export class MyOverviewPage {
   private readonly myOverview = inject(MyOverviewService);
+  private readonly impersonation = inject(ImpersonationService);
 
   protected readonly lines = signal<MyOverviewLine[]>([]);
   protected readonly loaded = signal(false);
@@ -39,7 +41,16 @@ export class MyOverviewPage {
   });
 
   constructor() {
-    this.myOverview.get().subscribe({
+    // See the identical comment in log-time-page.ts - the header's impersonation picker doesn't navigate
+    // away/back, so without this the overview kept showing your own hours after switching who you're acting as.
+    effect(() => {
+      this.impersonation.actingAs();
+      untracked(() => this.refresh());
+    });
+  }
+
+  private refresh(): void {
+    this.myOverview.get(this.impersonation.actingAs()?.id).subscribe({
       next: (lines) => {
         this.lines.set(lines);
         this.loaded.set(true);

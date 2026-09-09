@@ -27,6 +27,7 @@ export interface CreateExpenseEntryRequest {
   description: string | null;
   isBillable: boolean;
   kind?: ExpenseEntryKind;
+  onBehalfOfUserId?: number | null;
 }
 
 export type UpdateExpenseEntryRequest = Omit<CreateExpenseEntryRequest, 'projectId'>;

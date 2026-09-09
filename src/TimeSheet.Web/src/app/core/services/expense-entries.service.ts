@@ -10,13 +10,18 @@ export class ExpenseEntriesService {
   private readonly http = inject(HttpClient);
   private readonly baseUrl = `${environment.apiBaseUrl}/expense-entries`;
 
-  getById(id: number): Observable<ExpenseEntry> {
-    return this.http.get<ExpenseEntry>(`${this.baseUrl}/${id}`);
+  /// onBehalfOfUserId is honored server-side only for an Admin actively impersonating that user (see
+  /// ExpenseEntriesFunctions.CheckOwnership) - mirrors TimesheetEntriesService's own identical pattern.
+  getById(id: number, onBehalfOfUserId?: number | null): Observable<ExpenseEntry> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.get<ExpenseEntry>(`${this.baseUrl}/${id}`, { params });
   }
 
-  list(search?: string): Observable<ExpenseEntry[]> {
+  list(search?: string, onBehalfOfUserId?: number | null): Observable<ExpenseEntry[]> {
     let params = new HttpParams();
     if (search) params = params.set('search', search);
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
     return this.http.get<ExpenseEntry[]>(this.baseUrl, { params });
   }
 
@@ -28,8 +33,10 @@ export class ExpenseEntriesService {
     return this.http.put<ExpenseEntry>(`${this.baseUrl}/${id}`, request);
   }
 
-  delete(id: number): Observable<void> {
-    return this.http.delete<void>(`${this.baseUrl}/${id}`);
+  delete(id: number, onBehalfOfUserId?: number | null): Observable<void> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.delete<void>(`${this.baseUrl}/${id}`, { params });
   }
 
   uploadAttachment(expenseEntryId: number, file: File): Observable<Attachment> {

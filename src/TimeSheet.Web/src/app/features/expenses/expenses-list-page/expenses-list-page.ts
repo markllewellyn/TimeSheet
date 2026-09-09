@@ -1,9 +1,10 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { ExpenseEntriesService } from '../../../core/services/expense-entries.service';
 import { ExpenseEntry } from '../../../core/models/expense-entry.models';
 import { ConfirmService } from '../../../core/services/confirm.service';
+import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 /**
@@ -21,6 +22,7 @@ import { LoadingSpinner } from '../../../core/components/loading-spinner/loading
 export class ExpensesListPage {
   private readonly expenseEntries = inject(ExpenseEntriesService);
   private readonly confirmService = inject(ConfirmService);
+  private readonly impersonation = inject(ImpersonationService);
   private readonly router = inject(Router);
 
   protected readonly entries = signal<ExpenseEntry[]>([]);
@@ -28,11 +30,16 @@ export class ExpensesListPage {
   protected readonly error = signal<string | null>(null);
 
   constructor() {
-    this.refresh();
+    // See the identical comment in log-time-page.ts - the header's impersonation picker doesn't navigate
+    // away/back, so without this the list kept showing your own expenses after switching who you're acting as.
+    effect(() => {
+      this.impersonation.actingAs();
+      untracked(() => this.refresh());
+    });
   }
 
   private refresh(): void {
-    this.expenseEntries.list().subscribe({
+    this.expenseEntries.list(undefined, this.impersonation.actingAs()?.id).subscribe({
       next: (entries) => {
         this.entries.set(entries);
         this.loaded.set(true);
@@ -59,7 +66,7 @@ export class ExpensesListPage {
     );
     if (!confirmed) return;
 
-    this.expenseEntries.delete(entry.id).subscribe({
+    this.expenseEntries.delete(entry.id, this.impersonation.actingAs()?.id).subscribe({
       next: () => this.refresh(),
       error: (err) => this.error.set(err?.error?.error ?? 'Could not delete the entry.'),
     });

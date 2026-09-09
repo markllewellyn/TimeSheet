@@ -7,6 +7,6 @@ public record ExpenseEntryDto(
 
 /// <summary>Kind defaults to "Expense" when omitted. "Contract" is Admin-only and restricted to projects where
 /// CanInvoice is not true - see ExpenseEntriesFunctions.Create.</summary>
-public record CreateExpenseEntryRequest(int ProjectId, DateOnly Date, decimal Amount, string Currency, string? Description, bool IsBillable, string? Kind = null);
+public record CreateExpenseEntryRequest(int ProjectId, DateOnly Date, decimal Amount, string Currency, string? Description, bool IsBillable, string? Kind = null, int? OnBehalfOfUserId = null);
 
-public record UpdateExpenseEntryRequest(DateOnly Date, decimal Amount, string Currency, string? Description, bool IsBillable);
+public record UpdateExpenseEntryRequest(DateOnly Date, decimal Amount, string Currency, string? Description, bool IsBillable, int? OnBehalfOfUserId = null);

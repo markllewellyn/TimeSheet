@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
+using static TimeSheet.Api.Auth.ImpersonationAuthorization;
 using TimeSheet.Contracts;
 using TimeSheet.Domain;
 using TimeSheet.Domain.Entities;
@@ -14,6 +15,7 @@ public class ExpenseEntriesFunctions(
     IExpenseEntryRepository expenses,
     IStaffProjectRepository assignments,
     IProjectRepository projects,
+    IUserRepository users,
     IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -24,7 +26,10 @@ public class ExpenseEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await expenses.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
         return new OkObjectResult(ToDto(entry));
     }
 
@@ -33,11 +38,14 @@ public class ExpenseEntriesFunctions(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "expense-entries")] HttpRequest req, CancellationToken ct)
     {
         var user = currentUser.RequireUser();
+        var (viewError, effectiveUserId) = await ResolveViewTargetAsync(users, user, ParseOnBehalfOfUserId(req), ct);
+        if (viewError is not null) return viewError;
+
         var search = req.Query["search"].ToString();
         var from = req.Query.TryGetValue("from", out var f) && DateOnly.TryParse(f, out var fd) ? fd : (DateOnly?)null;
         var to = req.Query.TryGetValue("to", out var t) && DateOnly.TryParse(t, out var td) ? td : (DateOnly?)null;
 
-        var result = await expenses.GetForUserAsync(user.UserId, search, from, to, ct);
+        var result = await expenses.GetForUserAsync(effectiveUserId, search, from, to, ct);
         return new OkObjectResult(result.Select(ToDto));
     }
 
@@ -54,10 +62,14 @@ public class ExpenseEntriesFunctions(
             return new BadRequestObjectResult(new { error = "Invalid Kind." });
         }
 
+        var effectiveUserId = user.UserId;
+        int? impersonatedUserId = null;
+
         // "Contract" (an Admin-only monetary value against a non-invoiceable project) skips the normal
         // project-assignment check entirely - it isn't tied to the admin's own work on the project, so
         // requiring them to be personally assigned would be the wrong gate. CanInvoice + Admin role is the
-        // actual control here, mirroring the legacy Power App's separate admin-only value-entry flow.
+        // actual control here, mirroring the legacy Power App's separate admin-only value-entry flow. It's also
+        // never logged "on behalf of" anyone - it's the Admin's own value entry, not tied to a staff member.
         if (kind == ExpenseEntryKind.Contract)
         {
             if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
@@ -71,13 +83,29 @@ public class ExpenseEntriesFunctions(
         }
         else
         {
-            var validation = await ValidateAssignmentAsync(user.UserId, body.ProjectId, body.Date, ct);
+            // Impersonation: an Admin logging an expense on behalf of someone else - mirrors
+            // TimesheetEntriesFunctions.Create's identical check.
+            if (body.OnBehalfOfUserId is { } onBehalfOfUserId && onBehalfOfUserId != user.UserId)
+            {
+                if (!user.IsAdmin)
+                {
+                    return new ObjectResult(new { error = "Admin role required to log an expense on behalf of another user." })
+                    {
+                        StatusCode = StatusCodes.Status403Forbidden,
+                    };
+                }
+                if (await ValidateImpersonationTargetAsync(users, onBehalfOfUserId, ct) is { } impersonationError) return impersonationError;
+                effectiveUserId = onBehalfOfUserId;
+                impersonatedUserId = onBehalfOfUserId;
+            }
+
+            var validation = await ValidateAssignmentAsync(effectiveUserId, body.ProjectId, body.Date, ct);
             if (validation is not null) return validation;
         }
 
         var entry = new ExpenseEntry
         {
-            UserId = user.UserId,
+            UserId = effectiveUserId,
             ProjectId = body.ProjectId,
             Kind = kind,
             Date = body.Date,
@@ -93,7 +121,7 @@ public class ExpenseEntriesFunctions(
         // Two-step save - EntityId needs the entry's generated Id, only assigned once the entry's own save above
         // has run.
         await auditLog.LogAsync(user, "ExpenseEntry.Created", "ExpenseEntry", entry.Id,
-            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency} ({kind})", impersonatedUserId: null, ct);
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency} ({kind})", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
 
         var saved = await expenses.GetByIdAsync(entry.Id, ct);
@@ -106,16 +134,20 @@ public class ExpenseEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await expenses.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
 
         var body = await req.ReadFromJsonAsync<UpdateExpenseEntryRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
+
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, body.OnBehalfOfUserId);
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         // Mirrors Create's kind-based gate: a Contract entry was never subject to the assignment check to
         // begin with, so editing one must not suddenly require it either.
         if (entry.Kind != ExpenseEntryKind.Contract)
         {
-            var validation = await ValidateAssignmentAsync(user.UserId, entry.ProjectId, body.Date, ct);
+            var validation = await ValidateAssignmentAsync(entry.UserId, entry.ProjectId, body.Date, ct);
             if (validation is not null) return validation;
         }
 
@@ -128,7 +160,7 @@ public class ExpenseEntriesFunctions(
 
         expenses.Update(entry);
         await auditLog.LogAsync(user, "ExpenseEntry.Updated", "ExpenseEntry", entry.Id,
-            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId: null, ct);
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
         return new OkObjectResult(ToDto(entry));
     }
@@ -139,11 +171,14 @@ public class ExpenseEntriesFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await expenses.GetByIdAsync(id, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         expenses.Remove(entry);
         await auditLog.LogAsync(user, "ExpenseEntry.Deleted", "ExpenseEntry", entry.Id,
-            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId: null, ct);
+            $"{entry.Date:yyyy-MM-dd}, {entry.Amount} {entry.Currency}", impersonatedUserId, ct);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
     }

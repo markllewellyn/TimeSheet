@@ -4,6 +4,63 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later again in this session, 2026-09-09 — "Your Overview" and "Expenses" now honor impersonation too
+
+Immediate follow-up to the Log Time/Calendar impersonation-refresh fix above - the user tried the picker more
+thoroughly and reported "Your Overview" and "Expenses" still showed the Admin's own data while impersonating,
+not the target user's. Confirmed by reading the code: unlike `TimesheetEntriesFunctions`, neither
+`MeOverviewFunctions` nor `ExpenseEntriesFunctions` had ever had any impersonation support at all - every query
+was hardcoded to the caller's own `UserId`, so this wasn't a refresh-reactivity bug like the one above, it was a
+genuine missing feature on two of the FDD's own "on behalf of" surfaces.
+
+- **New shared `ImpersonationAuthorization` static class** (`TimeSheet.Api/Auth/`) - extracted
+  `TimesheetEntriesFunctions`'s own four private impersonation-gating methods (`ParseOnBehalfOfUserId`,
+  `ResolveViewTargetAsync`, `ValidateImpersonationTargetAsync`, `CheckOwnership`) into one shared, generic
+  (owner-id-based rather than entity-typed) location, since the exact same "only Admins may act on behalf of an
+  active user" rule (the FDD's own words) now needs to be enforced identically in three places, not one -
+  duplicating security-critical authorization logic across files risks one copy quietly drifting from the
+  others. `TimesheetEntriesFunctions` itself was refactored to call the shared version (mechanical, behavior-
+  preserving - same checks, same error messages, just relocated) rather than left with its own copy alongside
+  two new ones.
+- **`ExpenseEntriesFunctions`** now honors `onBehalfOfUserId` on List (view gate), GetById/Update/Delete
+  (ownership gate, matching Duplicate's pattern on the timesheet side), and Create (an Admin logging an expense
+  on behalf of someone else, mirroring `TimesheetEntriesFunctions.Create`'s identical branch) - the project-
+  assignment check on Create/Update now correctly validates against the *impersonated* user's assignments, not
+  the Admin's own (a latent bug in the pre-existing Update code, which checked `user.UserId` instead of
+  `entry.UserId` - harmless before since the two were always equal, now they can differ). "Contract" kind
+  entries are deliberately excluded from impersonation entirely - they're the Admin's own value entry, never
+  tied to a staff member, so `OnBehalfOfUserId` is simply not read on that branch. New
+  `CreateExpenseEntryRequest.OnBehalfOfUserId`/`UpdateExpenseEntryRequest.OnBehalfOfUserId` contract fields.
+- **`MeOverviewFunctions`** now takes the same `onBehalfOfUserId` query param via `ResolveViewTargetAsync`,
+  showing the impersonated user's own per-project hours/payroll breakdown instead of the Admin's.
+- **Deliberately NOT touched**: expense attachments (`ExpenseAttachmentsFunctions`) - checked the timesheet-
+  entry equivalent (`AttachmentsFunctions`) first and found it *also* has zero impersonation support (a
+  symmetric, pre-existing gap on both entity types, not something this round introduced or was asked to fix).
+  Fixing attachments-under-impersonation for expenses only would create a new asymmetry rather than close an
+  existing one, and wasn't part of what was reported - left as a possible future follow-up if it's ever asked
+  for on both.
+- **Frontend**: `expenses-list-page.ts` and `my-overview-page.ts` both gained the identical reactive
+  `effect()`-on-`impersonation.actingAs()` pattern from the Log Time/Calendar fix above (refetch on switch, not
+  just on initial load). `add-expense-page.ts` now threads `this.impersonation.actingAs()?.id` through
+  `getById`/`create`/`update` and the "assigned projects" fetch, mirroring `add-entry-page.ts`'s existing
+  pattern exactly. `ExpenseEntriesService`/`MyOverviewService` gained the matching `onBehalfOfUserId` params
+  (query string for GET/DELETE, request body field for POST/PUT) - same shape as `TimesheetEntriesService`.
+- Backend build clean; Infrastructure.Tests 48/48 pass unchanged (no dedicated test for these Functions classes
+  either before or after - matches this codebase's established bar for thin CRUD/authorization-gate endpoints,
+  same as `TimesheetEntriesFunctions` was never covered by a dedicated Functions-level test). Angular build
+  clean. API host restarted (new `IUserRepository` constructor dependency on two Functions classes) - confirmed
+  clean startup, all `ExpenseEntries_*`/`Me_Overview` routes registered.
+- **Live-verified end-to-end**: as Mark Llewellyn (Admin), captured his own baseline (Your Overview: 87.7 work
+  hours; Expenses: his own 3 entries), then impersonated Sarah Chen *while already on each page* - both
+  immediately switched to her data (Your Overview: 122 work hours across her real projects; Expenses: her one
+  real "Client site lunch" entry) with no reload. Created a brand-new test expense while impersonating her
+  (Acme Manufacturing GmbH / ERP Migration Phase 2, 7.50 GBP) - the Client/Project dropdowns correctly showed
+  only *her* assigned projects (just Acme), not Mark's full multi-client list, confirming
+  `listAssignedToMe(onBehalfOf)` picked up the impersonation id too. The new entry appeared correctly in her
+  list, was deleted through the UI (exercising the impersonated-delete authorization path), then reverted to
+  Mark - his own Expenses/Overview came back exactly as they were before, with no trace of the test entry ever
+  having existed there. Full round-trip proof, not just a UI glance.
+
 ## Done still later in this session, 2026-09-09 — impersonation didn't refresh Log Time/Calendar when switched mid-page, plus a real regression it surfaced
 
 User asked a clarifying question about the "Log time on behalf of another user" feature (confirmed against the

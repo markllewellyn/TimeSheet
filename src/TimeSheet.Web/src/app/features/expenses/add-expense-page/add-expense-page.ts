@@ -12,6 +12,7 @@ import { Attachment } from '../../../core/models/timesheet-entry.models';
 import { ExpenseEntry } from '../../../core/models/expense-entry.models';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { ConfirmService } from '../../../core/services/confirm.service';
+import { ImpersonationService } from '../../../core/services/impersonation.service';
 import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
 
 type EntryKind = 'Expense' | 'Contract';
@@ -28,6 +29,7 @@ export class AddExpensePage {
   private readonly clientsService = inject(ClientsService);
   private readonly expenseEntries = inject(ExpenseEntriesService);
   private readonly confirmService = inject(ConfirmService);
+  private readonly impersonation = inject(ImpersonationService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   protected readonly currentUser = inject(CurrentUserService);
@@ -75,7 +77,7 @@ export class AddExpensePage {
   }
 
   private loadExisting(id: number): void {
-    this.expenseEntries.getById(id).subscribe({
+    this.expenseEntries.getById(id, this.impersonation.actingAs()?.id).subscribe({
       next: (entry) => {
         this.kind.set(entry.kind);
         this.loadProjectsFor(entry.kind, () => {
@@ -109,7 +111,7 @@ export class AddExpensePage {
     this.projectsLoaded.set(false);
 
     if (kind === 'Expense') {
-      this.projectsService.listAssignedToMe().subscribe({
+      this.projectsService.listAssignedToMe(this.impersonation.actingAs()?.id).subscribe({
         next: (projects) => {
           this.projects.set(projects);
           this.projectsLoaded.set(true);
@@ -178,6 +180,8 @@ export class AddExpensePage {
 
     this.saving.set(true);
 
+    const onBehalfOfUserId = this.impersonation.actingAs()?.id ?? null;
+
     const save$ = this.isEditMode
       ? this.expenseEntries.update(Number(this.editId), {
           date: this.date(),
@@ -185,6 +189,7 @@ export class AddExpensePage {
           currency: this.currency(),
           description: this.description() || null,
           isBillable: this.isBillable(),
+          onBehalfOfUserId,
         })
       : this.expenseEntries.create({
           projectId,
@@ -194,6 +199,7 @@ export class AddExpensePage {
           description: this.description() || null,
           isBillable: this.isBillable(),
           kind: this.kind(),
+          onBehalfOfUserId,
         });
 
     save$.subscribe({
