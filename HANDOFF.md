@@ -39,6 +39,9 @@ page already displayed a "Billable" column, but nothing let a user actually set 
   low risk given the mechanism is identical to the Edit path's already-proven one. All three dev processes
   (Azurite, API host, Angular) left running at the end of this session for whoever picks this up next to
   live-verify first before trusting it further.
+- **Handbook updated**: §5 Expenses & Contract Values' opening paragraph no longer says an expense is
+  "rechargeable to the client by default" with no way to change it — now describes the new checkbox and that
+  it's editable any time from the entry's own Edit page.
 - This closes the one remaining explicitly-flagged item from the Expense Attachments round. The FDD-numbered
   backlog itself has nothing else outstanding — see "What's still open" below, unchanged in substance from
   2026-09-08 (still just the ambiguous dual-currency item, deliberately not a numbered gap, and the "Known loose
