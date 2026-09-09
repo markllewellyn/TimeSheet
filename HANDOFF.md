@@ -26,19 +26,27 @@ page already displayed a "Billable" column, but nothing let a user actually set 
   already-complete backend field, unlike every other item on the FDD backlog which needed real schema/service
   work.
 - Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
-- **Not live-verified in the browser this round** — Claude in Chrome reported not connected this session, same
-  situation this file has hit before (see the 2026-09-07 PM click-through entry). Started Azurite, the API
-  host (`:7071`), and Angular (`:3000`) fresh for this session (nothing was running at the start) and confirmed
-  both are up and serving, but couldn't drive the UI without the extension. Verified instead by: (1) confirming
-  the exact same checkbox/caption pattern this copies (`project-edit-page.html`'s "Cost Exempt" toggle) is
-  itself already live-verified elsewhere in this codebase, (2) reading `ExpenseEntriesFunctions.cs` end-to-end
-  to confirm both Create and Update already pass `IsBillable` straight through with no other logic gating it,
-  so there's no hidden business rule this checkbox could violate, and (3) the Edit-mode round-trip (load →
-  display → save-back) was already exercised live in the 2026-09-08 session when `isBillable` was carried
-  through unchanged. Only the create-mode default-to-`true`-unless-unchecked path is new and unexercised live —
-  low risk given the mechanism is identical to the Edit path's already-proven one. All three dev processes
-  (Azurite, API host, Angular) left running at the end of this session for whoever picks this up next to
-  live-verify first before trusting it further.
+- **Live-verified end-to-end in the browser**, once Chrome connected (it wasn't at first — reconnected mid-
+  session; see below). Started Azurite, the API host (`:7071`), and Angular (`:3000`) fresh for this session
+  (nothing was running at the start), signed in as Mark Llewellyn (Admin), opened Add Expense, filled in a real
+  entry (Northwind Logistics Ltd / Warehouse Ops Optimisation, 12.34 GBP), **unchecked "Rechargeable to
+  Client"**, and clicked Log — the request succeeded (201) and the new entry (#7) showed **Billable = No** on
+  the Expenses list, where every prior entry (all created before this fix, when Create hardcoded `true`) still
+  shows Yes. Reopened it via Edit, confirmed the checkbox correctly loaded unchecked, re-checked it, saved again
+  — the list updated to **Billable = Yes**, confirming the Update path round-trips the value both ways too, not
+  just Create. Deleted the test entry afterward via the list's Delete button (confirm dialog appeared correctly,
+  matching the rest of this app's destructive-action convention) — confirmed gone from the list, no artifact
+  left behind.
+- **A stale-session snag hit along the way, not a bug**: the browser's first attempt hit `401` on `/api/me` etc.
+  (a JWT saved in localStorage from a prior day's session, naturally expired) — the app doesn't force-redirect
+  to `/login` on a 401 from this particular page, it just shows the page's own "Could not load your assigned
+  projects" error banner instead, which briefly looked like a real problem before checking Network and seeing
+  the 401s. Signed back in (the user typed their own credentials — this session never handles a password,
+  consistent with every prior session's own rule) and the rest of the verification above proceeded normally.
+  Not investigated further as an actual product bug (a 401 mid-session on a random API call not redirecting
+  to login is a pre-existing, unrelated UX gap, not something this round of work touched or was asked to fix)
+  — flagged below under "Known loose ends" instead.
+- All three dev processes (Azurite, API host, Angular) left running at the end of this session.
 - **Handbook updated**: §5 Expenses & Contract Values' opening paragraph no longer says an expense is
   "rechargeable to the client by default" with no way to change it — now describes the new checkbox and that
   it's editable any time from the entry's own Edit page.
@@ -1479,6 +1487,12 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **New, not resolved**: an expired session (a stale JWT in localStorage from a prior day) doesn't force a
+  redirect to `/login` when an API call 401s from the Add Expense page - the page just renders its own "Could
+  not load your assigned projects" error banner instead, which looks like a real data-loading problem rather
+  than an auth one. Found incidentally while live-verifying the isBillable checkbox (2026-09-09 session) -
+  not reproduced on every page, not investigated further (out of scope for that round), but worth a proper look
+  if it recurs: does every page handle a 401 this way, or just this one?
 - **New, not resolved**: the user reported their own logged entries missing from an Entry Flags search while
   signed in as Admin. Could not be reproduced (tested live with two different search terms - own entries
   appeared correctly both times) and no code path was found that would exclude the searcher's own entries.
