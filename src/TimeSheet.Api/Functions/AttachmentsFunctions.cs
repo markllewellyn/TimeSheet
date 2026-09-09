@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
+using static TimeSheet.Api.Auth.ImpersonationAuthorization;
 using TimeSheet.Contracts;
 using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
@@ -9,9 +10,14 @@ using TimeSheet.Domain.Services;
 
 namespace TimeSheet.Api.Functions;
 
+/// <summary>Ownership check goes through the shared ImpersonationAuthorization gate (same as
+/// TimesheetEntriesFunctions itself), so an Admin impersonating a user can manage that user's timesheet
+/// attachments too. onBehalfOfUserId travels as a query-string param here - Upload's body is multipart form
+/// data, not JSON.</summary>
 public class AttachmentsFunctions(
     IAttachmentRepository attachments,
     ITimesheetEntryRepository entries,
+    IUserRepository users,
     IFileStorageService fileStorage,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -23,7 +29,10 @@ public class AttachmentsFunctions(
     {
         var user = currentUser.RequireUser();
         var entry = await entries.GetByIdAsync(entryId, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         if (!req.HasFormContentType || req.Form.Files.Count == 0)
         {
@@ -61,7 +70,10 @@ public class AttachmentsFunctions(
         if (attachment is null) return new NotFoundResult();
 
         var entry = await entries.GetByIdAsync(attachment.TimesheetEntryId, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         var stream = await fileStorage.OpenReadAsync(attachment.StorageKey, ct);
         return new FileStreamResult(stream, attachment.ContentType) { FileDownloadName = attachment.FileName };
@@ -76,7 +88,10 @@ public class AttachmentsFunctions(
         if (attachment is null) return new NotFoundResult();
 
         var entry = await entries.GetByIdAsync(attachment.TimesheetEntryId, ct);
-        if (entry is null || entry.UserId != user.UserId) return new NotFoundResult();
+        if (entry is null) return new NotFoundResult();
+        var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
+        if (!authorized) return new NotFoundResult();
+        if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
 
         await fileStorage.DeleteAsync(attachment.StorageKey, ct);
         attachments.Remove(attachment);

@@ -39,17 +39,23 @@ export class ExpenseEntriesService {
     return this.http.delete<void>(`${this.baseUrl}/${id}`, { params });
   }
 
-  uploadAttachment(expenseEntryId: number, file: File): Observable<Attachment> {
+  uploadAttachment(expenseEntryId: number, file: File, onBehalfOfUserId?: number | null): Observable<Attachment> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<Attachment>(`${this.baseUrl}/${expenseEntryId}/attachments`, formData);
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.post<Attachment>(`${this.baseUrl}/${expenseEntryId}/attachments`, formData, { params });
   }
 
-  downloadAttachment(attachmentId: number): Observable<Blob> {
-    return this.http.get(`${environment.apiBaseUrl}/expense-attachments/${attachmentId}`, { responseType: 'blob' });
+  downloadAttachment(attachmentId: number, onBehalfOfUserId?: number | null): Observable<Blob> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.get(`${environment.apiBaseUrl}/expense-attachments/${attachmentId}`, { params, responseType: 'blob' });
   }
 
-  deleteAttachment(attachmentId: number): Observable<void> {
-    return this.http.delete<void>(`${environment.apiBaseUrl}/expense-attachments/${attachmentId}`);
+  deleteAttachment(attachmentId: number, onBehalfOfUserId?: number | null): Observable<void> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.delete<void>(`${environment.apiBaseUrl}/expense-attachments/${attachmentId}`, { params });
   }
 }

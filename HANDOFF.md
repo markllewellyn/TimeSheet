@@ -4,6 +4,36 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-09 — closed the attachments-under-impersonation gap the moment it was actually hit
+
+User impersonated Priya Patel, tried to upload an attachment to a new expense, and got a generic "Could not
+upload the attachment." error - exactly the pre-existing, deliberately-left-alone gap flagged in this file's
+"Your Overview"/"Expenses" impersonation entry above (entry + expense attachments never had any impersonation
+support - `entry.UserId != user.UserId` fails outright when the caller is an Admin impersonating the entry's
+real owner). That entry said fixing only one side would create a new asymmetry, so now that it's a real,
+reported failure, both sides are fixed together rather than patching just the expense case.
+
+- **`ExpenseAttachmentsFunctions`** (Upload/Download/Delete) and **`AttachmentsFunctions`** (the timesheet-entry
+  equivalent) both now route their ownership check through the same shared `ImpersonationAuthorization` gate
+  every other entry/expense endpoint already uses (`CheckOwnership` + `ValidateImpersonationTargetAsync`) -
+  `onBehalfOfUserId` travels as a query-string param on all three actions, since Upload's body is multipart form
+  data (not JSON) and can't carry it any other way. Both classes gained the `IUserRepository` constructor
+  dependency the shared gate needs.
+- **Frontend**: `ExpenseEntriesService`/`TimesheetEntriesService`'s `uploadAttachment`/`downloadAttachment`/
+  `deleteAttachment` methods all gained an `onBehalfOfUserId` parameter (query string, same pattern as every
+  other impersonation-aware call in this codebase); `add-expense-page.ts`/`add-entry-page.ts` now pass
+  `this.impersonation.actingAs()?.id` through to all three.
+- Backend build clean; Infrastructure.Tests 48/48 pass unchanged (no dedicated test for these Functions classes,
+  same established bar as the other impersonation-gate wiring above). Angular build clean. API host restarted
+  (new constructor dependency on both attachment Functions classes) - confirmed clean startup.
+- **Live-verified end-to-end, reproducing the exact reported scenario**: impersonated Priya Patel, created a
+  real expense against her own project (BrightPath Retail Group / POS Rollout - confirmed the dropdown correctly
+  showed only her assigned projects), used Save & Attach, and uploaded a real file - it appeared in the
+  Attachments list with real metadata (filename, timestamp, size), where before this fix the exact same steps
+  produced "Could not upload the attachment." Deleted the attachment through the UI (also impersonation-gated,
+  also worked), deleted the test expense entry itself, then reverted to Mark - his own Expenses list was
+  completely unaffected throughout, no artifact left anywhere.
+
 ## Done even later still in this session, 2026-09-09 — the impersonation banner was unreadable in dark mode
 
 User reported the "Acting as X" banner (from the impersonation work above) was hard to read in dark mode.
@@ -58,12 +88,15 @@ genuine missing feature on two of the FDD's own "on behalf of" surfaces.
   `CreateExpenseEntryRequest.OnBehalfOfUserId`/`UpdateExpenseEntryRequest.OnBehalfOfUserId` contract fields.
 - **`MeOverviewFunctions`** now takes the same `onBehalfOfUserId` query param via `ResolveViewTargetAsync`,
   showing the impersonated user's own per-project hours/payroll breakdown instead of the Admin's.
-- **Deliberately NOT touched**: expense attachments (`ExpenseAttachmentsFunctions`) - checked the timesheet-
+- ~~**Deliberately NOT touched**: expense attachments (`ExpenseAttachmentsFunctions`) - checked the timesheet-
   entry equivalent (`AttachmentsFunctions`) first and found it *also* has zero impersonation support (a
   symmetric, pre-existing gap on both entity types, not something this round introduced or was asked to fix).
   Fixing attachments-under-impersonation for expenses only would create a new asymmetry rather than close an
   existing one, and wasn't part of what was reported - left as a possible future follow-up if it's ever asked
-  for on both.
+  for on both.~~ - **fixed later the same session, 2026-09-09**: the user hit this exact gap for real
+  (impersonating Priya Patel, uploading an expense attachment) - see that session's own "Done" entry further
+  down for both `ExpenseAttachmentsFunctions` and `AttachmentsFunctions` gaining full impersonation support
+  together.
 - **Frontend**: `expenses-list-page.ts` and `my-overview-page.ts` both gained the identical reactive
   `effect()`-on-`impersonation.actingAs()` pattern from the Log Time/Calendar fix above (refetch on switch, not
   just on initial load). `add-expense-page.ts` now threads `this.impersonation.actingAs()?.id` through

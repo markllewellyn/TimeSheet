@@ -222,7 +222,7 @@ export class AddExpensePage {
 
     this.uploadingAttachment.set(true);
     this.attachmentsError.set(null);
-    this.expenseEntries.uploadAttachment(Number(this.editId), file).subscribe({
+    this.expenseEntries.uploadAttachment(Number(this.editId), file, this.impersonation.actingAs()?.id).subscribe({
       next: (attachment) => {
         this.uploadingAttachment.set(false);
         input.value = '';
@@ -237,7 +237,7 @@ export class AddExpensePage {
   }
 
   protected downloadAttachment(attachment: Attachment): void {
-    this.expenseEntries.downloadAttachment(attachment.id).subscribe((blob) => {
+    this.expenseEntries.downloadAttachment(attachment.id, this.impersonation.actingAs()?.id).subscribe((blob) => {
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -254,7 +254,7 @@ export class AddExpensePage {
     });
     if (!confirmed) return;
 
-    this.expenseEntries.deleteAttachment(attachment.id).subscribe({
+    this.expenseEntries.deleteAttachment(attachment.id, this.impersonation.actingAs()?.id).subscribe({
       next: () => this.attachments.update((list) => list.filter((a) => a.id !== attachment.id)),
       error: (err) => this.attachmentsError.set(err?.error?.error ?? 'Could not delete the attachment.'),
     });

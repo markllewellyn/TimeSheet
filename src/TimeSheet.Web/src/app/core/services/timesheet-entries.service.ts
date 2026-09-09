@@ -58,17 +58,23 @@ export class TimesheetEntriesService {
     return this.http.post<TimesheetEntry>(`${this.baseUrl}/${id}/duplicate`, { date: date ?? null, onBehalfOfUserId: onBehalfOfUserId ?? null });
   }
 
-  uploadAttachment(entryId: number, file: File): Observable<Attachment> {
+  uploadAttachment(entryId: number, file: File, onBehalfOfUserId?: number | null): Observable<Attachment> {
     const formData = new FormData();
     formData.append('file', file);
-    return this.http.post<Attachment>(`${this.baseUrl}/${entryId}/attachments`, formData);
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.post<Attachment>(`${this.baseUrl}/${entryId}/attachments`, formData, { params });
   }
 
-  downloadAttachment(attachmentId: number): Observable<Blob> {
-    return this.http.get(`${environment.apiBaseUrl}/attachments/${attachmentId}`, { responseType: 'blob' });
+  downloadAttachment(attachmentId: number, onBehalfOfUserId?: number | null): Observable<Blob> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.get(`${environment.apiBaseUrl}/attachments/${attachmentId}`, { params, responseType: 'blob' });
   }
 
-  deleteAttachment(attachmentId: number): Observable<void> {
-    return this.http.delete<void>(`${environment.apiBaseUrl}/attachments/${attachmentId}`);
+  deleteAttachment(attachmentId: number, onBehalfOfUserId?: number | null): Observable<void> {
+    let params = new HttpParams();
+    if (onBehalfOfUserId) params = params.set('onBehalfOfUserId', onBehalfOfUserId);
+    return this.http.delete<void>(`${environment.apiBaseUrl}/attachments/${attachmentId}`, { params });
   }
 }
