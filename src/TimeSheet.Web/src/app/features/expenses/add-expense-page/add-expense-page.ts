@@ -58,8 +58,6 @@ export class AddExpensePage {
   protected readonly amount = signal(0);
   protected readonly currency = signal('GBP');
   protected readonly description = signal('');
-  // No UI toggle exists for this today (Create always sends true) - carried through unchanged so an edit never
-  // silently flips an existing entry's real value. See the plan note on ExpenseEntry.IsBillable.
   protected readonly isBillable = signal(true);
   protected readonly error = signal<string | null>(null);
   protected readonly saving = signal(false);
@@ -194,7 +192,7 @@ export class AddExpensePage {
           amount: this.amount(),
           currency: this.currency(),
           description: this.description() || null,
-          isBillable: true,
+          isBillable: this.isBillable(),
           kind: this.kind(),
         });
 

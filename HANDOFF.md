@@ -1,8 +1,48 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-08)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-09)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-09 — Expense "Rechargeable to Client" checkbox, closing the last loose end from the Expense Attachments round
+
+New session, picked up from HANDOFF's own note: the 2026-09-08 Expense Attachments work explicitly flagged
+`ExpenseEntry.IsBillable` (the same FDD line as the attachments ask — "an indication of whether it is
+rechargeable to the client") as a real, smaller gap it deliberately left alone — the field existed end-to-end
+in the backend (`CreateExpenseEntryRequest`/`UpdateExpenseEntryRequest`/`ExpenseEntryDto` all already carried
+it, `ExpenseEntriesFunctions` already read/wrote it with zero extra logic needed) and the new Expenses list
+page already displayed a "Billable" column, but nothing let a user actually set it — Create silently hardcoded
+`true` and there was no checkbox anywhere.
+
+- **New "Rechargeable to Client" checkbox** on `add-expense-page.html`, in both Add and Edit modes — a direct
+  copy of the admin Project edit page's existing "Cost Exempt" checkbox pattern (plain `[ngModel]`/
+  `(ngModelChange)` on the signal, a one-line explanatory caption underneath), the closest existing precedent
+  for a plain boolean toggle in this app.
+- **`add-expense-page.ts`**: `performSave`'s create-mode request now sends `isBillable: this.isBillable()`
+  instead of a hardcoded `true`. Edit mode was already correct (round-trips whatever value is loaded, per the
+  2026-09-08 work) — only the create path needed fixing. Removed the now-stale comment noting the missing UI
+  toggle.
+- No backend/contract/DB change needed at all — this was purely the missing last mile of UI wiring onto an
+  already-complete backend field, unlike every other item on the FDD backlog which needed real schema/service
+  work.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Not live-verified in the browser this round** — Claude in Chrome reported not connected this session, same
+  situation this file has hit before (see the 2026-09-07 PM click-through entry). Started Azurite, the API
+  host (`:7071`), and Angular (`:3000`) fresh for this session (nothing was running at the start) and confirmed
+  both are up and serving, but couldn't drive the UI without the extension. Verified instead by: (1) confirming
+  the exact same checkbox/caption pattern this copies (`project-edit-page.html`'s "Cost Exempt" toggle) is
+  itself already live-verified elsewhere in this codebase, (2) reading `ExpenseEntriesFunctions.cs` end-to-end
+  to confirm both Create and Update already pass `IsBillable` straight through with no other logic gating it,
+  so there's no hidden business rule this checkbox could violate, and (3) the Edit-mode round-trip (load →
+  display → save-back) was already exercised live in the 2026-09-08 session when `isBillable` was carried
+  through unchanged. Only the create-mode default-to-`true`-unless-unchecked path is new and unexercised live —
+  low risk given the mechanism is identical to the Edit path's already-proven one. All three dev processes
+  (Azurite, API host, Angular) left running at the end of this session for whoever picks this up next to
+  live-verify first before trusting it further.
+- This closes the one remaining explicitly-flagged item from the Expense Attachments round. The FDD-numbered
+  backlog itself has nothing else outstanding — see "What's still open" below, unchanged in substance from
+  2026-09-08 (still just the ambiguous dual-currency item, deliberately not a numbered gap, and the "Known loose
+  ends" list of business-decision/blocked items).
 
 ## Done very last in this session, 2026-09-08 — Expense Entry Attachments, and a real expense list/edit view
 
@@ -35,10 +75,12 @@ minimal "attach at creation only" patch, since attachments need somewhere to be 
   Expenses list to confirm the upload persisted, downloaded/deleted the attachment (confirmed both the DB row
   and the blob were removed), then deleted the whole test entry. Regression-checked the Log Time grid and its
   own entry-level attachments are unaffected.
-- Noted but deliberately left alone: `ExpenseEntry.IsBillable` (also mentioned by the same FDD line - "an
+- ~~Noted but deliberately left alone: `ExpenseEntry.IsBillable` (also mentioned by the same FDD line - "an
   indication of whether it is rechargeable to the client") has no UI toggle anywhere; Create always sends
   `true`. The new edit page now round-trips whatever value is loaded rather than re-forcing `true` on every
-  save, but doesn't add a new checkbox - a separate, smaller gap from the attachments ask actually raised.
+  save, but doesn't add a new checkbox - a separate, smaller gap from the attachments ask actually raised.~~ —
+  **fixed 2026-09-09, a later session**: see that session's own "Done" entry above for the new "Rechargeable to
+  Client" checkbox.
 
 ## Done very last in this session, 2026-09-08 — the Log Time grid itself still showed the notional billing amount
 

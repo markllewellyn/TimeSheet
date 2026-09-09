@@ -84,6 +84,15 @@
         <span class="field-label">Description</span>
         <input type="text" placeholder="Task description" class="input" [ngModel]="description()" (ngModelChange)="description.set($event)" />
       </label>
+
+      <div class="col-span-2">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" [ngModel]="isBillable()" (ngModelChange)="isBillable.set($event)" />
+          Rechargeable to Client
+        </label>
+        <p class="mt-1 text-xs text-muted-foreground">Whether this {{ kind() === 'Contract' ? 'contract value' : 'expense' }} should be
+          passed on to the client, or absorbed as an internal cost.</p>
+      </div>
     </div>
 
     <div class="mt-6 flex gap-3">
