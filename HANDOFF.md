@@ -4,6 +4,31 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-09 — the impersonation banner was unreadable in dark mode
+
+User reported the "Acting as X" banner (from the impersonation work above) was hard to read in dark mode.
+
+- **Root cause**: a genuine color-token bug in `styles.scss`, not specific to the banner component itself.
+  `:root.dark`'s `--warning-foreground` was set to `oklch(0.141 0.005 285.823)` - the *exact same* near-black
+  value as dark mode's own `--background`/`--foreground`(inverted) tokens, clearly a copy-paste leftover from
+  `--success-foreground`'s dark-mode value (which is correct *there* only because `--success` is used as a
+  solid, bright badge background needing dark text - `.banner-warning` and `.badge-warning` instead use
+  `--warning` as a ~18% tint over the page's own dark background, which stays dark, so pairing it with a
+  near-black text color made the banner text almost invisible - dark-on-dark. Light mode's `--warning-foreground`
+  (a proper dark amber-brown, correct for a light tinted background) was never affected.
+- **Fixed** by giving dark mode its own proper light, warm value: `oklch(0.9 0.1 75)` - same hue family as
+  `--warning` itself, but light enough to read clearly against the dark-tinted banner background, mirroring how
+  `--destructive`/`--success` already scale appropriately between the two color schemes.
+- **Scope**: this one token is also used by `.badge-warning` (not just `.banner-warning`) - both get the fix
+  automatically since it's a single shared CSS custom property, not a per-component style.
+- Angular build clean. Frontend-only, CSS-only change - no backend/DB change, no API host restart needed.
+- **Live-verified in the browser, both color schemes**: impersonated Sarah Chen in dark mode - the banner text
+  ("Acting as Sarah Chen - new timesheet entries will be logged on their behalf.") now renders in a clearly
+  legible warm amber against the dark background, a stark contrast to the earlier near-invisible dark-on-dark
+  text. Switched to light mode with the same impersonation still active - confirmed completely unchanged
+  (dark-brown text on the light amber tint, exactly as before this fix), proving the dark-mode-only token change
+  didn't regress light mode.
+
 ## Done still later again in this session, 2026-09-09 — "Your Overview" and "Expenses" now honor impersonation too
 
 Immediate follow-up to the Log Time/Calendar impersonation-refresh fix above - the user tried the picker more
