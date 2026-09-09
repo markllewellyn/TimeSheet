@@ -4,6 +4,56 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later in this session, 2026-09-09 — impersonation didn't refresh Log Time/Calendar when switched mid-page, plus a real regression it surfaced
+
+User asked a clarifying question about the "Log time on behalf of another user" feature (confirmed against the
+FDD's own wording that its narrow scope - timesheet entries only, not a full account switch - is correct, not a
+gap), then reported: "When I switch to impersonate another user I still only see my own log entries." Confirmed
+by reading the code, not by guessing - a real bug, not a misunderstanding.
+
+- **Root cause**: `log-time-page.ts` and `calendar-page.ts` both only call their own `refresh()` from the
+  constructor and from explicit UI actions (search, month navigation, post-edit reload) - neither ever reacts
+  to `ImpersonationService.actingAs()` changing on its own. The impersonation picker lives in the shared header
+  (`app.html`) and doesn't navigate away/back when you pick someone, so switching who you're acting as while
+  already sitting on Log Time or Calendar left the grid/calendar showing your own entries until some unrelated
+  action happened to trigger a refresh - exactly the symptom reported. (Navigating to Log Time/Calendar *after*
+  already impersonating worked fine all along, since the component's constructor runs fresh in that case - the
+  bug only bit you when switching while already on one of those two pages.)
+- **Fixed both pages** with an `effect()` in the constructor that reads `impersonation.actingAs()` and calls
+  `refresh()` inside `untracked()` - the effect runs once immediately (replacing the old direct `this.refresh()`
+  call) and again every time impersonation changes, without also re-running on unrelated signals `refresh()`
+  happens to read (`searchText` on Log Time), which already have their own explicit refresh triggers.
+- **A real, separate regression found and fixed while investigating**: while chasing why the impersonation
+  picker's admin-only visibility seemed inconsistent, found that `/api/me` silently never resolves on a *fresh*
+  page load when a valid session token already exists in storage (as opposed to signing in through the SPA's
+  own login form, which works fine) - the nav bar would render in a reduced, non-admin-looking state even for
+  Mark's own real Admin account, until some other action happened to "unstick" it. Confirmed the exact cause via
+  a temporary console diagnostic (removed before landing the fix, see below) rather than guessing: this
+  session's own earlier `sessionExpiredInterceptor` (added in the 401-handling round above) injects
+  `CurrentUserService` - but `CurrentUserService`'s own constructor calls `/api/me` via `loadMe()` on every app
+  boot with an existing token, and that request flows through the same interceptor chain. Asking the injector
+  for `CurrentUserService` from inside the interceptor while `CurrentUserService` is itself still mid-
+  construction is a genuine circular dependency (`NG0200`) - silently caught by the HTTP error channel (not an
+  uncaught exception), so it never surfaced as a visible error, it just meant `/api/me` quietly never completed
+  on that one specific bootstrap path.
+- **Fixed** by having `sessionExpiredInterceptor` depend on `LocalAuthService`/`ImpersonationService` directly
+  instead of `CurrentUserService` - neither of those has any HTTP-triggering constructor logic, so there's no
+  cycle. Functionally identical outcome (clears the token, stops impersonation, redirects to login) for the
+  401-handling behavior itself; only the dependency shape changed.
+- Angular build clean throughout. Frontend-only changes, no backend/DB change, no API host restart needed.
+- **Live-verified end-to-end, both fixes**: (1) confirmed the `NG0200` diagnostic fired on a cold reload before
+  the fix and was gone after, and that a fresh `/timesheet` load now shows the full Admin nav (Approvals, Entry
+  Flags, Payroll Periods, Invoicing, Reports, the impersonation icon) immediately, matching a real `/api/me`
+  fetch confirming `role: "Admin"`. (2) As Mark Llewellyn (Admin), already sitting on Log Time showing his own
+  entries (#126-128 etc.), opened the impersonation picker and picked Sarah Chen *without navigating away* - the
+  grid immediately updated to her entries (#29, #42, #28...) with the "Acting as Sarah Chen" banner, no reload.
+  Repeated on Calendar (already showing Mark's September, 29h) - switching to Sarah Chen immediately dropped the
+  month total to 0h (her real entries are all in August). "Revert to myself" immediately restored Mark's own
+  29h with no reload either. No test data was created - impersonation was only switched and reverted, never
+  used to log/edit anything.
+- Chrome connectivity was flaky again this session (had to be reconnected once more) - purely an extension
+  connectivity issue, unrelated to any of this session's code changes.
+
 ## Done later in this session, 2026-09-09 — global 401 handling, closing the stale-session UX gap found while verifying the checkbox above
 
 Immediate follow-up to the isBillable checkbox round below: while live-verifying it, a stale JWT in

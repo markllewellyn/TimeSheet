@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Router } from '@angular/router';
 import { AgGridAngular } from 'ag-grid-angular';
 import { ColDef, themeQuartz } from 'ag-grid-community';
@@ -113,7 +113,15 @@ export class LogTimePage {
   ];
 
   constructor() {
-    this.refresh();
+    // The header's impersonation picker lives outside this page and doesn't navigate away/back when you pick
+    // someone - without this effect, switching who you're acting as while already on Log Time left the grid
+    // showing your own entries until some other action (search, edit, etc.) happened to trigger a refresh.
+    // untracked() keeps this effect from also re-running on searchText - refresh() still reads its current
+    // value, it just isn't a dependency of *this* effect (onSearchChange already calls refresh() for that).
+    effect(() => {
+      this.impersonation.actingAs();
+      untracked(() => this.refresh());
+    });
     this.workloadService.estimatedHoursThisWeek().subscribe((w) => this.workload.set(w));
   }
 

@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { TimesheetEntriesService } from '../../../core/services/timesheet-entries.service';
 import { TimesheetEntry } from '../../../core/models/timesheet-entry.models';
@@ -120,7 +120,13 @@ export class CalendarPage {
   });
 
   constructor() {
-    this.refresh();
+    // See the identical comment in log-time-page.ts - the header's impersonation picker doesn't navigate
+    // away/back, so without this the calendar kept showing your own entries after switching who you're acting
+    // as until some other action (changing month, etc.) happened to trigger a refresh.
+    effect(() => {
+      this.impersonation.actingAs();
+      untracked(() => this.refresh());
+    });
   }
 
   protected prevMonth(): void {
