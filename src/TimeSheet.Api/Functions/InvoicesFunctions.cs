@@ -17,6 +17,7 @@ public class InvoicesFunctions(
     IInvoiceRepository invoiceRepository,
     IProjectRepository projectRepository,
     IInvoicingService invoicing,
+    IAuditLogService auditLog,
     ICurrentUserAccessor currentUser)
 {
     [Function("Invoices_ListForProjectManager")]
@@ -139,6 +140,53 @@ public class InvoicesFunctions(
         }
     }
 
+    /// <summary>Nothing was ever locked for a Draft, so this is a plain delete - no entries to unwind.</summary>
+    [Function("Invoices_DeleteDraft")]
+    public async Task<IActionResult> DeleteDraft(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "delete", Route = "invoices/{id:int}")] HttpRequest req, int id, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var invoice = await invoiceRepository.GetByIdAsync(id, ct);
+        if (invoice is null) return new NotFoundResult();
+
+        try
+        {
+            await invoicing.DeleteDraftAsync(id, ct);
+            await auditLog.LogAsync(currentUser.RequireUser(), "Invoice.DraftDeleted", "Invoice", id,
+                $"{invoice.PeriodStart:yyyy-MM-dd} to {invoice.PeriodEnd:yyyy-MM-dd}, client {invoice.ClientId}", null, ct);
+            return new NoContentResult();
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
+    }
+
+    /// <summary>Keeps the invoice, its real number and its PDF permanently - unlocks every entry/expense that
+    /// was locked to it so they become invoiceable again. See InvoicingService.VoidInvoiceAsync.</summary>
+    [Function("Invoices_Void")]
+    public async Task<IActionResult> Void(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "invoices/{id:int}/void")] HttpRequest req, int id, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var body = await req.ReadFromJsonAsync<VoidInvoiceRequest>(ct) ?? new VoidInvoiceRequest(null);
+        var user = currentUser.RequireUser();
+
+        try
+        {
+            var invoice = await invoicing.VoidInvoiceAsync(id, body.Reason, user.UserId, user.DisplayName, ct);
+            await auditLog.LogAsync(user, "Invoice.Voided", "Invoice", id, body.Reason, null, ct);
+            var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
+            return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
+    }
+
     [Function("Invoices_Pdf")]
     public async Task<IActionResult> Pdf(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/{id:int}/pdf")] HttpRequest req, int id, CancellationToken ct)
@@ -159,7 +207,8 @@ public class InvoicesFunctions(
     private static InvoiceDto ToDto(Invoice i, string clientName) => new(
         i.Id, i.ClientId, clientName, i.PeriodStart, i.PeriodEnd, i.ReportingCurrency, i.ExchangeRate, i.Status.ToString(),
         i.InvoiceNumber, i.TotalAmount, i.GeneratedAtUtc, i.FinalizedAtUtc,
-        i.LineItems.Select(ToLineItemDto).ToList());
+        i.LineItems.Select(ToLineItemDto).ToList(),
+        i.VoidedAtUtc, i.VoidedByName, i.VoidReason);
 
     private static InvoiceLineItemDto ToLineItemDto(InvoiceLineItem l) => new(
         l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.GrossAmount, l.DiscountPercent, l.Amount, l.Type.ToString(),

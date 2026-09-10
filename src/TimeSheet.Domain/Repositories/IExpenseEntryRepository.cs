@@ -12,6 +12,10 @@ public interface IExpenseEntryRepository
     /// overlapping period never double-counts an already-invoiced expense.</summary>
     Task<IReadOnlyList<ExpenseEntry>> GetBillableForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct);
 
+    /// <summary>Every expense currently locked to this invoice - used by InvoicingService.VoidInvoiceAsync to
+    /// unlock them all (InvoiceId = null) so they become invoiceable again.</summary>
+    Task<IReadOnlyList<ExpenseEntry>> GetByInvoiceIdAsync(int invoiceId, CancellationToken ct);
+
     Task AddAsync(ExpenseEntry entry, CancellationToken ct);
     void Update(ExpenseEntry entry);
     void Remove(ExpenseEntry entry);

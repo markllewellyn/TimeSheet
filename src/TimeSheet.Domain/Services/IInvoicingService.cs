@@ -29,6 +29,15 @@ public interface IInvoicingService
     Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct);
 
     Task<Stream> GetPdfAsync(int invoiceId, CancellationToken ct);
+
+    /// <summary>Nothing was ever locked for a Draft, so this is a plain delete - no entries to unwind. Throws
+    /// if the invoice isn't a Draft.</summary>
+    Task DeleteDraftAsync(int invoiceId, CancellationToken ct);
+
+    /// <summary>Keeps the Invoice row, its real InvoiceNumber and its PDF permanently (a durable record this
+    /// number was issued then voided) - unlocks every entry/expense that was locked to it so they become
+    /// invoiceable again. Cannot be called on a Draft (nothing to void) or an already-Voided invoice.</summary>
+    Task<Invoice> VoidInvoiceAsync(int invoiceId, string? reason, int voidedByUserId, string voidedByName, CancellationToken ct);
 }
 
 public record InvoiceDocumentModel(

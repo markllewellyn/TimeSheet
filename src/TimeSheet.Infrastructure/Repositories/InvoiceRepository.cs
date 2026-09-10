@@ -31,12 +31,17 @@ public class InvoiceRepository(TimesheetDbContext db) : IInvoiceRepository
             .Where(i => i.LineItems.Any(l => projectIds.Contains(l.ProjectId)))
             .OrderByDescending(i => i.PeriodStart).ToListAsync(ct);
 
+    // Status != Draft (not just == Finalized) - a Voided invoice keeps its InvoiceNumber permanently, and
+    // that number must never be reused by a later invoice for the same client. Matches the DB-level partial
+    // unique index, which is filtered to the same two statuses for the same reason.
     public Task<bool> InvoiceNumberInUseAsync(int clientId, string invoiceNumber, CancellationToken ct) =>
-        db.Invoices.AnyAsync(i => i.ClientId == clientId && i.InvoiceNumber == invoiceNumber && i.Status == InvoiceStatus.Finalized, ct);
+        db.Invoices.AnyAsync(i => i.ClientId == clientId && i.InvoiceNumber == invoiceNumber && i.Status != InvoiceStatus.Draft, ct);
 
     public async Task AddAsync(Invoice invoice, CancellationToken ct) => await db.Invoices.AddAsync(invoice, ct);
 
     public void Update(Invoice invoice) => db.Invoices.Update(invoice);
+
+    public void Remove(Invoice invoice) => db.Invoices.Remove(invoice);
 
     public void ClearLineItems(Invoice invoice)
     {

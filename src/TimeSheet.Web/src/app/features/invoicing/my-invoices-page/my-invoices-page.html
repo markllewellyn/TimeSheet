@@ -29,7 +29,7 @@
         <div class="flex items-center gap-3">
           <span class="font-semibold text-foreground">{{ invoice.clientName }}</span>
           <span class="text-sm text-muted-foreground">{{ invoice.periodStart }} – {{ invoice.periodEnd }}</span>
-          <span [class]="invoice.status === 'Finalized' ? 'badge-success' : 'badge-warning'">
+          <span [class]="statusBadgeClass(invoice.status)">
             {{ invoice.status }}
           </span>
           @if (invoice.invoiceNumber) {

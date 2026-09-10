@@ -60,11 +60,15 @@ public class InvoiceConfiguration : IEntityTypeConfiguration<Invoice>
         builder.Property(i => i.PdfStorageKey).HasMaxLength(1000);
         builder.Property(i => i.TotalAmount).HasPrecision(18, 2);
         builder.Property(i => i.Status).HasConversion<string>().HasMaxLength(20);
+        builder.Property(i => i.VoidedByName).HasMaxLength(100);
+        builder.Property(i => i.VoidReason).HasMaxLength(1000);
 
-        // Unique invoice number per client, scoped to Finalized invoices only (Drafts have no number yet).
+        // Unique invoice number per client, scoped to Finalized-or-Voided invoices (Drafts have no number
+        // yet). Voided is included, not just Finalized, so a voided invoice's number can never silently be
+        // reused by a later invoice - the whole point of voiding rather than deleting.
         builder.HasIndex(i => new { i.ClientId, i.InvoiceNumber })
             .IsUnique()
-            .HasFilter("\"Status\" = 'Finalized'");
+            .HasFilter("\"Status\" IN ('Finalized', 'Voided')");
 
         builder.HasMany(i => i.LineItems)
             .WithOne(li => li.Invoice)

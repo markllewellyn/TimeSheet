@@ -4,6 +4,70 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-10 — Delete a Draft invoice; Void a Finalized invoice, so a mistake can actually be corrected
+
+Immediate follow-up to the double-billing fix above: that fix closed the hole that let a duplicate invoice be
+finalized in the first place, but the user hit exactly that scenario live before it landed and asked directly:
+"I think I need the option to delete a draft, and even a finalized invoice, putting the entries back into an
+invoicable state?" This runs against an explicit FDD design decision ("a Finalized invoice is never
+un-finalized in this app"), so rather than quietly picking a shape, it was raised with the user directly via
+Plan Mode with an `AskUserQuestion` round first.
+
+- **Confirmed with the user**: a **Draft** gets a plain delete (nothing was ever locked for a Draft, so nothing
+  needs unwinding). A **Finalized** invoice gets a **Void**, not a hard delete - the invoice row, its real
+  `InvoiceNumber`, and its PDF are all kept permanently (a durable record this number was issued then
+  corrected, closer to standard accounting practice than erasing it), and every `TimesheetEntry`/`ExpenseEntry`
+  locked to it gets unlocked (`InvoiceId = null`) so it becomes invoiceable again.
+- **A real DB-level gap found while planning, not just an app-level check**: `InvoiceConfiguration`'s partial
+  unique index on `{ClientId, InvoiceNumber}` was filtered to `Status = 'Finalized'` rows only - if a voided
+  invoice's status became `Voided` while keeping its number, the index would stop covering it, meaning the
+  database itself would silently let a *new* Finalized invoice reuse a voided invoice's number, defeating the
+  whole point of Void. Filter widened to `Status IN ('Finalized', 'Voided')` (new migration
+  `AddInvoiceVoiding`); `InvoiceRepository.InvoiceNumberInUseAsync`'s app-level check updated to match
+  (`Status != Draft` instead of `Status == Finalized`).
+- **New `Invoice` fields** (`VoidedAtUtc`/`VoidedByUserId`/`VoidedByName`/`VoidReason`) - same "FK + denormalized
+  name snapshot" pattern as `FinalizedAtUtc`/`FinalizedByUserId`, since this is specifically meant to be a
+  durable audit record even if the voiding user is later renamed or deactivated. `InvoicingService.GetPdfAsync`'s
+  guard inverted (`Status == Draft` blocks, not `Status != Finalized`) so a Voided invoice's PDF stays
+  downloadable, same as a Finalized one's.
+- **New `IInvoicingService.DeleteDraftAsync`/`VoidInvoiceAsync`** - `DeleteDraftAsync` throws if the invoice
+  isn't a Draft; `VoidInvoiceAsync` throws if it isn't Finalized, then re-fetches everything currently locked to
+  it via the real `InvoiceId` FK (`ITimesheetEntryRepository`/`IExpenseEntryRepository.GetByInvoiceIdAsync`,
+  both new) and clears it on every one before flipping the status. New `Invoices_DeleteDraft`
+  (`DELETE invoices/{id}`) and `Invoices_Void` (`POST invoices/{id}/void`) endpoints, both Admin-only,
+  audit-logged (`Invoice.DraftDeleted`/`Invoice.Voided`) via `IAuditLogService` newly injected into
+  `InvoicesFunctions`.
+- **Frontend**: `invoicing-page` gained a "Delete Draft" link next to Finalize on Draft cards, and a Finalized
+  card's action row now also carries a reason input + "Void Invoice" link (both `ConfirmService`-gated,
+  `destructive: true`, mirroring `expenses-list-page`'s own delete pattern exactly); a Voided card shows
+  "Download PDF" plus a plain-text "Voided {date} by {name}: {reason}" line, with no other actions - already
+  terminal. New `statusBadgeClass()` helper (Finalized→green, Draft→amber, Voided→red) replaces the old
+  two-way ternary on both `invoicing-page` and the read-only `my-invoices-page` (PM view), which would
+  otherwise have rendered a Voided invoice with the same amber badge as a Draft.
+- Backend build clean, 56/56 tests pass (4 new: `DeleteDraftAsync` removes the invoice and throws on a
+  Finalized one; `VoidInvoiceAsync` unlocks every entry/expense and throws on a Draft). Angular build clean.
+  API host restarted (new migration + endpoints + `IAuditLogService` DI change on `InvoicesFunctions`) -
+  confirmed via a direct DB script that all 4 new `Invoices` columns and the widened index filter landed.
+- **Live-verified end-to-end in the browser, both flows with real proof, not just the happy path**: deleted a
+  genuine empty Draft for SVG - confirmed the "Draft invoice deleted." banner and that it vanished from the
+  list. Voided the real `#CLEANUP-EXPENSE-LOCK` invoice for Everlast (the deliberate fix-through-the-app
+  invoice left over from the double-billing round above, with one real locked expense on it) with a typed
+  reason - confirmed the card flipped to a red "Voided" badge showing "Voided Sep 10, 2026 by Mark Llewellyn:
+  Duplicate invoice from double-billing bug - correcting", "Download PDF" still worked (fetched it directly,
+  200/`application/pdf`), and its expense line stayed visible read-only, no Void/Finalize controls. Confirmed
+  the unlock was real, not just a status flip: queried the dev DB directly (0 rows still pointing `InvoiceId`
+  at the voided invoice), confirmed the Expenses list now showed that same expense with Edit/Delete instead of
+  "Locked (invoiced)", then generated a fresh Draft for Everlast covering the exact same period and got the
+  same line back (125.00 USD, same staff/date/description) - proof it's genuinely re-invoiceable, not just
+  unlocked in name. Finally tried finalizing that fresh draft under the exact same number,
+  `CLEANUP-EXPENSE-LOCK` - correctly rejected with "Invoice number 'CLEANUP-EXPENSE-LOCK' is already in use for
+  this client.", proving both the app-level check and the underlying DB index fix block reuse of a voided
+  invoice's number.
+- **New demo-data state**: invoice `#CLEANUP-EXPENSE-LOCK` is now `Voided` (was `Finalized`) rather than a new
+  artifact - one of the SVG Drafts from the double-billing round's own leftover state was deleted as part of
+  verification, and a fresh Draft for Everlast (2026-08-01 to 2026-09-10, 125.00 USD, never finalized) was left
+  behind from the re-invoiceability proof.
+
 ## Done even later still in this session, 2026-09-10 — a real double-billing bug: invoicing never excluded already-invoiced entries
 
 Found live by the user, immediately after the invoice-per-entry-line work below: they generated and finalized

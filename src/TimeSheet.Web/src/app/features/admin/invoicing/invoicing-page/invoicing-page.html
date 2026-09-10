@@ -68,7 +68,7 @@
           <div class="mb-3 flex items-center justify-between">
             <div class="flex items-center gap-3">
               <span class="font-semibold text-foreground">{{ invoice.periodStart }} – {{ invoice.periodEnd }}</span>
-              <span [class]="invoice.status === 'Finalized' ? 'badge-success' : 'badge-warning'">
+              <span [class]="statusBadgeClass(invoice.status)">
                 {{ invoice.status }}
               </span>
               @if (invoice.invoiceNumber) {
@@ -155,10 +155,25 @@
             <div class="mt-4 flex items-center gap-3">
               <input placeholder="Invoice number" class="input max-w-xs" [ngModel]="invoiceNumberDraft()" (ngModelChange)="invoiceNumberDraft.set($event)" />
               <button class="btn-primary" (click)="finalize(invoice)">Finalize</button>
+              <button class="btn-link text-[var(--destructive)]" (click)="deleteDraft(invoice)">Delete Draft</button>
+            </div>
+          } @else if (invoice.status === 'Finalized') {
+            <div class="mt-4 flex items-center gap-3">
+              <button class="btn-secondary" (click)="downloadPdf(invoice)">Download PDF</button>
+              <input
+                placeholder="Reason (optional)"
+                class="input max-w-xs"
+                [ngModel]="voidReasonDraft()"
+                (ngModelChange)="voidReasonDraft.set($event)"
+              />
+              <button class="btn-link text-[var(--destructive)]" (click)="voidInvoice(invoice)">Void Invoice</button>
             </div>
           } @else {
-            <div class="mt-4">
+            <div class="mt-4 flex items-center gap-3">
               <button class="btn-secondary" (click)="downloadPdf(invoice)">Download PDF</button>
+              <span class="text-sm text-muted-foreground">
+                Voided {{ invoice.voidedAtUtc | date }} by {{ invoice.voidedByName }}{{ invoice.voidReason ? ': ' + invoice.voidReason : '' }}
+              </span>
             </div>
           }
         </div>

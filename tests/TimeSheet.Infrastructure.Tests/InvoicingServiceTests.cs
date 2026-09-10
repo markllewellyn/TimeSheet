@@ -124,6 +124,85 @@ public class InvoicingServiceTests
     }
 
     [Fact]
+    public async Task DeleteDraftAsync_RemovesTheInvoiceAndItsLineItems()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        await service.DeleteDraftAsync(draft.Id, CancellationToken.None);
+
+        Assert.False(await db.Invoices.AnyAsync(i => i.Id == draft.Id));
+        Assert.False(await db.InvoiceLineItems.AnyAsync(l => l.InvoiceId == draft.Id));
+    }
+
+    [Fact]
+    public async Task DeleteDraftAsync_FinalizedInvoice_Throws()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        var finalized = await service.FinalizeInvoiceAsync(draft.Id, "INV-DEL-1", user.Id, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.DeleteDraftAsync(finalized.Id, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task VoidInvoiceAsync_UnlocksEntriesAndExpenses_SoTheyAreInvoiceableAgain()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        var entry = MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m);
+        var expense = MakeExpense(project, user, new DateOnly(2026, 2, 16), 50m);
+        db.TimesheetEntries.Add(entry);
+        db.ExpenseEntries.Add(expense);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        var finalized = await service.FinalizeInvoiceAsync(draft.Id, "INV-VOID-1", user.Id, CancellationToken.None);
+
+        var voided = await service.VoidInvoiceAsync(finalized.Id, "Duplicate, raised in error", user.Id, "Admin User", CancellationToken.None);
+
+        Assert.Equal(InvoiceStatus.Voided, voided.Status);
+        Assert.NotNull(voided.VoidedAtUtc);
+        Assert.Equal("Admin User", voided.VoidedByName);
+        Assert.Equal("Duplicate, raised in error", voided.VoidReason);
+
+        var reloadedEntry = await db.TimesheetEntries.AsNoTracking().SingleAsync(e => e.Id == entry.Id);
+        var reloadedExpense = await db.ExpenseEntries.AsNoTracking().SingleAsync(e => e.Id == expense.Id);
+        Assert.Null(reloadedEntry.InvoiceId);
+        Assert.Null(reloadedExpense.InvoiceId);
+
+        // The concrete proof this actually restores invoiceability, not just clears a flag: a fresh draft for
+        // the exact same client/period now picks the same entry and expense back up.
+        var newDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Equal(2, newDraft.LineItems.Count);
+    }
+
+    [Fact]
+    public async Task VoidInvoiceAsync_DraftInvoice_Throws()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => service.VoidInvoiceAsync(draft.Id, null, user.Id, "Admin User", CancellationToken.None));
+    }
+
+    [Fact]
     public async Task GenerateDraftInvoiceAsync_EntryAlreadyLockedToAPriorInvoice_NotIncludedAgain()
     {
         // Reproduces a real bug the user hit live: finalizing an invoice, then generating a second draft for

@@ -42,7 +42,13 @@ public enum AssignmentStatus
 public enum InvoiceStatus
 {
     Draft,
-    Finalized
+    Finalized,
+
+    /// <summary>A Finalized invoice that's since been corrected - the invoice row, its InvoiceNumber and its
+    /// PDF are kept permanently as a record it was issued then voided, but every entry/expense locked to it is
+    /// unlocked (InvoiceId cleared) so it becomes invoiceable again. Never applies to a Draft - delete it
+    /// instead, since nothing was ever locked for one.</summary>
+    Voided
 }
 
 public enum InvoiceLineItemType

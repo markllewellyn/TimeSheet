@@ -161,12 +161,63 @@ public class InvoicingService(
         var invoice = await invoices.GetByIdAsync(invoiceId, ct)
             ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
 
-        if (invoice.Status != InvoiceStatus.Finalized || invoice.PdfStorageKey is null)
+        // Finalized or Voided (not Draft) - a voided invoice's PDF stays downloadable as part of the
+        // permanent record of what was actually issued before it was corrected.
+        if (invoice.Status == InvoiceStatus.Draft || invoice.PdfStorageKey is null)
         {
             throw new InvalidOperationException("The PDF is only available once the invoice has been finalized.");
         }
 
         return await fileStorage.OpenReadAsync(invoice.PdfStorageKey, ct);
+    }
+
+    public async Task DeleteDraftAsync(int invoiceId, CancellationToken ct)
+    {
+        var invoice = await invoices.GetByIdAsync(invoiceId, ct)
+            ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
+
+        if (invoice.Status != InvoiceStatus.Draft)
+        {
+            throw new InvalidOperationException("Only a Draft invoice can be deleted.");
+        }
+
+        invoices.Remove(invoice);
+        await uow.SaveChangesAsync(ct);
+    }
+
+    public async Task<Invoice> VoidInvoiceAsync(int invoiceId, string? reason, int voidedByUserId, string voidedByName, CancellationToken ct)
+    {
+        var invoice = await invoices.GetByIdAsync(invoiceId, ct)
+            ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
+
+        if (invoice.Status != InvoiceStatus.Finalized)
+        {
+            throw new InvalidOperationException("Only a Finalized invoice can be voided.");
+        }
+
+        // Unlock by re-fetching whatever is CURRENTLY locked to this invoice via its real FK - simpler than
+        // LockEntriesAsync's own project/period reconstitution trick, which only exists because InvoiceLineItem
+        // has no FK back to the source row; here we're going the other direction, off a real InvoiceId.
+        foreach (var entry in await entries.GetByInvoiceIdAsync(invoiceId, ct))
+        {
+            entry.InvoiceId = null;
+            entries.Update(entry);
+        }
+        foreach (var expense in await expenseEntries.GetByInvoiceIdAsync(invoiceId, ct))
+        {
+            expense.InvoiceId = null;
+            expenseEntries.Update(expense);
+        }
+
+        invoice.Status = InvoiceStatus.Voided;
+        invoice.VoidedAtUtc = DateTimeOffset.UtcNow;
+        invoice.VoidedByUserId = voidedByUserId;
+        invoice.VoidedByName = voidedByName;
+        invoice.VoidReason = reason;
+
+        invoices.Update(invoice);
+        await uow.SaveChangesAsync(ct);
+        return invoice;
     }
 
     /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." InvoiceLineItem has no FK

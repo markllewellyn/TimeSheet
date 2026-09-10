@@ -39,4 +39,15 @@ export class MyInvoicesPage {
   protected groupedLineItems(invoice: ProjectManagerInvoice): InvoiceLineItemGroup[] {
     return groupInvoiceLineItemsByProject(invoice.lineItems);
   }
+
+  protected statusBadgeClass(status: ProjectManagerInvoice['status']): string {
+    switch (status) {
+      case 'Finalized':
+        return 'badge-success';
+      case 'Voided':
+        return 'badge-danger';
+      default:
+        return 'badge-warning';
+    }
+  }
 }

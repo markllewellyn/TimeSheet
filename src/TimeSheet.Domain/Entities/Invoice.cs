@@ -28,8 +28,17 @@ public class Invoice
     public int? FinalizedByUserId { get; set; }
 
     /// <summary>Opaque key into IFileStorageService. Only populated at Finalize time (so the invoice number
-    /// appears on the rendered document).</summary>
+    /// appears on the rendered document). Left untouched by voiding - the PDF stays downloadable as part of
+    /// the permanent record.</summary>
     public string? PdfStorageKey { get; set; }
+
+    /// <summary>Set only when Status becomes Voided. VoidedByName is a denormalized snapshot (FK + name, same
+    /// pattern as TimesheetEntry.ApprovedByStaffId/ApprovedByName) since this is specifically meant to be a
+    /// durable audit record, not just a live join.</summary>
+    public DateTimeOffset? VoidedAtUtc { get; set; }
+    public int? VoidedByUserId { get; set; }
+    public string? VoidedByName { get; set; }
+    public string? VoidReason { get; set; }
 
     public List<InvoiceLineItem> LineItems { get; set; } = [];
 }

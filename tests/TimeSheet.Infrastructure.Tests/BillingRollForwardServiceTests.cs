@@ -189,6 +189,11 @@ public class BillingRollForwardServiceTests
             inner.FinalizeInvoiceAsync(invoiceId, invoiceNumber, finalizedByUserId, ct);
 
         public Task<Stream> GetPdfAsync(int invoiceId, CancellationToken ct) => inner.GetPdfAsync(invoiceId, ct);
+
+        public Task DeleteDraftAsync(int invoiceId, CancellationToken ct) => inner.DeleteDraftAsync(invoiceId, ct);
+
+        public Task<Invoice> VoidInvoiceAsync(int invoiceId, string? reason, int voidedByUserId, string voidedByName, CancellationToken ct) =>
+            inner.VoidInvoiceAsync(invoiceId, reason, voidedByUserId, voidedByName, ct);
     }
 
     private class RecordingNotificationService : INotificationService

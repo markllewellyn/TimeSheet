@@ -88,6 +88,10 @@ public interface ITimesheetEntryRepository
     /// without a second round trip.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken ct);
 
+    /// <summary>Every entry currently locked to this invoice - used by InvoicingService.VoidInvoiceAsync to
+    /// unlock them all (InvoiceId = null) so they become invoiceable again.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetByInvoiceIdAsync(int invoiceId, CancellationToken ct);
+
     Task AddAsync(TimesheetEntry entry, CancellationToken ct);
     void Update(TimesheetEntry entry);
     void Remove(TimesheetEntry entry);

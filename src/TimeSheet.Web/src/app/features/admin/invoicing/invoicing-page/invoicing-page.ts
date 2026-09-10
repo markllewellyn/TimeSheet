@@ -1,22 +1,24 @@
-import { DecimalPipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { Invoice, InvoiceLineItem, InvoicesService } from '../../../../core/services/invoices.service';
 import { BillingRollForwardService } from '../../../../core/services/billing-roll-forward.service';
+import { ConfirmService } from '../../../../core/services/confirm.service';
 import { Client } from '../../../../core/models/project.models';
 import { groupInvoiceLineItemsByProject, InvoiceLineItemGroup } from '../../../../core/utils/invoice-line-grouping';
 
 @Component({
   selector: 'app-invoicing-page',
   standalone: true,
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, DatePipe],
   templateUrl: './invoicing-page.html',
 })
 export class InvoicingPage {
   private readonly clientsService = inject(ClientsService);
   private readonly invoicesService = inject(InvoicesService);
   private readonly billingRollForwardService = inject(BillingRollForwardService);
+  private readonly confirmService = inject(ConfirmService);
 
   protected readonly clients = signal<Client[]>([]);
   protected readonly selectedClientId = signal<number | null>(null);
@@ -26,6 +28,7 @@ export class InvoicingPage {
   protected readonly periodStart = signal(this.firstOfMonth());
   protected readonly periodEnd = signal(new Date().toISOString().slice(0, 10));
   protected readonly invoiceNumberDraft = signal('');
+  protected readonly voidReasonDraft = signal('');
   protected readonly manualExchangeRateInput = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly successMessage = signal<string | null>(null);
@@ -123,6 +126,62 @@ export class InvoicingPage {
         this.error.set(err?.error?.error ?? 'Could not finalize the invoice.');
       },
     });
+  }
+
+  /** Nothing was ever locked for a Draft, so this is a plain delete - no entries to unwind. */
+  protected async deleteDraft(invoice: Invoice): Promise<void> {
+    const confirmed = await this.confirmService.confirm(
+      `Delete this draft invoice for ${invoice.clientName} (${invoice.periodStart} to ${invoice.periodEnd})?`,
+      { confirmLabel: 'Delete', destructive: true },
+    );
+    if (!confirmed) return;
+
+    this.invoicesService.deleteDraft(invoice.id).subscribe({
+      next: () => {
+        this.error.set(null);
+        this.successMessage.set('Draft invoice deleted.');
+        this.refresh(invoice.clientId);
+      },
+      error: (err) => {
+        this.successMessage.set(null);
+        this.error.set(err?.error?.error ?? 'Could not delete the draft invoice.');
+      },
+    });
+  }
+
+  /** Keeps the invoice, its real number and its PDF permanently - unlocks every entry/expense that was locked
+   * to it so they become invoiceable again. */
+  protected async voidInvoice(invoice: Invoice): Promise<void> {
+    const reason = this.voidReasonDraft().trim() || null;
+    const confirmed = await this.confirmService.confirm(
+      `Void invoice ${invoice.invoiceNumber ?? invoice.id}? Its entries and expenses will become invoiceable again.`,
+      { confirmLabel: 'Void Invoice', destructive: true },
+    );
+    if (!confirmed) return;
+
+    this.invoicesService.voidInvoice(invoice.id, reason).subscribe({
+      next: () => {
+        this.voidReasonDraft.set('');
+        this.error.set(null);
+        this.successMessage.set('Invoice voided.');
+        this.refresh(invoice.clientId);
+      },
+      error: (err) => {
+        this.successMessage.set(null);
+        this.error.set(err?.error?.error ?? 'Could not void the invoice.');
+      },
+    });
+  }
+
+  protected statusBadgeClass(status: Invoice['status']): string {
+    switch (status) {
+      case 'Finalized':
+        return 'badge-success';
+      case 'Voided':
+        return 'badge-danger';
+      default:
+        return 'badge-warning';
+    }
   }
 
   protected groupedLineItems(invoice: Invoice): InvoiceLineItemGroup[] {

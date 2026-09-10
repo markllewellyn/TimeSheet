@@ -195,6 +195,9 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
     public async Task<IReadOnlyList<TimesheetEntry>> GetByIdsAsync(IReadOnlyCollection<int> ids, CancellationToken ct) =>
         await db.TimesheetEntries.Include(e => e.Project).Where(e => ids.Contains(e.Id)).ToListAsync(ct);
 
+    public async Task<IReadOnlyList<TimesheetEntry>> GetByInvoiceIdAsync(int invoiceId, CancellationToken ct) =>
+        await db.TimesheetEntries.Where(e => e.InvoiceId == invoiceId).ToListAsync(ct);
+
     public async Task AddAsync(TimesheetEntry entry, CancellationToken ct) => await db.TimesheetEntries.AddAsync(entry, ct);
 
     public void Update(TimesheetEntry entry) => db.TimesheetEntries.Update(entry);

@@ -29,12 +29,17 @@ export interface Invoice {
   periodEnd: string;
   reportingCurrency: string;
   exchangeRate: number | null;
-  status: 'Draft' | 'Finalized';
+  status: 'Draft' | 'Finalized' | 'Voided';
   invoiceNumber: string | null;
   totalAmount: number;
   generatedAtUtc: string;
   finalizedAtUtc: string | null;
   lineItems: InvoiceLineItem[];
+  // Set only once Status becomes 'Voided' - a permanent record of what happened and why, kept alongside the
+  // still-downloadable PDF rather than deleting the invoice outright.
+  voidedAtUtc: string | null;
+  voidedByName: string | null;
+  voidReason: string | null;
 }
 
 /// A project manager's own-project view of an invoice - lineItems and myTotalAmount are already filtered/summed
@@ -46,7 +51,7 @@ export interface ProjectManagerInvoice {
   periodStart: string;
   periodEnd: string;
   reportingCurrency: string;
-  status: 'Draft' | 'Finalized';
+  status: 'Draft' | 'Finalized' | 'Voided';
   invoiceNumber: string | null;
   myTotalAmount: number;
   generatedAtUtc: string;
@@ -91,5 +96,16 @@ export class InvoicesService {
 
   downloadPdf(invoiceId: number): Observable<Blob> {
     return this.http.get(`${this.baseUrl}/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
+  }
+
+  /** Nothing was ever locked for a Draft, so this is a plain delete - no entries to unwind. */
+  deleteDraft(invoiceId: number): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/invoices/${invoiceId}`);
+  }
+
+  /** Keeps the invoice, its real number and its PDF permanently - unlocks every entry/expense that was locked
+   * to it so they become invoiceable again. */
+  voidInvoice(invoiceId: number, reason: string | null): Observable<Invoice> {
+    return this.http.post<Invoice>(`${this.baseUrl}/invoices/${invoiceId}/void`, { reason });
   }
 }
