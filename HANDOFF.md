@@ -2028,6 +2028,13 @@ session's earlier entry above respectively. They are not part of the new numbere
     "Notif Threshold Test (verification - can be deleted)" (project id 9), and project 3's
     `ProjectManagerUserId` nominating `sarah.chen` (this is now load-bearing — this session's PM
     scoping tests depend on it — don't unset it without picking a replacement PM to test against).
+  - At the user's own request, 2026-09-10: entries 105 and 106 on project 3 (ERP Migration Phase 2) had their
+    `EntryType` set to Testing/Documentation respectively via the app's own Edit form (not a direct DB write),
+    purely so the new Project Detail Breakdown page's "By Entry Type" pie had more than one visible slice for a
+    demo - entry 126 already had Development set from an earlier session. Real data, not fabricated - these are
+    genuine pre-existing test entries, just newly categorized. Re-saving each via the UI also recomputed
+    `ToPayroll` (490.00 each) per this codebase's existing "recompute on every save" behavior - expected, not a
+    side effect worth undoing.
 
 ## How to resume
 
