@@ -18,6 +18,13 @@ public class InvoiceRepository(TimesheetDbContext db) : IInvoiceRepository
         db.Invoices.Include(i => i.LineItems)
             .FirstOrDefaultAsync(i => i.ClientId == clientId && i.PeriodStart == periodStart && i.Status == InvoiceStatus.Draft, ct);
 
+    public Task<Invoice?> GetOverlappingDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct) =>
+        db.Invoices.FirstOrDefaultAsync(i =>
+            i.ClientId == clientId &&
+            i.Status == InvoiceStatus.Draft &&
+            i.PeriodStart <= periodEnd &&
+            i.PeriodEnd >= periodStart, ct);
+
     public async Task<IReadOnlyList<Invoice>> GetByClientAsync(int clientId, CancellationToken ct) =>
         await db.Invoices
             .Include(i => i.Client)

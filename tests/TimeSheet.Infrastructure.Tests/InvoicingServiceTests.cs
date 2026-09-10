@@ -225,6 +225,81 @@ public class InvoicingServiceTests
     }
 
     [Fact]
+    public async Task GenerateDraftInvoiceAsync_OverlappingDraftAlreadyExists_Throws()
+    {
+        // The real gap the earlier per-line fixes don't close: a still-open Draft is never locked, so leaving
+        // one around unrefreshed while a sibling invoice for an overlapping period gets finalized would let
+        // that stale Draft later be finalized too, double-billing the client for the same work.
+        await using var db = CreateInMemoryDb();
+        var (client, _, _) = await SeedAsync(db);
+
+        var service = CreateService(db);
+        await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        var overlappingStart = PeriodStart.AddDays(14);
+        var overlappingEnd = PeriodEnd.AddDays(14);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.GenerateDraftInvoiceAsync(client.Id, overlappingStart, overlappingEnd, null, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_NonOverlappingDraftExists_Succeeds()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, _, _) = await SeedAsync(db);
+
+        var service = CreateService(db);
+        var firstDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        var nextPeriodStart = PeriodEnd.AddDays(1);
+        var nextPeriodEnd = nextPeriodStart.AddDays(27);
+        var secondDraft = await service.GenerateDraftInvoiceAsync(client.Id, nextPeriodStart, nextPeriodEnd, null, CancellationToken.None);
+
+        Assert.NotEqual(firstDraft.Id, secondDraft.Id);
+        Assert.Equal(2, await db.Invoices.CountAsync());
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_SamePeriodStartAsExistingDraft_StillRegeneratesInPlace()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+
+        var service = CreateService(db);
+        var firstDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 20), 2m, 100m));
+        await db.SaveChangesAsync();
+
+        var regenerated = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Equal(firstDraft.Id, regenerated.Id);
+        Assert.Equal(1, await db.Invoices.CountAsync());
+        Assert.Single(regenerated.LineItems);
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_OverlapsOnlyAFinalizedInvoice_StillSucceeds()
+    {
+        // Proves the new block is Draft-only - a period overlapping an already-Finalized invoice must still be
+        // allowed to generate (just excluding whatever that invoice already billed), not blocked outright.
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.Add(MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        await service.FinalizeInvoiceAsync(draft.Id, "INV-OVERLAP-FIN-1", user.Id, CancellationToken.None);
+
+        var overlappingStart = PeriodStart.AddDays(14);
+        var overlappingEnd = PeriodEnd.AddDays(14);
+        var secondDraft = await service.GenerateDraftInvoiceAsync(client.Id, overlappingStart, overlappingEnd, null, CancellationToken.None);
+
+        Assert.Empty(secondDraft.LineItems);
+    }
+
+    [Fact]
     public async Task GenerateDraftInvoiceAsync_FixedFeeAlreadyFinalized_NotIncludedAgain()
     {
         // Reproduces a real bug the user hit live: a Fixed Project Cost project's flat fee has no source

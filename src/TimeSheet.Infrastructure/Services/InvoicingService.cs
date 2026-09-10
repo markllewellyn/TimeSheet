@@ -18,9 +18,26 @@ public class InvoicingService(
 {
     public async Task<Invoice> GenerateDraftInvoiceAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct)
     {
+        var existing = await invoices.GetDraftAsync(clientId, periodStart, ct);
+
+        // A genuinely different (not-same-periodStart) Draft is blocked from being generated while another
+        // Draft for an overlapping span already exists - a still-open Draft was never locked, so leaving one
+        // around unrefreshed while a sibling invoice for an overlapping period gets finalized is exactly how a
+        // client ends up billed twice for the same work. A Finalized/Voided overlap is fine (not checked here)
+        // - the per-line exclusions already handle that by just leaving already-billed work off the new draft.
+        if (existing is null)
+        {
+            var overlapping = await invoices.GetOverlappingDraftAsync(clientId, periodStart, periodEnd, ct);
+            if (overlapping is not null)
+            {
+                throw new InvalidOperationException(
+                    $"A draft invoice already exists for this client covering {overlapping.PeriodStart} to {overlapping.PeriodEnd}. " +
+                    "Finalize or delete it before generating a draft for an overlapping period.");
+            }
+        }
+
         var freshDraft = await generation.BuildDraftAsync(clientId, periodStart, periodEnd, manualExchangeRate, ct);
 
-        var existing = await invoices.GetDraftAsync(clientId, periodStart, ct);
         if (existing is not null)
         {
             // A Draft can be freely regenerated - nothing has gone to the client yet.

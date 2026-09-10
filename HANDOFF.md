@@ -4,6 +4,58 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later again in this session, 2026-09-10 — closed the last double-billing hole: a stale sibling Draft for an overlapping period is now blocked at generation time
+
+Immediate follow-up to the Fixed Fee fix above, the user's own suggested fix for a gap flagged in that entry's
+own "Not fixed" note: `FinalizeInvoiceAsync` never re-validates a Draft's *own already-stored* line items
+against current reality. If Draft A and Draft B exist for the same client with overlapping periods (both
+legitimately show the same entries/expenses/Fixed Fee, since nothing is locked until Finalize), finalizing A
+correctly excludes what it billed from any *new* draft generation - but Draft B itself is never refreshed. Its
+line items were computed before A existed and stay stale. Finalizing B afterward would still charge the client
+a real second invoice for the same work, since `FinalizeInvoiceAsync` just PDFs/locks whatever B's own
+`LineItems` already say, never rebuilds them.
+
+While investigating this, the user also asked separately why a Fixed Fee didn't become billable again after
+voiding one duplicate invoice, staff costs did. Checked live against the real Acme data: **not a bug** - Acme's
+"ERP Migration Phase 2" project still had 5 *other* Finalized invoices carrying the same duplicate Fixed Fee
+line, untouched by the one Void. `HasFixedFeeBeenInvoicedAsync` (from the fix above) correctly asks "does *any*
+Finalized invoice for this project still carry the fee" - true, since 5 still did. Unlike T&M/Expense, which
+lock to one *specific* invoice's own `InvoiceId` (so voiding invoice A only ever unlocks what A itself locked),
+the Fixed Fee has no such per-invoice ownership - it's a project-wide "has this ever been billed" check. Voiding
+every remaining duplicate would be needed to make the fee billable again - a data decision left to the user, not
+auto-corrected.
+
+- **`InvoicingService.GenerateDraftInvoiceAsync`** now rejects generating a draft for a period that overlaps an
+  existing **Draft**-status invoice for the same client, unless it's an exact `periodStart` match (which is the
+  pre-existing, legitimate "regenerate this same draft in place" path via `GetDraftAsync` - untouched,
+  reordered only so the new check runs first and skips entirely when that reuse path applies, so refreshing
+  your own open draft is never blocked). Deliberately **Draft-only**: a period overlapping an already-Finalized
+  or Voided invoice is still allowed to generate - the per-line exclusions already shipped this session (T&M,
+  Expense, Fixed Fee) correctly handle that case by just leaving already-billed work off the new draft, not by
+  blocking generation outright.
+- **New `IInvoiceRepository.GetOverlappingDraftAsync(clientId, periodStart, periodEnd, ct)`** - a plain
+  range-overlap query (`start1 <= end2 && start2 <= end1`) scoped to `Status == Draft` only. No new persisted
+  state, no migration - a pure additional read check before generation proceeds.
+- **No Functions/Contracts/Angular changes needed at all** - `InvoicesFunctions.GenerateDraft` already wraps
+  the call in `catch (InvalidOperationException)` → `BadRequestObjectResult`, and `invoicing-page.ts`'s
+  `generateDraft()` already renders `err?.error?.error` into the existing error banner. `BillingRollForwardService`
+  already catches `Exception` per client and counts it as a failure without aborting the run - a client with a
+  lingering overlapping Draft now correctly shows up as a roll-forward failure instead of silently
+  double-billing, with every other client unaffected.
+- Backend build clean, 63/63 tests pass (4 new: overlapping Draft throws - confirmed this test genuinely fails
+  without the fix by temporarily reverting the check and re-running before restoring, same rigor as the last
+  two fixes; a non-overlapping Draft still succeeds and coexists; regenerating the exact same `periodStart`
+  still refreshes in place, not blocked; overlapping only a Finalized invoice still succeeds, proving the block
+  is Draft-only). Angular unaffected (no frontend change). API host restarted (backend logic change inside an
+  existing method) - confirmed clean startup.
+- **Live-verified via direct API calls against real Acme data**: generated a fresh Draft for a clean period,
+  then confirmed a second draft request for an overlapping period was rejected with a real 400 and the exact
+  intended message; confirmed regenerating the identical `periodStart` still returns the same invoice id
+  (refresh-in-place untouched); confirmed a genuinely non-overlapping period still succeeds as a brand-new
+  draft. Also confirmed in the browser itself: filled the form for the same overlapping period and clicked
+  Generate Draft - the new red error banner rendered exactly as intended, no second draft created. Test drafts
+  cleaned up via the app's own Delete Draft endpoint afterward.
+
 ## Done still later again in this session, 2026-09-10 — a third double-billing bug: Fixed Fee had no locking at all, and had already double/triple-billed a real client in this dev DB
 
 Immediate follow-up to the Void/Delete feature above, reported live by the user right after: "I have just

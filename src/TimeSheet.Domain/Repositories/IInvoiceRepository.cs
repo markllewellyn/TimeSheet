@@ -6,6 +6,17 @@ public interface IInvoiceRepository
 {
     Task<Invoice?> GetByIdAsync(int id, CancellationToken ct);
     Task<Invoice?> GetDraftAsync(int clientId, DateOnly periodStart, CancellationToken ct);
+
+    /// <summary>The first other Draft invoice for this client whose period overlaps [periodStart, periodEnd] -
+    /// used to block generating a second, genuinely different draft while one already exists for an overlapping
+    /// span. Deliberately Draft-only: a Finalized or Voided invoice covering an overlapping period is fine and
+    /// must NOT block a new draft - GetCountedForInvoicingAsync/GetBillableForProjectAsync/
+    /// HasFixedFeeBeenInvoicedAsync already correctly exclude whatever that invoice locked or billed, so the new
+    /// draft just comes back with less on it, not blocked outright. Only a still-open Draft is the real risk: it
+    /// was never locked, so leaving it around unrefreshed while another invoice for an overlapping period gets
+    /// finalized is exactly how a client ends up billed twice for the same work.</summary>
+    Task<Invoice?> GetOverlappingDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
+
     Task<IReadOnlyList<Invoice>> GetByClientAsync(int clientId, CancellationToken ct);
 
     /// <summary>Every invoice with at least one line item against any of the given projects, across all
