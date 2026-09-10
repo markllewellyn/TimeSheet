@@ -58,8 +58,14 @@ public class InvoicingServiceTests
         ResolvedCustomerRate = resolvedCustomerRate, CreatedUtc = DateTimeOffset.UtcNow,
     };
 
+    private static ExpenseEntry MakeExpense(Project project, User user, DateOnly date, decimal amount) => new()
+    {
+        UserId = user.Id, ProjectId = project.Id, Date = date, Amount = amount, Currency = "GBP",
+        Description = "Taxi", IsBillable = true, CreatedUtc = DateTimeOffset.UtcNow,
+    };
+
     private static InvoicingService CreateService(TimesheetDbContext db) => new(
-        new InvoiceRepository(db), new ClientRepository(db), new TimesheetEntryRepository(db),
+        new InvoiceRepository(db), new ClientRepository(db), new TimesheetEntryRepository(db), new ExpenseEntryRepository(db),
         new InvoiceGenerationService(
             new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
             new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
@@ -115,6 +121,52 @@ public class InvoicingServiceTests
 
         var reloaded = await db.TimesheetEntries.AsNoTracking().SingleAsync(e => e.Id == entry.Id);
         Assert.Null(reloaded.InvoiceId);
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_EntryAlreadyLockedToAPriorInvoice_NotIncludedAgain()
+    {
+        // Reproduces a real bug the user hit live: finalizing an invoice, then generating a second draft for
+        // the same client and an overlapping period, included the exact same already-invoiced entries again -
+        // which would double-bill the client if that second draft were also finalized.
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        var entry = MakeEntry(client, project, user, new DateOnly(2026, 2, 15), 4m, 100m);
+        db.TimesheetEntries.Add(entry);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var firstDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        await service.FinalizeInvoiceAsync(firstDraft.Id, "INV-LOCK-1", user.Id, CancellationToken.None);
+
+        var secondDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Empty(secondDraft.LineItems);
+        Assert.Equal(0m, secondDraft.TotalAmount);
+    }
+
+    [Fact]
+    public async Task FinalizeInvoiceAsync_Expense_LocksItAndExcludesItFromALaterDraft()
+    {
+        // Expenses had NO locking mechanism at all before this fix (no InvoiceId, no exclusion in
+        // GetBillableForProjectAsync) - unlike timesheet entries, so this needed its own dedicated coverage.
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        var expense = MakeExpense(project, user, new DateOnly(2026, 2, 10), 50m);
+        db.ExpenseEntries.Add(expense);
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var firstDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Single(firstDraft.LineItems, l => l.Type == InvoiceLineItemType.Expense);
+
+        await service.FinalizeInvoiceAsync(firstDraft.Id, "INV-EXP-1", user.Id, CancellationToken.None);
+
+        var reloaded = await db.ExpenseEntries.AsNoTracking().SingleAsync(e => e.Id == expense.Id);
+        Assert.NotNull(reloaded.InvoiceId);
+
+        var secondDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Empty(secondDraft.LineItems);
     }
 
     [Fact]

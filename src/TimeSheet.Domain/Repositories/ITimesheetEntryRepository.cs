@@ -39,7 +39,9 @@ public interface ITimesheetEntryRepository
     /// immediately following the one its own Date falls in (same length as the period being invoiced now,
     /// ending the day before periodStart) - so a deferred entry is picked up by exactly the next invoice run,
     /// never lingering indefinitely. Kept separate from GetCountedForProjectAsync, which other, non-invoicing
-    /// callers (e.g. ProjectHealthAssessor) still use unmodified.</summary>
+    /// callers (e.g. ProjectHealthAssessor) still use unmodified. Also excludes any entry already locked to a
+    /// prior invoice (InvoiceId is not null) - without this, generating a second draft for an overlapping
+    /// period would double-bill the client for the same hours.</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetCountedForInvoicingAsync(int projectId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct);
 
     /// <summary>Sum of WorkHours+OutOfHoursHours for every entry against a project. Used by

@@ -17,6 +17,9 @@ export interface ExpenseEntry {
   isBillable: boolean;
   kind: ExpenseEntryKind;
   attachments: Attachment[];
+  // FDD: "Finalizing an invoice locks the entries it was built from" - true once this expense has been
+  // included on a finalized invoice; can no longer be edited or deleted.
+  invoiced: boolean;
 }
 
 export interface CreateExpenseEntryRequest {

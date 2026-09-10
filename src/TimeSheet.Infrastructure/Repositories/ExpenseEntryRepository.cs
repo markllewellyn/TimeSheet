@@ -36,7 +36,9 @@ public class ExpenseEntryRepository(TimesheetDbContext db) : IExpenseEntryReposi
     public async Task<IReadOnlyList<ExpenseEntry>> GetBillableForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct) =>
         await db.ExpenseEntries
             .Include(e => e.User)
-            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to && e.IsBillable)
+            // InvoiceId == null - an expense already locked to a prior invoice must never be counted again on
+            // a new one, same reasoning as ITimesheetEntryRepository.GetCountedForInvoicingAsync.
+            .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to && e.IsBillable && e.InvoiceId == null)
             .ToListAsync(ct);
 
     public async Task AddAsync(ExpenseEntry entry, CancellationToken ct) => await db.ExpenseEntries.AddAsync(entry, ct);

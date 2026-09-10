@@ -48,8 +48,12 @@
               <td class="text-muted-foreground">{{ entry.description }}</td>
               <td class="text-muted-foreground">{{ entry.attachments.length > 0 ? entry.attachments.length : '-' }}</td>
               <td class="text-right">
-                <button class="btn-link mr-3" (click)="edit(entry)">Edit</button>
-                <button class="btn-link text-[var(--destructive)]" (click)="delete(entry)">Delete</button>
+                @if (entry.invoiced) {
+                  <span class="text-xs text-muted-foreground">Locked (invoiced)</span>
+                } @else {
+                  <button class="btn-link mr-3" (click)="edit(entry)">Edit</button>
+                  <button class="btn-link text-[var(--destructive)]" (click)="delete(entry)">Delete</button>
+                }
               </td>
             </tr>
           }

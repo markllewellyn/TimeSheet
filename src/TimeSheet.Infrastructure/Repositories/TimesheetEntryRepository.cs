@@ -29,7 +29,10 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
 
         return await db.TimesheetEntries
             .Include(e => e.User)
-            .Where(e => e.ProjectId == projectId &&
+            // InvoiceId == null - an entry already locked to a prior invoice must never be counted again on a
+            // new one (BuildDraftAsync and LockEntriesAsync both call this query) - without this, regenerating
+            // or generating a second overlapping-period draft would double-bill the client for the same hours.
+            .Where(e => e.ProjectId == projectId && e.InvoiceId == null &&
                 ((e.Date >= periodStart && e.Date <= periodEnd && e.BillingPeriodChoice == BillingPeriodChoice.Current) ||
                  (e.Date >= previousPeriodStart && e.Date <= previousPeriodEnd && e.BillingPeriodChoice == BillingPeriodChoice.Next)))
             .ToListAsync(ct);

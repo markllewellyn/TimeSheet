@@ -9,6 +9,7 @@ public class InvoicingService(
     IInvoiceRepository invoices,
     IClientRepository clients,
     ITimesheetEntryRepository entries,
+    IExpenseEntryRepository expenseEntries,
     IInvoiceGenerationService generation,
     IPdfInvoiceRenderer pdfRenderer,
     INotificationService notificationService,
@@ -169,16 +170,18 @@ public class InvoicingService(
     }
 
     /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." InvoiceLineItem has no FK
-    /// back to the TimesheetEntry it came from (only a StaffId/TaskDate/Description snapshot) - so the entry
-    /// set is reconstituted here by re-running the exact same period/project query that built the line items in
-    /// the first place, then stamping each one with this invoice's id. Fixed Fee and Expense line items don't
-    /// derive from TimesheetEntry rows, so there's nothing to lock for those. Idempotent-safe to call more than
-    /// once (an already-locked entry is simply re-stamped with the same value), though FinalizeInvoiceAsync's
-    /// Draft-only guard means that never actually happens.</summary>
+    /// back to the TimesheetEntry/ExpenseEntry it came from (only a StaffId/TaskDate/Description snapshot) - so
+    /// the entry set is reconstituted here by re-running the exact same period/project query that built the
+    /// line items in the first place, then stamping each one with this invoice's id. Both queries already
+    /// exclude anything with InvoiceId already set (see GetCountedForInvoicingAsync/GetBillableForProjectAsync),
+    /// which is also what stops a second draft for an overlapping period from double-counting an entry this
+    /// invoice already locked. Fixed Fee line items don't derive from either row type, so there's nothing to
+    /// lock for those. Idempotent-safe to call more than once (an already-locked entry is simply re-stamped
+    /// with the same value), though FinalizeInvoiceAsync's Draft-only guard means that never actually happens.</summary>
     private async Task LockEntriesAsync(Invoice invoice, CancellationToken ct)
     {
-        // DistinctBy(ProjectId) - there's now one InvoiceLineItem per entry rather than one per project, so
-        // without this the identical GetCountedForInvoicingAsync query would otherwise re-run once per entry.
+        // DistinctBy(ProjectId) - there's one InvoiceLineItem per entry rather than one per project, so without
+        // this the identical query would otherwise re-run once per entry instead of once per project.
         foreach (var line in invoice.LineItems.Where(l => l.Type == InvoiceLineItemType.TimeAndMaterials).DistinctBy(l => l.ProjectId))
         {
             var counted = await entries.GetCountedForInvoicingAsync(line.ProjectId, invoice.PeriodStart, invoice.PeriodEnd, ct);
@@ -186,6 +189,16 @@ public class InvoicingService(
             {
                 entry.InvoiceId = invoice.Id;
                 entries.Update(entry);
+            }
+        }
+
+        foreach (var line in invoice.LineItems.Where(l => l.Type == InvoiceLineItemType.Expense).DistinctBy(l => l.ProjectId))
+        {
+            var billable = await expenseEntries.GetBillableForProjectAsync(line.ProjectId, invoice.PeriodStart, invoice.PeriodEnd, ct);
+            foreach (var expense in billable)
+            {
+                expense.InvoiceId = invoice.Id;
+                expenseEntries.Update(expense);
             }
         }
     }

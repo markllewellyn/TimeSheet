@@ -16,6 +16,7 @@ public class ExpenseEntryConfiguration : IEntityTypeConfiguration<ExpenseEntry>
 
         builder.HasOne(e => e.Project).WithMany().HasForeignKey(e => e.ProjectId).OnDelete(DeleteBehavior.Restrict);
         builder.HasOne(e => e.User).WithMany().HasForeignKey(e => e.UserId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(e => e.Invoice).WithMany().HasForeignKey(e => e.InvoiceId).OnDelete(DeleteBehavior.Restrict);
 
         builder.HasMany(e => e.Attachments)
             .WithOne(a => a.ExpenseEntry)

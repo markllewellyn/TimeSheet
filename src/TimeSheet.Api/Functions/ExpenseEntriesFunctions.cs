@@ -142,6 +142,7 @@ public class ExpenseEntriesFunctions(
         var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, body.OnBehalfOfUserId);
         if (!authorized) return new NotFoundResult();
         if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
+        if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
         // Mirrors Create's kind-based gate: a Contract entry was never subject to the assignment check to
         // begin with, so editing one must not suddenly require it either.
@@ -175,6 +176,7 @@ public class ExpenseEntriesFunctions(
         var (authorized, impersonatedUserId) = CheckOwnership(entry.UserId, user, ParseOnBehalfOfUserId(req));
         if (!authorized) return new NotFoundResult();
         if (impersonatedUserId is { } impId && await ValidateImpersonationTargetAsync(users, impId, ct) is { } impError) return impError;
+        if (entry.InvoiceId is not null) return InvoicedLockedResult();
 
         expenses.Remove(entry);
         await auditLog.LogAsync(user, "ExpenseEntry.Deleted", "ExpenseEntry", entry.Id,
@@ -198,8 +200,17 @@ public class ExpenseEntriesFunctions(
         return null;
     }
 
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Set by
+    /// InvoicingService.FinalizeInvoiceAsync, never here - this is read-only enforcement.</summary>
+    private static IActionResult InvoicedLockedResult() =>
+        new ObjectResult(new { error = "This entry has been included on a finalized invoice and can no longer be changed." })
+        {
+            StatusCode = StatusCodes.Status409Conflict,
+        };
+
     private static ExpenseEntryDto ToDto(ExpenseEntry e) => new(
         e.Id, e.ProjectId, e.Project?.Name ?? "", e.Project?.ClientId ?? 0, e.Project?.Client?.Name ?? "",
         e.Date, e.Amount, e.Currency, e.Description, e.IsBillable, e.Kind.ToString(),
-        e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList());
+        e.Attachments.Select(a => new AttachmentDto(a.Id, a.FileName, a.ContentType, a.SizeBytes, a.UploadedAtUtc)).ToList(),
+        e.InvoiceId is not null);
 }

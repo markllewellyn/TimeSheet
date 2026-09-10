@@ -4,6 +4,59 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-10 — a real double-billing bug: invoicing never excluded already-invoiced entries
+
+Found live by the user, immediately after the invoice-per-entry-line work below: they generated and finalized
+an invoice, then generated a second draft for the *same client and an overlapping period* - and the exact same
+already-invoiced entries appeared again, at full undiscounted value. If that second draft had also been
+finalized, the client would have been billed twice for the same hours. Reproduced live first (a genuine second
+Draft, full 12,000.00 USD, all 10 lines duplicated) before touching any code, to confirm this wasn't a
+misunderstanding.
+
+- **Root cause**: `ITimesheetEntryRepository.GetCountedForInvoicingAsync` - the query both `BuildDraftAsync` and
+  `LockEntriesAsync` use to find a project's invoiceable entries for a period - filtered only by project, date
+  range and `BillingPeriodChoice`. It never excluded an entry that was already locked to a *prior* invoice
+  (`InvoiceId is not null`). This bug **predates this session's invoice-line-detail work entirely** - the old
+  one-line-per-project rollup had exactly the same defect, just hidden inside a single summed number instead of
+  ten visibly-repeated lines with real dates and descriptions, which is presumably why nobody had ever noticed
+  it before.
+- **Fixed at the source**: added `&& e.InvoiceId == null` to `GetCountedForInvoicingAsync`'s query - the single
+  change that closes the whole class of bug, since both draft-generation and finalize-time locking share this
+  one method. Added `.DistinctBy(l => l.ProjectId)` was already in place from the earlier per-entry-line work,
+  no change needed there.
+- **A second, equally real half of the same bug**: `ExpenseEntry` had **no locking mechanism at all** - no
+  `InvoiceId` field, nothing stamped at finalize time, no exclusion anywhere. An already-invoiced expense could
+  be re-included on a new invoice *and* still be freely edited or deleted through the Expenses page, forever.
+  Fixed properly, not just patched: new `ExpenseEntry.InvoiceId`/`Invoice` (new migration
+  `AddExpenseEntryInvoiceLock`), `ExpenseEntryRepository.GetBillableForProjectAsync` now excludes locked
+  expenses (mirrors the TimesheetEntry fix exactly), `InvoicingService.LockEntriesAsync` extended to also stamp
+  Expense-type lines at finalize time (re-runs `GetBillableForProjectAsync` per project, same "re-run the same
+  query, no FK back to the original row" pattern already used for T&M entries), and `ExpenseEntriesFunctions`
+  Update/Delete gained the exact same `InvoiceId is not null` → 409 lock guard `TimesheetEntriesFunctions`
+  already had. New `ExpenseEntryDto.Invoiced` field; `expenses-list-page` now shows "Locked (invoiced)" instead
+  of Edit/Delete for a locked expense, mirroring the Log Time grid's own existing locked-entry treatment.
+- Backend build clean, 52/52 tests pass (2 new: one reproducing the exact reported scenario - finalize, then
+  generate a second draft for the same period, assert it comes back empty - confirmed this test genuinely
+  fails without the fix by temporarily reverting it and re-running before restoring; one for the equivalent
+  expense-locking path, which had zero prior coverage of any kind). Angular build clean. API host restarted
+  (new migration) - confirmed the `InvoiceId` column landed on `ExpenseEntries` directly against the dev DB.
+- **Live-verified end-to-end, with a real scare along the way worth recording honestly**: the first live
+  re-test through the actual UI still showed all 10 duplicate lines, which looked like the fix hadn't taken -
+  turned out to be a stale/already-existing Draft invoice from the *reproduction* step earlier, combined with a
+  UI click that didn't register cleanly (a recurring flakiness with this exact form already noted earlier this
+  session). Called the `Invoices_GenerateDraft` endpoint directly (via script, not the UI) to get an
+  unambiguous answer: it now correctly excluded all 9 already-locked timesheet entries, leaving exactly **one**
+  line - a single pre-existing expense that had been invoiced *before* the expense-locking fix existed, so it
+  was never retroactively stamped (expected - this codebase's established "only affects entries saved/
+  processed from now on" convention, not a bug). Closed that one real remaining risk properly, through the app
+  itself rather than a raw DB write: finalized that small draft too (`#CLEANUP-EXPENSE-LOCK`, 125.00 USD),
+  confirmed the expense now shows "Locked (invoiced)" on the Expenses page, then generated one more fresh draft
+  for the exact same client and period and confirmed it now comes back with **zero line items, zero total** -
+  the double-billing risk is fully closed, not just mitigated.
+- **New demo-data artifacts**: invoice `#CLEANUP-EXPENSE-LOCK` (a real, deliberate fix-through-the-app, not
+  test noise) and one harmless empty ($0, 0 lines) leftover Draft invoice for Everlast from the final proof
+  step - left as-is, matching this dev DB's existing density of small finalized test invoices for this client.
+
 ## Done later still in this session, 2026-09-10 — invoice line items: per-entry detail, closing the audit's biggest finding
 
 Immediate follow-up to the fresh FDD re-audit below, picked as the user's first priority. The FDD says a

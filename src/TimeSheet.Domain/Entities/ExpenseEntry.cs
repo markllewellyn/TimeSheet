@@ -26,5 +26,13 @@ public class ExpenseEntry
     public DateTimeOffset CreatedUtc { get; set; }
     public DateTimeOffset? ModifiedUtc { get; set; }
 
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from" - same locking mechanism as
+    /// TimesheetEntry.InvoiceId. Set once, at InvoicingService.FinalizeInvoiceAsync time; never cleared
+    /// afterward. Set by re-running the same GetBillableForProjectAsync query the Draft was built from, since
+    /// InvoiceLineItem has no FK back to the ExpenseEntry it came from (only a StaffId/TaskDate/Description
+    /// snapshot) - mirrors TimesheetEntriesFunctions' own identical pattern exactly.</summary>
+    public int? InvoiceId { get; set; }
+    public Invoice? Invoice { get; set; }
+
     public List<ExpenseAttachment> Attachments { get; set; } = [];
 }
