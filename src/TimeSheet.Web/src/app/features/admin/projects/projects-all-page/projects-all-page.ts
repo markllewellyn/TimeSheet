@@ -5,6 +5,7 @@ import { ClientsService } from '../../../../core/services/clients.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { Project } from '../../../../core/models/project.models';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
+import { ProjectStatusBadges } from '../../../../core/components/project-status-badges/project-status-badges';
 
 /**
  * A flat, all-clients view of Projects - the per-client project list (admin/clients/:clientId/projects) is
@@ -14,7 +15,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 @Component({
   selector: 'app-projects-all-page',
   standalone: true,
-  imports: [RouterLink, LoadingSpinner],
+  imports: [RouterLink, LoadingSpinner, ProjectStatusBadges],
   templateUrl: './projects-all-page.html',
 })
 export class ProjectsAllPage {

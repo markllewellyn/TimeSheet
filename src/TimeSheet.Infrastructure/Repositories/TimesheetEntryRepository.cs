@@ -14,6 +14,13 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             .Where(e => e.ProjectId == projectId && e.Date >= from && e.Date <= to)
             .ToListAsync(ct);
 
+    public async Task<IReadOnlyList<TimesheetEntry>> GetAllCountedForProjectAsync(int projectId, CancellationToken ct) =>
+        await db.TimesheetEntries
+            .Include(e => e.User)
+            .Include(e => e.EntryType)
+            .Where(e => e.ProjectId == projectId)
+            .ToListAsync(ct);
+
     public async Task<IReadOnlyList<TimesheetEntry>> GetCountedForInvoicingAsync(int projectId, DateOnly periodStart, DateOnly periodEnd, CancellationToken ct)
     {
         var periodLengthDays = periodEnd.DayNumber - periodStart.DayNumber + 1;
@@ -32,6 +39,19 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
         await db.TimesheetEntries
             .Where(e => e.ProjectId == projectId)
             .SumAsync(e => e.WorkHours + e.OutOfHoursHours, ct);
+
+    public async Task<IReadOnlyDictionary<int, ProjectActuals>> GetActualsByProjectIdsAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct) =>
+        (await db.TimesheetEntries
+            .Where(e => projectIds.Contains(e.ProjectId))
+            .GroupBy(e => e.ProjectId)
+            .Select(g => new
+            {
+                ProjectId = g.Key,
+                TotalHours = g.Sum(e => e.WorkHours + e.OutOfHoursHours),
+                TotalCost = g.Sum(e => e.WorkHours * (e.ResolvedHourlyCost ?? 0) + e.OutOfHoursHours * (e.ResolvedOutOfHoursCost ?? 0)),
+            })
+            .ToListAsync(ct))
+            .ToDictionary(x => x.ProjectId, x => new ProjectActuals(x.TotalHours, x.TotalCost));
 
     public async Task<decimal> GetTotalHoursForUserDateAsync(int userId, DateOnly date, int? excludeEntryId, CancellationToken ct) =>
         await db.TimesheetEntries

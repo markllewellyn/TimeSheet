@@ -4,10 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
-import { PaymentModel, ProjectAttachment, ProjectEstimate, ProjectType } from '../../../../core/models/project.models';
+import { PaymentModel, ProjectAttachment, ProjectEstimate, ProjectStatus, ProjectType } from '../../../../core/models/project.models';
 import { AppUser } from '../../../../core/models/user.models';
 import { ConfirmService } from '../../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
+import { projectStatusBadgeClass, projectStatusBarColor } from '../../../../core/utils/project-status.utils';
 
 @Component({
   selector: 'app-project-edit-page',
@@ -48,6 +49,7 @@ export class ProjectEditPage {
   protected readonly saving = signal(false);
 
   protected readonly estimate = signal<ProjectEstimate | null>(null);
+  protected readonly status = signal<ProjectStatus | null>(null);
 
   protected readonly attachments = signal<ProjectAttachment[]>([]);
   // Only ever false->true, on the first loadAttachments() call - later reloads (after upload/delete) don't
@@ -62,6 +64,7 @@ export class ProjectEditPage {
     if (this.editId) {
       const id = Number(this.editId);
       this.projectsAdmin.getEstimate(id).subscribe((e) => this.estimate.set(e));
+      this.projectsAdmin.getStatus(id).subscribe((s) => this.status.set(s));
       this.loadAttachments(id);
       this.projectsAdmin.getById(id).subscribe({
         next: (p) => {
@@ -145,6 +148,14 @@ export class ProjectEditPage {
           this.error.set(err?.error?.error ?? 'Could not create the project.');
         },
       });
+  }
+
+  protected badgeClass(percent: number): string {
+    return projectStatusBadgeClass(percent);
+  }
+
+  protected barColor(percent: number): string {
+    return projectStatusBarColor(percent);
   }
 
   protected cancel(): void {

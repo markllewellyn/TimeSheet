@@ -25,6 +25,12 @@ public interface ITimesheetEntryRepository
     /// query an entry, not a gate, so a flagged entry still counts (FDD).</summary>
     Task<IReadOnlyList<TimesheetEntry>> GetCountedForProjectAsync(int projectId, DateOnly from, DateOnly to, CancellationToken ct);
 
+    /// <summary>Every entry ever logged against a project, unbounded by date - the same all-time scope as
+    /// GetActualsByProjectIdsAsync, so the project drill-down breakdown's totals never disagree with the
+    /// Budget & Cost Status panel on the same page. Includes User and EntryType navigations as group labels
+    /// for IProjectBreakdownService.</summary>
+    Task<IReadOnlyList<TimesheetEntry>> GetAllCountedForProjectAsync(int projectId, CancellationToken ct);
+
     /// <summary>Invoicing's own view of "every entry for a project within a billing period" - like
     /// GetCountedForProjectAsync but additionally honours TimesheetEntry.BillingPeriodChoice (FDD: "the user can
     /// choose to add it to the current billing period or to the next billing period"): an entry dated in
@@ -39,6 +45,14 @@ public interface ITimesheetEntryRepository
     /// <summary>Sum of WorkHours+OutOfHoursHours for every entry against a project. Used by
     /// IBudgetMonitoringService to evaluate a new entry against Project.BudgetHours.</summary>
     Task<decimal> GetTotalCountedHoursForProjectAsync(int projectId, CancellationToken ct);
+
+    /// <summary>All-time actual hours and cost per project, for however many of the given projects have any
+    /// entries at all - a project with none simply has no key in the result, callers default to zero. One
+    /// query for however many rows are on screen, same batching shape as
+    /// IStaffProjectRepository.GetActiveAssignmentCountsAsync, rather than one round trip per project. Cost
+    /// mirrors ReportingRepository's own CostAmountNative computation exactly (WorkHours*ResolvedHourlyCost +
+    /// OutOfHoursHours*ResolvedOutOfHoursCost) - powers IProjectStatusService's "actual vs budget" figures.</summary>
+    Task<IReadOnlyDictionary<int, ProjectActuals>> GetActualsByProjectIdsAsync(IReadOnlyCollection<int> projectIds, CancellationToken ct);
 
     /// <summary>Sum of WorkHours+OutOfHoursHours for ALL of a user's entries on a date - a physical "a day only
     /// has 24 hours" cap, not a payroll rule. excludeEntryId lets Update exclude the row being edited (its OLD
@@ -76,3 +90,5 @@ public interface ITimesheetEntryRepository
     void Update(TimesheetEntry entry);
     void Remove(TimesheetEntry entry);
 }
+
+public record ProjectActuals(decimal TotalHours, decimal TotalCost);

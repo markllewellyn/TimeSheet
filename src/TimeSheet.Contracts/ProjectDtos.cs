@@ -4,7 +4,12 @@ public record ProjectDto(
     int Id, int ClientId, string ClientName, string Name, string Code, string? Description,
     string PaymentModel, string ProjectType, bool? CanInvoice, bool IsCostExempt, string? CurrencyOverride, DateOnly StartDate, DateOnly? EndDate,
     decimal? BudgetHours, decimal? FixedFeeAmount, bool IsActive,
-    int? ProjectManagerUserId, string? ProjectManagerName, int AssignedStaffCount);
+    int? ProjectManagerUserId, string? ProjectManagerName, int AssignedStaffCount,
+    // Only populated by the list endpoints an Admin or a project's own PM can call (Projects_ListAll,
+    // Projects_ListByClient, Projects_ListManagedByMe) - null on every other ProjectDto response (Get/Create/
+    // Update/ListAssignedToMe), which a regular assigned staff member can also reach and must not see project
+    // financials through. See ProjectsFunctions.ToDto's optional status parameter.
+    decimal? ActualHours = null, decimal? HoursUsedPercent = null, decimal? ActualCost = null, decimal? CostUsedPercent = null);
 
 public record CreateProjectRequest(
     int ClientId, string Name, string Code, string? Description,

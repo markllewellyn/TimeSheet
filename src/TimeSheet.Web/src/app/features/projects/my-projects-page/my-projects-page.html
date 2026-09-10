@@ -1,10 +1,10 @@
 <div class="flex flex-col gap-4">
-  <div class="page-header">
-    <h1 class="page-title">Projects</h1>
-    <a routerLink="/admin/clients" class="btn-primary">
-      + New Project (via a Client)
-    </a>
-  </div>
+  <h1 class="page-title">My Projects</h1>
+  <p class="text-sm text-muted-foreground">Projects you're the nominated manager for, and whether each is on track against its budget hours or fixed fee.</p>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
 
   @if (!loaded()) {
     <app-loading-spinner />
@@ -16,7 +16,7 @@
         </svg>
       </span>
       <p class="empty-state-title">No projects yet</p>
-      <p class="empty-state-body">Create a Client first, then add a Project under it.</p>
+      <p class="empty-state-body">You aren't the nominated manager for any project yet.</p>
     </div>
   } @else {
     <div class="card overflow-hidden px-4">
@@ -24,12 +24,9 @@
         <thead>
           <tr>
             <th>Client</th>
-            <th>Code</th>
-            <th>Name</th>
+            <th>Project</th>
             <th>Payment Model</th>
-            <th>Staff</th>
             <th>On Track</th>
-            <th>Status</th>
             <th></th>
           </tr>
         </thead>
@@ -37,22 +34,14 @@
           @for (p of projects(); track p.id) {
             <tr>
               <td class="text-muted-foreground">{{ p.clientName }}</td>
-              <td class="text-muted-foreground">{{ p.code }}</td>
               <td class="font-medium text-foreground">{{ p.name }}</td>
               <td>
                 <span class="badge-neutral">{{ p.paymentModel === 'TimeAndMaterials' ? 'Time & Materials' : 'Fixed Cost' }}</span>
               </td>
-              <td class="text-muted-foreground">{{ p.assignedStaffCount }}</td>
               <td>
                 <app-project-status-badges [hoursUsedPercent]="p.hoursUsedPercent" [costUsedPercent]="p.costUsedPercent" />
               </td>
-              <td>
-                <span [class]="p.isActive ? 'badge-success' : 'badge-danger'">{{ p.isActive ? 'Active' : 'Inactive' }}</span>
-              </td>
               <td class="text-right">
-                <a [routerLink]="['/admin/projects', p.id]" class="btn-link mr-3">Edit / Rates</a>
-                <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="btn-link mr-3">Assignments</a>
-                <a [routerLink]="['/admin/projects', p.id, 'entry-types']" class="btn-link mr-3">Entry Types</a>
                 <a [routerLink]="['/projects', p.id, 'breakdown']" class="btn-link">Breakdown</a>
               </td>
             </tr>

@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { PaymentModel, Project, ProjectAttachment, ProjectEstimate, ProjectType } from '../models/project.models';
+import { PaymentModel, Project, ProjectAttachment, ProjectBreakdown, ProjectEstimate, ProjectStatus, ProjectType } from '../models/project.models';
 
 export interface CreateProjectRequest {
   clientId: number;
@@ -62,6 +62,23 @@ export class ProjectsAdminService {
 
   getEstimate(id: number): Observable<ProjectEstimate> {
     return this.http.get<ProjectEstimate>(`${this.baseUrl}/projects/${id}/estimate`);
+  }
+
+  getStatus(id: number): Observable<ProjectStatus> {
+    return this.http.get<ProjectStatus>(`${this.baseUrl}/projects/${id}/status`);
+  }
+
+  getBreakdown(id: number): Observable<ProjectBreakdown> {
+    return this.http.get<ProjectBreakdown>(`${this.baseUrl}/projects/${id}/breakdown`);
+  }
+
+  /** FDD: a project's nominated PM can view it - powers the My Projects page. Empty for anyone who manages
+   * nothing, same "backend scopes, route stays open to any signed-in user" pattern as My Invoices.
+   * onBehalfOfUserId lets an Admin impersonating a PM see that PM's own managed project(s). */
+  listManagedByMe(onBehalfOfUserId?: number | null): Observable<Project[]> {
+    return this.http.get<Project[]>(`${this.baseUrl}/projects/managed-by-me`, {
+      params: onBehalfOfUserId ? { onBehalfOfUserId } : {},
+    });
   }
 
   listAttachments(projectId: number): Observable<ProjectAttachment[]> {

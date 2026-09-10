@@ -39,6 +39,7 @@
             <th>Payment Model</th>
             <th>Budget Hours</th>
             <th>Staff</th>
+            <th>On Track</th>
             <th>Status</th>
             <th></th>
           </tr>
@@ -54,12 +55,16 @@
               <td class="text-muted-foreground">{{ p.budgetHours ?? '-' }}</td>
               <td class="text-muted-foreground">{{ p.assignedStaffCount }}</td>
               <td>
+                <app-project-status-badges [hoursUsedPercent]="p.hoursUsedPercent" [costUsedPercent]="p.costUsedPercent" />
+              </td>
+              <td>
                 <span [class]="p.isActive ? 'badge-success' : 'badge-danger'">{{ p.isActive ? 'Active' : 'Inactive' }}</span>
               </td>
               <td class="text-right">
                 <a [routerLink]="['/admin/projects', p.id]" class="btn-link mr-3">Edit / Rates</a>
                 <a [routerLink]="['/admin/projects', p.id, 'assignments']" class="btn-link mr-3">Assignments</a>
-                <a [routerLink]="['/admin/projects', p.id, 'entry-types']" class="btn-link">Entry Types</a>
+                <a [routerLink]="['/admin/projects', p.id, 'entry-types']" class="btn-link mr-3">Entry Types</a>
+                <a [routerLink]="['/projects', p.id, 'breakdown']" class="btn-link">Breakdown</a>
               </td>
             </tr>
           }

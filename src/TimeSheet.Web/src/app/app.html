@@ -20,6 +20,9 @@
         @if (!currentUser.isAdmin()) {
           <a routerLink="/my-invoices" routerLinkActive="nav-link-active" class="nav-link">My Invoices</a>
         }
+        @if ((currentUser.isProjectManager() && !currentUser.isAdmin()) || impersonation.actingAs()) {
+          <a routerLink="/my-projects" routerLinkActive="nav-link-active" class="nav-link">My Projects</a>
+        }
         @if (currentUser.isAdmin()) {
           <a routerLink="/admin/payroll-periods" routerLinkActive="nav-link-active" class="nav-link">Payroll Periods</a>
           <a routerLink="/admin/invoicing" routerLinkActive="nav-link-active" class="nav-link">Invoicing</a>

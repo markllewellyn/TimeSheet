@@ -111,6 +111,51 @@
     <button class="btn-secondary" [disabled]="saving()" (click)="cancel()">Cancel</button>
   </div>
 
+  @if (isEditMode && status(); as s) {
+    <div class="card-padded mt-6">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-foreground">Budget &amp; Cost Status</h2>
+        <a [routerLink]="['/projects', s.projectId, 'breakdown']" class="btn-link text-xs">View Breakdown</a>
+      </div>
+      <div class="flex flex-col gap-4">
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span>Hours: <strong>{{ s.actualHours | number: '1.1-1' }}</strong> of {{ s.budgetHours ?? '?' }} budgeted</span>
+            @if (s.hoursUsedPercent !== null) {
+              <span [class]="badgeClass(s.hoursUsedPercent)">{{ s.hoursUsedPercent | number: '1.0-0' }}%</span>
+            }
+          </div>
+          @if (s.hoursUsedPercent === null) {
+            <p class="text-xs text-muted-foreground">Set Budget Hours above to track hours against a budget.</p>
+          } @else {
+            <div class="h-2 w-full overflow-hidden rounded-full bg-secondary">
+              <div class="h-full rounded-full" [style.width.%]="s.hoursUsedPercent > 100 ? 100 : s.hoursUsedPercent" [style.background-color]="barColor(s.hoursUsedPercent)"></div>
+            </div>
+          }
+        </div>
+
+        <div>
+          <div class="mb-1 flex items-center justify-between text-sm">
+            <span>
+              Cost: <strong>{{ s.actualCost | number: '1.2-2' }}</strong>
+              @if (s.fixedFeeAmount !== null) { of {{ s.fixedFeeAmount | number: '1.2-2' }} fixed fee }
+            </span>
+            @if (s.costUsedPercent !== null) {
+              <span [class]="badgeClass(s.costUsedPercent)">{{ s.costUsedPercent | number: '1.0-0' }}%</span>
+            }
+          </div>
+          @if (s.costUsedPercent === null) {
+            <p class="text-xs text-muted-foreground">Only tracked for a project with a Fixed Fee Amount set above.</p>
+          } @else {
+            <div class="h-2 w-full overflow-hidden rounded-full bg-secondary">
+              <div class="h-full rounded-full" [style.width.%]="s.costUsedPercent > 100 ? 100 : s.costUsedPercent" [style.background-color]="barColor(s.costUsedPercent)"></div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
   @if (isEditMode && estimate(); as e) {
     <div class="card-padded mt-6">
       <h2 class="mb-1 text-sm font-semibold text-foreground">Estimated Cost / Profit</h2>

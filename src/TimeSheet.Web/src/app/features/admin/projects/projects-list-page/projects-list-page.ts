@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
 import { ClientsService } from '../../../../core/services/clients.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
+import { ProjectStatusBadges } from '../../../../core/components/project-status-badges/project-status-badges';
 import { Project } from '../../../../core/models/project.models';
 
 @Component({
   selector: 'app-projects-list-page',
   standalone: true,
-  imports: [RouterLink, FormsModule, LoadingSpinner],
+  imports: [RouterLink, FormsModule, LoadingSpinner, ProjectStatusBadges],
   templateUrl: './projects-list-page.html',
 })
 export class ProjectsListPage {

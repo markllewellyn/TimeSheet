@@ -48,6 +48,8 @@ public static class DependencyInjection
 
         services.AddScoped<IRateResolver, RateResolver>();
         services.AddScoped<IProjectEstimateService, ProjectEstimateService>();
+        services.AddScoped<IProjectStatusService, ProjectStatusService>();
+        services.AddScoped<IProjectBreakdownService, ProjectBreakdownService>();
         services.AddScoped<IUserWorkloadService, UserWorkloadService>();
         services.AddScoped<IFileStorageService, AzureBlobFileStorageService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();

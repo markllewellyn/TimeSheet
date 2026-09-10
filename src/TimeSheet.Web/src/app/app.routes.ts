@@ -66,6 +66,21 @@ export const routes: Routes = [
     loadComponent: () => import('./features/invoicing/my-invoices-page/my-invoices-page').then((m) => m.MyInvoicesPage),
   },
   {
+    // Same pattern as my-invoices above - any signed-in user, scoped server-side to the caller's own managed
+    // project(s) (Projects_ListManagedByMe), empty for everyone else.
+    path: 'my-projects',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/projects/my-projects-page/my-projects-page').then((m) => m.MyProjectsPage),
+  },
+  {
+    // Admin or the project's own nominated PM - the backend (Projects_Breakdown, RequireAdminOrProjectManager)
+    // enforces this per-request; no adminGuard here so a PM linked in from My Projects can actually reach it,
+    // same pattern as admin/entry-flags and admin/approvals below.
+    path: 'projects/:id/breakdown',
+    canActivate: [authGuard],
+    loadComponent: () => import('./features/projects/project-detail-page/project-detail-page').then((m) => m.ProjectDetailPage),
+  },
+  {
     path: 'timesheet/calendar',
     canActivate: [authGuard],
     loadComponent: () => import('./features/timesheet/calendar-page/calendar-page').then((m) => m.CalendarPage),

@@ -4,6 +4,126 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later in this session, 2026-09-10 — Project Detail Breakdown: charts showing who's done what, and on what
+
+Immediate follow-up to the Budget & Cost Status feature below - the user, reviewing it live, asked whether it
+was worth drilling further: "see what has taken the time... a click through to a more detailed project page
+showing pie charts and who has done what." Not an FDD gap - a user-driven feature request, planned properly
+(Plan Mode, two Explore agents, a Plan agent, three rounds of AskUserQuestion) before writing any code, since
+it touched new charting infrastructure and a real money-accuracy question.
+
+- **New `IProjectBreakdownService`/`ProjectBreakdownService`** (`TimeSheet.Domain/Services/
+  IProjectBreakdownService.cs`, `TimeSheet.Infrastructure/Services/`) - three independent breakdowns of a
+  project's all-time actual logged entries: **by staff member** (hours/cost/revenue/profit each person has
+  logged), **by entry type/category** (bucketing a null `EntryTypeId` as "Unspecified"), and **by calendar
+  month** (hours trend). New `ITimesheetEntryRepository.GetAllCountedForProjectAsync` (all-time, unbounded -
+  deliberately a new method rather than reusing the existing, currently-uncalled `GetCountedForProjectAsync`
+  with sentinel min/max dates, matching this codebase's documented-intent style) feeds all three.
+- **A real money-accuracy question surfaced and resolved before coding**: for a Fixed Project Cost project, a
+  naive `hours × rate` per person would NOT sum to the project's real recognized revenue - confirmed by reading
+  `ReportingService.GetProfitOnProjectReportAsync`, which already deliberately zeros each person's individual
+  Billed amount for a Fixed Fee project and recognizes revenue only once at the whole-project level via
+  `IRevenueRecognitionService.GetRecognizedRevenueAsync` (prorated by hours-consumed-of-`BudgetHours`). Asked
+  the user directly rather than silently picking; they chose to match the existing Reports behavior. The new
+  service does the same: zeroes per-person Revenue/Profit for a Fixed Fee project and returns one
+  `RecognizedRevenueToDate` figure instead, shown as a summary line above the by-staff table.
+- **A real bug caught during implementation, before it shipped**: the plan's first draft resolved the
+  project's "native currency" via `project.Client.ReportingCurrencyCode` - but `IProjectRepository.GetByIdAsync`
+  only `.Include(p => p.Client)`, not `.ThenInclude(c => c.Currency)`, so `ReportingCurrencyCode` (which reads
+  `Currency?.CurrencyCode ?? "GBP"`) would have silently fallen back to "GBP" for every non-GBP-reporting
+  client. Fixed by fetching the Client separately via `IClientRepository.GetByIdAsync` (which does include
+  `Currency`), mirroring `ReportingService.ResolveNativeProjectCurrencyAsync`'s own identical pattern exactly.
+- **New `Projects_Breakdown`** endpoint (`GET projects/{id}/breakdown`), same `RequireAdminOrProjectManager`
+  gate as `Estimate`/`Status` - deliberately NOT built on the general Reports feature's
+  `reports/cost-on-project`/`profit-on-project` endpoints, which are hard Admin-only app-wide and would wrongly
+  block a PM from seeing their own project's figures here.
+- **Chart.js added as a new npm dependency** (`chart.js` alone, not `ng2-charts` - zero framework peer-
+  dependency, avoids a peer-conflict risk against this app's very new Angular 22, and only 3 chart instances
+  ever exist on one page so `ng2-charts`'s extra diffing/change-detection integration buys nothing). New
+  reusable `core/components/chart-canvas/chart-canvas.ts` - one generic wrapper (not a pie-specific +
+  bar-specific pair, since Chart.js's `type` is just a config field), signal-`effect()`-driven, rebuilding the
+  chart wholesale on any input change (fine - each chart is fetched once per page load, never live-updated).
+  New `core/utils/chart-palette.ts` - a small fixed 10-color categorical palette (the app's own
+  `--success`/`--warning`/`--destructive` tokens are only 3-4 colors, not enough for N staff members).
+- **New `features/projects/project-detail-page/`** (route `/projects/:id/breakdown`, `authGuard` only - no
+  `adminGuard`, so a PM linked in from My Projects can actually reach it, same pattern as `admin/entry-flags`/
+  `admin/approvals`) - three sections (pie: by staff, pie: by entry type, bar: by month), each paired with a
+  supporting table (money formatted `1.2-2`, hours `1.1-1`, matching the Estimate table's existing convention).
+  Linked from all three places a project's status is already visible: `projects-all-page`/`projects-list-page`
+  (new "Breakdown" action link per row), `project-edit-page`'s Budget & Cost Status panel ("View Breakdown"),
+  and `my-projects-page` (new action column).
+- Backend build clean, 48/48 tests pass unchanged (no dedicated test for the new service - matches this
+  codebase's established bar, same as `ProjectStatusService`/`ProjectEstimateService`). Angular build clean
+  (`chart.js` lazy-loads inside the new page's own chunk, not the initial bundle). API host restarted (new
+  Function definitions + DI change) - confirmed clean startup.
+- **Live-verified by the user themselves in the browser**: confirmed the new page renders correctly from all
+  three entry points. Flagged that the "By Entry Type" pie showed "Unspecified" on every project checked -
+  investigated via a throwaway console script (`Microsoft.Data.Sqlite` direct against the dev DB, cleaned up
+  afterward) rather than guessing: confirmed this is accurate, not a bug - on "ERP Migration Phase 2" (the
+  *only* project with any `EntryType` rows configured at all), just 1 of 33 entries (2 of 101.4 hours) actually
+  has an `EntryTypeId` set, so "Unspecified" at ~98% is correct, just easy to miss the sliver next to it. Every
+  other project has zero `EntryType` rows, so 100% "Unspecified" there is also correct. User declined to seed
+  more demo data to make the chart look busier - left as accurate, real data.
+
+## Done later in this session, 2026-09-10 — Budget & Cost Status: an "is this project on track" indicator
+
+Not an FDD gap - a feature request, prompted by the user noticing there was "nowhere to see the current status
+of a project" beyond the existing over-budget flag/notification. Deliberately distinct from the old, removed
+"Project Health" feature (an AI-judgment call, removed 2026-09-03 for being unverified/costly) - this is purely
+two already-stored, objective figures made visible: actual hours vs `Project.BudgetHours`, and actual cost vs
+`Project.FixedFeeAmount`. Two design questions were asked and confirmed with the user before building: (1)
+show it both as a compact badge on every project list row AND a fuller panel on the project detail page - not
+just one or the other; (2) a Project Manager should see this for their own managed project too, not just Admin
+(matching the existing Estimated Cost/Profit panel's visibility rule).
+
+- **New `IProjectStatusService`/`ProjectStatusService`** (`TimeSheet.Domain/Services/IProjectStatusService.cs`,
+  `TimeSheet.Infrastructure/Services/`) - `HoursUsedPercent`/`CostUsedPercent`, null when there's nothing to
+  compare against (no `BudgetHours`/`FixedFeeAmount` set) rather than a misleading 0%. New
+  `ITimesheetEntryRepository.GetActualsByProjectIdsAsync` - one bulk query (`GROUP BY ProjectId`, same
+  batching shape as `IStaffProjectRepository.GetActiveAssignmentCountsAsync`) rather than one round trip per
+  project on a list page.
+- **New `Projects_Status`** endpoint (single project, Admin-or-PM via the existing
+  `RequireAdminOrProjectManager`, mirroring `Projects_Estimate` exactly) for the detail panel; `Projects_ListAll`/
+  `Projects_ListByClient` (both Admin-only, unchanged gating) now bundle bulk-computed status fields directly
+  onto `ProjectDto` for the list badges - same "merge onto the existing DTO" pattern `AssignedStaffCount`
+  already uses. The 4 new `ProjectDto` fields are nullable and only ever populated by these Admin/PM-safe
+  endpoints - left null on `Get`/`Create`/`Update`/`ListAssignedToMe`, which a regular assigned staff member can
+  also reach and must not see project financials through.
+- **New `Projects_ListManagedByMe`** endpoint (any signed-in user; empty for anyone who manages nothing) - the
+  PM-facing counterpart to the Admin-only list endpoints, since neither of those routes was reachable from the
+  frontend by a non-admin. Powers a new **`my-projects-page`** (route `/my-projects`, `authGuard` only, no
+  `adminGuard` - mirrors `my-invoices`'s exact "backend scopes, route stays open" pattern), with a new "My
+  Projects" nav link shown when `isProjectManager() && !isAdmin()` **or** when actively impersonating someone
+  (an Admin impersonating a PM can now check what that PM manages too) - also wired `onBehalfOfUserId` through
+  this endpoint via the existing shared `ImpersonationAuthorization.ResolveViewTargetAsync` gate.
+- **New shared `core/components/project-status-badges/`** (compact list-row badge, up to two pills - "Hours
+  X%"/"Cost X%", or a neutral "No budget set") and **`core/utils/project-status.utils.ts`** (`75%`/`100%`
+  green/amber/red banding, reusing the existing `badge-success`/`badge-warning`/`badge-danger` CSS classes -
+  deliberately independent of the Settings-configurable notification thresholds, which drive when a
+  notification *fires*, not this purely visual indicator). Badges added to `projects-all-page`/
+  `projects-list-page`'s existing tables (new "On Track" column, distinct from the pre-existing Active/Inactive
+  "Status" column) and `my-projects-page`. A fuller "Budget & Cost Status" panel (two progress bars) added to
+  `project-edit-page`, right above the existing Estimated Cost/Profit panel.
+- **A real template bug caught and fixed during live verification**: Angular parses `a ?? b | pipe` as
+  `(a ?? b) | pipe`, not `a ?? (b | pipe)` - `{{ s.fixedFeeAmount ?? '?' | number: '1.2-2' }}` was silently
+  passing the literal string `'?'` through the `number` pipe when `fixedFeeAmount` was null, breaking the whole
+  interpolation (the "of ? fixed fee" text vanished entirely, not just showing garbage). Fixed by moving the
+  null case into an `@if` block instead of relying on `??` before a pipe.
+- Backend build clean, 48/48 tests pass unchanged (no dedicated test - matches this codebase's established bar
+  for thin composition services, same as `ProjectEstimateService`). Angular build clean. API host restarted
+  (new Function definitions + DI changes, twice this round) - confirmed clean startup each time.
+- **Live-verified with a real before/after wherever a fix was involved, not just the happy path**: as Mark
+  Llewellyn (Admin), confirmed the "On Track" column on both Admin project lists shows real, meaningful
+  badges - "Notif Threshold Test" at a genuine 110% in red, "ERP Migration Phase 2" (Fixed Cost) showing both
+  "Hours 17%"/"Cost 9%", projects with no budget showing the neutral badge. Opened the Fixed-Cost project's
+  detail panel and confirmed the progress bars/percentages matched the list badges exactly. The `?? | pipe`
+  template bug above was actually caught this way - live-verifying a no-budget project (Hours 110% over, no
+  Fixed Fee Amount set) showed the broken "Cost: 495.00" with nothing after it; fixed the template, reloaded,
+  confirmed it now reads "Only tracked for a project with a Fixed Fee Amount set above." - a real broken-then-
+  fixed screenshot pair, not just a code-review guess. Confirmed My Projects works correctly both empty (Mark himself
+  manages nothing) and populated (while impersonating Sarah Chen, the nominated PM on ERP Migration Phase 2) -
+  the nav link only appeared during impersonation or for a real non-admin PM, exactly as designed.
+
 ## Done later in this session, 2026-09-10 — /login double-render fixed, closing a known loose end
 
 Not an FDD gap - the "Known loose ends" list's newest, not-yet-resolved item, picked from a short menu of

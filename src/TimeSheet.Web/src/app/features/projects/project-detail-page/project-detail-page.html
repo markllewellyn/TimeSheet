@@ -1,0 +1,105 @@
+<div class="flex flex-col gap-4">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">{{ project()?.name ?? 'Project Breakdown' }}</h1>
+      @if (project(); as p) {
+        <p class="page-subtitle">{{ p.clientName }} · Who has logged time, on what, and when</p>
+      }
+    </div>
+  </div>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  @if (!loaded()) {
+    <app-loading-spinner />
+  } @else if (breakdown(); as b) {
+    <div class="card-padded">
+      <h2 class="mb-3 text-sm font-semibold text-foreground">By Staff Member</h2>
+      @if (b.recognizedRevenueToDate !== null) {
+        <p class="mb-3 text-sm text-muted-foreground">
+          Recognized Revenue to date: <strong class="text-foreground">{{ b.recognizedRevenueToDate | number: '1.2-2' }}</strong>
+          (Fixed Fee - not attributed per person below)
+        </p>
+      }
+      @if (b.byStaff.length === 0) {
+        <p class="text-sm text-muted-foreground">No time logged against this project yet.</p>
+      } @else {
+        <app-chart-canvas type="pie" [data]="byStaffChart()" />
+        <table class="table-clean mt-4">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Hours</th>
+              <th>Cost</th>
+              <th>Revenue</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of b.byStaff; track line.userId) {
+              <tr>
+                <td class="font-medium text-foreground">{{ line.userName }}</td>
+                <td class="text-muted-foreground">{{ line.hours | number: '1.1-1' }}</td>
+                <td class="text-muted-foreground">{{ line.cost | number: '1.2-2' }}</td>
+                <td class="text-muted-foreground">{{ line.revenue | number: '1.2-2' }}</td>
+                <td class="text-muted-foreground">{{ line.profit | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+
+    <div class="card-padded">
+      <h2 class="mb-3 text-sm font-semibold text-foreground">By Entry Type</h2>
+      @if (b.byEntryType.length === 0) {
+        <p class="text-sm text-muted-foreground">No time logged against this project yet.</p>
+      } @else {
+        <app-chart-canvas type="pie" [data]="byEntryTypeChart()" />
+        <table class="table-clean mt-4">
+          <thead>
+            <tr>
+              <th>Entry Type</th>
+              <th>Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of b.byEntryType; track line.entryTypeId ?? -1) {
+              <tr>
+                <td class="font-medium text-foreground">{{ line.entryTypeName }}</td>
+                <td class="text-muted-foreground">{{ line.hours | number: '1.1-1' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+
+    <div class="card-padded">
+      <h2 class="mb-3 text-sm font-semibold text-foreground">By Month</h2>
+      @if (b.byMonth.length === 0) {
+        <p class="text-sm text-muted-foreground">No time logged against this project yet.</p>
+      } @else {
+        <app-chart-canvas type="bar" [data]="byMonthChart()" />
+        <table class="table-clean mt-4">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of b.byMonth; track line.year + '-' + line.month) {
+              <tr>
+                <td class="font-medium text-foreground">{{ line.month }}/{{ line.year }}</td>
+                <td class="text-muted-foreground">{{ line.hours | number: '1.1-1' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+  }
+</div>

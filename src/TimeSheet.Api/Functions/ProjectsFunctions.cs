@@ -16,6 +16,8 @@ public class ProjectsFunctions(
     IUserRepository users,
     IStaffProjectRepository assignments,
     IProjectEstimateService estimateService,
+    IProjectStatusService statusService,
+    IProjectBreakdownService breakdownService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -35,6 +37,43 @@ public class ProjectsFunctions(
                 l.HourlyCost, l.CustomerRate, l.EstimatedCost, l.EstimatedRevenue, l.EstimatedProfit, l.Warning)).ToList()));
     }
 
+    /// <summary>User-requested "is this project on track" figures (actual hours vs BudgetHours, actual cost vs
+    /// FixedFeeAmount) for the Project edit page's detail panel - same Admin-or-PM gate as Estimate above.</summary>
+    [Function("Projects_Status")]
+    public async Task<IActionResult> Status(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{id:int}/status")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var project = await projects.GetByIdAsync(id, ct);
+        if (project is null) return new NotFoundResult();
+        if (currentUser.RequireAdminOrProjectManager(project) is { } forbidden) return forbidden;
+
+        var status = await statusService.GetStatusAsync(project, ct);
+        return new OkObjectResult(new ProjectStatusDto(
+            status.ProjectId, status.ActualHours, status.BudgetHours, status.HoursUsedPercent,
+            status.ActualCost, status.FixedFeeAmount, status.CostUsedPercent));
+    }
+
+    /// <summary>User-requested "who has done what, and on what" drill-down (by staff, by entry type, by month)
+    /// for the project detail page - same Admin-or-PM gate as Estimate/Status above. Deliberately not built on
+    /// the general Reports feature's reports/cost-on-project|profit-on-project endpoints, which are hard
+    /// Admin-only app-wide and would wrongly block a PM from seeing their own project's figures here.</summary>
+    [Function("Projects_Breakdown")]
+    public async Task<IActionResult> Breakdown(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/{id:int}/breakdown")] HttpRequest req, int id, CancellationToken ct)
+    {
+        var project = await projects.GetByIdAsync(id, ct);
+        if (project is null) return new NotFoundResult();
+        if (currentUser.RequireAdminOrProjectManager(project) is { } forbidden) return forbidden;
+
+        var breakdown = await breakdownService.GetBreakdownAsync(project, ct);
+        return new OkObjectResult(new ProjectBreakdownDto(
+            breakdown.ProjectId,
+            breakdown.ByStaff.Select(l => new StaffBreakdownLineDto(l.UserId, l.UserName, l.Hours, l.Cost, l.Revenue, l.Profit)).ToList(),
+            breakdown.ByEntryType.Select(l => new EntryTypeBreakdownLineDto(l.EntryTypeId, l.EntryTypeName, l.Hours)).ToList(),
+            breakdown.ByMonth.Select(l => new MonthBreakdownLineDto(l.Year, l.Month, l.Hours)).ToList(),
+            breakdown.RecognizedRevenueToDate));
+    }
+
     /// <summary>Flat, all-clients list of every active project - used by the Staff screen's project
     /// filter/picker so it doesn't need to replicate a per-client fan-out client-side.</summary>
     [Function("Projects_ListAll")]
@@ -45,7 +84,8 @@ public class ProjectsFunctions(
 
         var result = await projects.GetAllActiveAsync(ct);
         var counts = await assignments.GetActiveAssignmentCountsAsync(result.Select(p => p.Id).ToList(), ct);
-        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "", assignedStaffCount: counts.GetValueOrDefault(p.Id))));
+        var statuses = await statusService.GetStatusesAsync(result, ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "", assignedStaffCount: counts.GetValueOrDefault(p.Id), status: statuses.GetValueOrDefault(p.Id))));
     }
 
     [Function("Projects_ListByClient")]
@@ -60,7 +100,29 @@ public class ProjectsFunctions(
         var includeInactive = req.Query["includeInactive"] == "true";
         var result = await projects.GetByClientIdAsync(clientId, includeInactive, ct);
         var counts = await assignments.GetActiveAssignmentCountsAsync(result.Select(p => p.Id).ToList(), ct);
-        return new OkObjectResult(result.Select(p => ToDto(p, client.Name, assignedStaffCount: counts.GetValueOrDefault(p.Id))));
+        var statuses = await statusService.GetStatusesAsync(result, ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, client.Name, assignedStaffCount: counts.GetValueOrDefault(p.Id), status: statuses.GetValueOrDefault(p.Id))));
+    }
+
+    /// <summary>FDD: "a project manager is nominated against each project" who can "view/query" it - this
+    /// PM-facing counterpart to Projects_ListAll/ListByClient (both Admin-only) is how a PM actually reaches
+    /// their own projects' on-track status, since neither of those routes is reachable from the frontend by a
+    /// non-admin. Any signed-in user may call this; GetManagedByUserAsync naturally returns an empty list for
+    /// anyone who manages nothing, mirroring the existing Invoices_ListForProjectManager/My Invoices pattern.
+    /// Also honours onBehalfOfUserId (same shared gate as Your Overview/Expenses) so an Admin impersonating a PM
+    /// sees that PM's own managed project(s), not their own.</summary>
+    [Function("Projects_ListManagedByMe")]
+    public async Task<IActionResult> ListManagedByMe(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "projects/managed-by-me")] HttpRequest req, CancellationToken ct)
+    {
+        var user = currentUser.RequireUser();
+        var onBehalfOfUserId = ImpersonationAuthorization.ParseOnBehalfOfUserId(req);
+        var (error, targetUserId) = await ImpersonationAuthorization.ResolveViewTargetAsync(users, user, onBehalfOfUserId, ct);
+        if (error is not null) return error;
+
+        var result = await projects.GetManagedByUserAsync(targetUserId, ct);
+        var statuses = await statusService.GetStatusesAsync(result, ct);
+        return new OkObjectResult(result.Select(p => ToDto(p, p.Client?.Name ?? "", status: statuses.GetValueOrDefault(p.Id))));
     }
 
     [Function("Projects_ListAssignedToMe")]
@@ -211,9 +273,10 @@ public class ProjectsFunctions(
         return (user, null);
     }
 
-    private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null, int assignedStaffCount = 0) => new(
+    private static ProjectDto ToDto(Project p, string clientName, string? projectManagerName = null, int assignedStaffCount = 0, ProjectStatus? status = null) => new(
         p.Id, p.ClientId, clientName, p.Name, p.Code, p.Description,
         p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.IsCostExempt, p.CurrencyOverride, p.StartDate, p.EndDate,
         p.BudgetHours, p.FixedFeeAmount, p.IsActive,
-        p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName, assignedStaffCount);
+        p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName, assignedStaffCount,
+        status?.ActualHours, status?.HoursUsedPercent, status?.ActualCost, status?.CostUsedPercent);
 }

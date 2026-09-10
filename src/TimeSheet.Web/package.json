@@ -23,6 +23,7 @@
     "@tailwindcss/postcss": "^4.3.3",
     "ag-grid-angular": "^36.1.0",
     "ag-grid-community": "^36.1.0",
+    "chart.js": "^4.5.1",
     "postcss": "^8.5.26",
     "rxjs": "~7.8.0",
     "tailwind-merge": "^3.5.0",
