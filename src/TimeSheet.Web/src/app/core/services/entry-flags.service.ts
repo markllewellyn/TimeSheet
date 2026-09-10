@@ -15,6 +15,13 @@ export interface EntryFlagSearchResult {
   outOfHoursHours: number;
 }
 
+export interface EntryFlagSearchResponse {
+  results: EntryFlagSearchResult[];
+  // True when the search matched more than the 25 results actually returned - lets the picker tell the user
+  // to narrow their search rather than silently truncating with no indication anything was cut.
+  hasMore: boolean;
+}
+
 export interface EntryFlag {
   id: number;
   timesheetEntryId: number;
@@ -42,8 +49,8 @@ export class EntryFlagsService {
     return this.http.get<EntryFlag[]>(`${this.baseUrl}/open`);
   }
 
-  searchEntries(search: string): Observable<EntryFlagSearchResult[]> {
-    return this.http.get<EntryFlagSearchResult[]>(`${this.baseUrl}/search-entries`, { params: { search } });
+  searchEntries(search: string): Observable<EntryFlagSearchResponse> {
+    return this.http.get<EntryFlagSearchResponse>(`${this.baseUrl}/search-entries`, { params: { search } });
   }
 
   raiseManual(timesheetEntryId: number, notes: string | null): Observable<EntryFlag> {

@@ -15,3 +15,8 @@ public record ClearEntryFlagRequest(string? Notes);
 public record EntryFlagSearchResultDto(
     int Id, int StaffId, string StaffName, DateOnly Date, string Description,
     string ProjectName, string ClientName, decimal WorkHours, decimal OutOfHoursHours);
+
+/// <summary>HasMore is true when the search matched more entries than are actually returned - the picker is
+/// capped at 25 results (most-recent-first), so a genuinely-matching but older entry can otherwise be silently
+/// truncated with no indication anything was cut. Lets the UI tell the user to narrow their search instead.</summary>
+public record EntryFlagSearchResponseDto(IReadOnlyList<EntryFlagSearchResultDto> Results, bool HasMore);

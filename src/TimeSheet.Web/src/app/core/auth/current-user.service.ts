@@ -1,5 +1,6 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { Me } from '../models/user.models';
 import { ImpersonationService } from '../services/impersonation.service';
@@ -16,6 +17,7 @@ export class CurrentUserService {
   private readonly localAuth = inject(LocalAuthService);
   private readonly http = inject(HttpClient);
   private readonly impersonation = inject(ImpersonationService);
+  private readonly router = inject(Router);
 
   private readonly meSignal = signal<Me | null>(null);
   readonly me = this.meSignal.asReadonly();
@@ -48,6 +50,9 @@ export class CurrentUserService {
     this.localAuth.logout();
     this.meSignal.set(null);
     this.notProvisionedSignal.set(false);
+    // Otherwise the signed-in header just flips to a "Sign in" button on whatever page you were already on -
+    // the route itself doesn't re-check authGuard just because the token disappeared out from under it.
+    this.router.navigate(['/login']);
   }
 
   refreshMe(): void {

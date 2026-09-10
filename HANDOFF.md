@@ -4,6 +4,55 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done even later still in this session, 2026-09-10 — Sign Out didn't redirect to the login screen
+
+Not an FDD gap - a real, separate UX bug the user noticed while testing the work above. Root cause, confirmed
+by reading the code: `app.html`'s "Sign out" button calls `currentUser.logout()` directly, which clears the
+token/profile/impersonation state but never navigated anywhere - the route itself doesn't re-check `authGuard`
+just because the token disappeared out from under it, so the user was left looking at whatever page they were
+already on, now just showing a "Sign in" button in the header instead of their name.
+
+- **`CurrentUserService.logout()`** now calls `this.router.navigate(['/login'])` as its last step, after
+  clearing local state - `sessionExpiredInterceptor` was confirmed as the only other place a "logout" happens
+  in this app, and it does its own separate `localAuth.logout()` + navigate, never calling
+  `CurrentUserService.logout()` at all, so this change has exactly one caller (the Sign Out button) and can't
+  affect that other flow.
+- **Checked against this session's earlier `guestGuard` fix before landing this**: `logout()` clears the token
+  *before* calling `navigate(['/login'])`, so by the time `guestGuard` evaluates `isSignedIn()` for the
+  redirect, it's already `false` and the navigation goes through cleanly rather than bouncing back to
+  `/timesheet`.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified by the user themselves**: confirmed clicking Sign Out now lands directly on the login screen.
+
+## Done later still in this session, 2026-09-10 — Entry Flags search: no longer silently truncates past 25 results
+
+Picked up the "Known loose ends" list's Entry Flags search report (own logged entries once missing from a
+search) at the user's request. Re-read the whole search path fresh (`EntryFlagsFunctions.SearchEntries`,
+`ITimesheetEntryRepository.SearchForFlaggingAsync`, `ApplyStaffClientProjectSearch`) and found the same thing
+the original investigation did: no code path excludes the searcher's own entries, and for an Admin
+`projectIds` stays `null` (no scoping at all). Asked the user for repro specifics (exact search term, roughly
+how old the missing entry was) - none were available, so the bug itself remains unreproduced. Rather than leave
+it as a dead end, closed the identified real weak point instead: the picker was silently capped at 25 results
+(most-recent-first) with **zero indication** anything was cut, so if this was the cause, the user would have
+had no way to know their entry simply lost a "most recent 25" tiebreak.
+
+- **`EntryFlagsFunctions.SearchEntries`** now fetches `take + 1` (26, not 25) purely to detect truncation
+  cheaply, without a separate `COUNT` query - `hasMore = fetched.Count > 25`. New
+  `EntryFlagSearchResponseDto(Results, HasMore)` envelope replaces the previous bare array response.
+- **`entry-flags-page`**'s picker now shows "Showing the 25 most recent matches - add more detail... to narrow
+  the search" beneath the results whenever `hasMore` is true, so a truncated search is visible instead of
+  silent - the actual, provable fix, even though the original report couldn't be reproduced to confirm it was
+  really the cause.
+- Backend build clean, 48/48 tests pass unchanged (no dedicated test - matches this codebase's established bar
+  for a thin Functions-layer response shape change). Angular build clean. API host restarted (changed endpoint
+  response shape) - confirmed clean startup.
+- **Live-verified by the user themselves**: searched "test" in the raise-a-flag picker (a very common word in
+  this dev data's entry descriptions) - confirmed the new hint appeared, proving a broad search does trip the
+  25-result cap in practice, exactly the scenario this fix targets.
+- This doesn't fully close the "Known loose ends" item below (the original report is still unconfirmed/
+  unreproduced), but meaningfully improves it - struck through as "mitigated further" rather than "fixed",
+  since the root cause was never actually confirmed.
+
 ## Done still later in this session, 2026-09-10 — Project Detail Breakdown: charts showing who's done what, and on what
 
 Immediate follow-up to the Budget & Cost Status feature below - the user, reviewing it live, asked whether it
@@ -1871,12 +1920,14 @@ session's earlier entry above respectively. They are not part of the new numbere
   session's own "Done" entry above for the new global `sessionExpiredInterceptor` - this was a real, app-wide
   gap (any page's API call 401ing would have shown the same symptom, not just this one), not something specific
   to Add Expense.
-- **New, not resolved**: the user reported their own logged entries missing from an Entry Flags search while
-  signed in as Admin. Could not be reproduced (tested live with two different search terms - own entries
-  appeared correctly both times) and no code path was found that would exclude the searcher's own entries.
-  Adding exact Entry ID search (see this session's later entry above) should route around the most likely cause
-  (the picker's 25-result, most-recent-first cap pushing an older entry out) but this is a mitigation, not a
-  confirmed fix - if it happens again, get the exact search term used.
+- **Not resolved, mitigated further 2026-09-10**: the user reported their own logged entries missing from an
+  Entry Flags search while signed in as Admin. Still could not be reproduced (asked again this session for the
+  exact search term/how old the entry was - no specifics remembered either time) and still no code path found
+  that would exclude the searcher's own entries. Exact Entry ID search (2026-09-04) and, this session, a
+  visible "showing the 25 most recent matches" hint when a search is truncated (see that session's own "Done"
+  entry above) both target the most likely cause (the picker's 25-result, most-recent-first cap silently
+  pushing an older entry out) - but neither is a confirmed fix, since the root cause was never actually
+  confirmed. If it happens again, get the exact search term used.
 - **EntryType rows exist on only one project** (ERP Migration Phase 2) after this session's cleanup - every
   other project in the app still has zero, so the Entry Type picker on Add Entry stays hidden for them. Adding
   more is a "which projects, what types" business decision, not something to guess at - ask the user first.

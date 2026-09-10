@@ -58,14 +58,20 @@ public class EntryFlagsFunctions(
         if (!user.IsAdmin)
         {
             var managed = await projects.GetManagedByUserAsync(user.UserId, ct);
-            if (managed.Count == 0) return new OkObjectResult(Array.Empty<EntryFlagSearchResultDto>());
+            if (managed.Count == 0) return new OkObjectResult(new EntryFlagSearchResponseDto(Array.Empty<EntryFlagSearchResultDto>(), false));
             projectIds = managed.Select(p => p.Id).ToHashSet();
         }
 
-        var results = await entries.SearchForFlaggingAsync(search, projectIds, take: 25, ct);
-        return new OkObjectResult(results.Select(e => new EntryFlagSearchResultDto(
+        // Fetch one extra row (26, not 25) purely to detect whether the real match set is bigger than the
+        // picker shows - cheaper than a separate COUNT query, and avoids the picker silently truncating with
+        // no indication anything was cut (a real, previously-unreproducible bug report's most likely cause).
+        const int take = 25;
+        var fetched = await entries.SearchForFlaggingAsync(search, projectIds, take: take + 1, ct);
+        var hasMore = fetched.Count > take;
+        var results = fetched.Take(take).Select(e => new EntryFlagSearchResultDto(
             e.Id, e.UserId, e.User?.DisplayName ?? "", e.Date, e.Description,
-            e.Project?.Name ?? "", e.Client?.Name ?? "", e.WorkHours, e.OutOfHoursHours)));
+            e.Project?.Name ?? "", e.Client?.Name ?? "", e.WorkHours, e.OutOfHoursHours)).ToList();
+        return new OkObjectResult(new EntryFlagSearchResponseDto(results, hasMore));
     }
 
     [Function("EntryFlags_RaiseManual")]

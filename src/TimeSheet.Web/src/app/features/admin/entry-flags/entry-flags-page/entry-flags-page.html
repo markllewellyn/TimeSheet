@@ -49,6 +49,11 @@
             </button>
           }
         </div>
+        @if (entrySearchHasMore()) {
+          <p class="text-xs text-muted-foreground">
+            Showing the 25 most recent matches - add more detail (e.g. a client, project, or exact Entry Id) to narrow the search if the entry you want isn't listed.
+          </p>
+        }
       } @else if (entrySearched()) {
         <p class="text-sm text-muted-foreground">No matching entries found.</p>
       }

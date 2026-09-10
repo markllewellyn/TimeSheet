@@ -31,6 +31,10 @@ export class EntryFlagsPage {
   // Timesheet Entry Id to be typed in by hand.
   protected readonly entrySearchQuery = signal('');
   protected readonly entrySearchResults = signal<EntryFlagSearchResult[]>([]);
+  // True when the search matched more entries than the picker's 25-result cap shows - closes a real,
+  // previously-unreproducible "my entry is missing from search" report by at least telling the user something
+  // was cut, instead of silently truncating.
+  protected readonly entrySearchHasMore = signal(false);
   protected readonly entrySearching = signal(false);
   protected readonly entrySearched = signal(false);
   protected readonly selectedEntry = signal<EntryFlagSearchResult | null>(null);
@@ -81,6 +85,7 @@ export class EntryFlagsPage {
     const minLength = /^\d+$/.test(query) ? 1 : 2;
     if (query.length < minLength) {
       this.entrySearchResults.set([]);
+      this.entrySearchHasMore.set(false);
       this.entrySearched.set(false);
       this.entrySearching.set(false);
       return;
@@ -88,18 +93,20 @@ export class EntryFlagsPage {
 
     this.entrySearching.set(true);
     this.entryFlagsService.searchEntries(query).subscribe({
-      next: (results) => {
+      next: (response) => {
         if (this.entrySearchQuery().trim() !== query) return; // a newer keystroke's request already landed
         this.entrySearching.set(false);
         this.entrySearched.set(true);
         this.error.set(null);
-        this.entrySearchResults.set(results);
+        this.entrySearchResults.set(response.results);
+        this.entrySearchHasMore.set(response.hasMore);
       },
       error: (err) => {
         if (this.entrySearchQuery().trim() !== query) return;
         this.entrySearching.set(false);
         this.entrySearched.set(true);
         this.entrySearchResults.set([]);
+        this.entrySearchHasMore.set(false);
         this.error.set(err?.error?.error ?? 'Could not search entries.');
       },
     });
@@ -109,6 +116,7 @@ export class EntryFlagsPage {
     this.selectedEntry.set(result);
     this.entrySearchQuery.set('');
     this.entrySearchResults.set([]);
+    this.entrySearchHasMore.set(false);
     this.entrySearched.set(false);
   }
 
