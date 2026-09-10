@@ -1,11 +1,13 @@
 import { Routes } from '@angular/router';
 import { adminGuard } from './core/auth/admin.guard';
 import { authGuard } from './core/auth/auth.guard';
+import { guestGuard } from './core/auth/guest.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'timesheet' },
   {
     path: 'login',
+    canActivate: [guestGuard],
     loadComponent: () => import('./features/login/login-page/login-page').then((m) => m.LoginPage),
   },
   {

@@ -4,6 +4,36 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later in this session, 2026-09-10 — /login double-render fixed, closing a known loose end
+
+Not an FDD gap - the "Known loose ends" list's newest, not-yet-resolved item, picked from a short menu of
+options the user chose from. Root cause, confirmed by reading the code: `app.html` (the app shell) always
+renders its header - nav links, "Acting as X" banner, etc - regardless of route, gated only by
+`currentUser.isSignedIn()`/`isAdmin()` internally, not by which route is active. The `login` route itself had
+no guard at all, so navigating straight to `/login` while already signed in rendered the full signed-in header
+*and* the login form (from `<router-outlet>`) at the same time.
+
+- **New `guestGuard`** (`core/auth/guest.guard.ts`) - the mirror image of `authGuard`: redirects to `/timesheet`
+  if `LocalAuthService.isSignedIn()`, otherwise allows the route. Applied only to the `login` route in
+  `app.routes.ts` - `bootstrap-local` and `auth/complete` (the SSO callback) were left untouched, out of scope
+  for what was actually reported.
+- **Checked the one flow this could plausibly break before applying it**: `sessionExpiredInterceptor` (from the
+  2026-09-09 session) navigates to `/login?error=session_expired` after a 401, but it calls
+  `localAuth.logout()` *synchronously, before* the `router.navigate(...)` call - so by the time `guestGuard`
+  runs, `isSignedIn()` is already `false` and the guard correctly lets the redirect through rather than bouncing
+  it back to `/timesheet`.
+- Angular build clean. Frontend-only change, no backend/DB change, no API host restart needed.
+- **Live-verified both paths, with real proof for each**: (1) as Mark Llewellyn (Admin, still signed in from
+  cold-navigating around during the adminGuard fix above), cold-navigated straight to `/login` - immediately
+  redirected to `/timesheet` showing his own real data, no login form ever rendered. (2) Re-ran this session's
+  own token-tampering trick (appended garbage to the stored JWT via a script, leaving the expiry untouched) and
+  navigated to `/timesheet` - the 401 correctly redirected to `/login?error=session_expired` showing "Your
+  session has expired - please sign in again.", proving `guestGuard` does *not* block the interceptor's own
+  redirect. Confirmed via script that `localAuthToken`/`localAuthTokenExpiry` were both actually cleared from
+  storage (not just visually hidden), matching the original 2026-09-09 verification of the same mechanism. The
+  user signed back in via SSO afterward - confirmed the app came back up completely normally.
+- This closes the "New, not resolved" login double-render item from "Known loose ends" below.
+
 ## Done in this session, 2026-09-10 — finished an unfinished, uncommitted fix left in the working tree: adminGuard could bounce a genuine Admin on a cold page load
 
 Not an FDD gap — a real, separate app-level bug. Found `current-user.service.ts` sitting modified but uncommitted at the start of this session, with no HANDOFF note at all: a `meLoaded` promise had been added to `CurrentUserService` but never wired up — `loadMe()` never resolved it, and `admin.guard.ts` was still fully synchronous. Read the code to work out the intent: `adminGuard` reads `currentUser.isAdmin()` synchronously, but on a cold page load (fresh URL, bookmark, browser refresh) the constructor's own `/api/me` fetch hasn't resolved yet, so a genuine Admin hitting an admin route directly would get bounced to `/` because `isAdmin()` was still `false` at that instant. (Navigating to an admin route *from within* the already-running SPA was never affected — by then `/api/me` has long since resolved.)
@@ -1713,11 +1743,9 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
-- **New, not resolved**: navigating directly to `/login` while already signed in shows both the signed-in
-  header (nav links, "Sign out") *and* the login form at the same time, rather than either redirecting away or
-  hiding one of the two. Noticed incidentally while live-verifying the new `sessionExpiredInterceptor`
-  (2026-09-09 session) - a separate, pre-existing minor UX quirk, unrelated to the 401-handling gap that round
-  actually targeted, not investigated or fixed.
+- ~~navigating directly to `/login` while already signed in shows both the signed-in header (nav links, "Sign
+  out") *and* the login form at the same time~~ - **fixed 2026-09-10, a later session**: see that session's own
+  "Done" entry above for the new `guestGuard`.
 - ~~an expired session (a stale JWT in localStorage from a prior day) doesn't force a redirect to `/login` when
   an API call 401s from the Add Expense page~~ - **fixed later the same session, 2026-09-09**: see that
   session's own "Done" entry above for the new global `sessionExpiredInterceptor` - this was a real, app-wide
