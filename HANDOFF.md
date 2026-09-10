@@ -4,6 +4,62 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done still later again in this session, 2026-09-10 — a third double-billing bug: Fixed Fee had no locking at all, and had already double/triple-billed a real client in this dev DB
+
+Immediate follow-up to the Void/Delete feature above, reported live by the user right after: "I have just
+generated an invoice for Acme, and the ERP Migration Phase 2 Fixed fee showed up on the next draft even though
+it is already invoiced on a previous invoice and that invoice was not voided." Same bug class as the
+double-billing fix two entries below (T&M/Expense), but for the third and last invoice line type - Fixed Fee -
+which that earlier fix's own code comment explicitly, and it turns out incorrectly, exempted: "Fixed Fee line
+items don't derive from either row type, so there's nothing to lock for those."
+
+- **Confirmed this was real and already live in the dev DB, not a one-off**: queried Acme's own invoice history
+  directly - `InvoiceGenerationService.BuildDraftAsync`'s Fixed Fee branch had **zero exclusion logic of any
+  kind**, unconditionally adding the project's full `FixedFeeAmount` to *every single draft ever generated*,
+  regardless of period or of how many times it had already been finalized. Acme's "ERP Migration Phase 2"
+  project had its Fixed Fee billed on **8 separate real Finalized invoices** already sitting in this dev DB
+  (`#3`, `rr`, `inv1233`, `inv1234`, `inv123456`, `uuuu`, `jhg`, plus 2 Voided ones) - a genuine, already-
+  happened multiple-billing incident in what's meant to be this app's own demo data.
+- **Confirmed the intended design from the FDD itself before fixing anything**: extracted the FDD docx's plain
+  text again (same throwaway unzip-and-strip-tags approach as the earlier full re-audit) and found the decisive
+  line: "A project is either a fixed one-off piece of time or repeating time on a monthly basis, controlled by
+  the billing or invoice period held against the project." Fixed Fee is explicitly **one-off**, not recurring -
+  confirming the bug's fix direction, and also matching `IRevenueRecognitionService`'s already-existing model
+  (recognizes a Fixed Fee project's revenue once, total, prorated by hours-consumed-of-budget - never as a
+  repeating full amount either).
+- **New `IInvoiceRepository.HasFixedFeeBeenInvoicedAsync(projectId, ct)`** - true if any `InvoiceLineItem` of
+  `Type == FixedFee` for that project sits on a **Finalized** invoice. Only Finalized counts (not Draft, not
+  Voided) - matching the exact same "a Draft locks nothing yet" convention already established for
+  TimesheetEntry/ExpenseEntry, which is also what makes regenerating the very Draft that already carries this
+  project's fee safe (its own not-yet-cleared line item is on a Draft, so it doesn't trip its own check) without
+  needing any self-exclusion logic. Voided is excluded so voiding correctly makes the fee billable again, same
+  as the Void feature's own philosophy for T&M/Expense. `InvoiceGenerationService.BuildDraftAsync`'s Fixed Fee
+  branch now checks this before adding the line; gained a new `IInvoiceRepository` constructor dependency (both
+  already-registered Scoped services, no DI cycle).
+- Backend build clean, 59/59 tests pass (3 new: the exact reported scenario - finalize a Fixed Fee invoice, then
+  generate a second draft for a later period, assert the fee is excluded - **confirmed this test genuinely
+  fails without the fix** by temporarily reverting the one-line guard and re-running before restoring it, same
+  rigor as the T&M double-billing fix; regenerating the same still-open Draft correctly keeps its own fee, not
+  stripped by its own not-yet-cleared line item; voiding the invoice correctly makes the fee billable again).
+  Angular build unaffected (backend-only change, no DTO/contract shape change). API host restarted (new
+  constructor dependency) - confirmed clean startup, all routes registered.
+- **Live-verified directly against the real, already-affected Acme data, not a synthetic repro**: regenerated
+  the stale overlapping-period Draft for Acme (`clientId 2`, `2026-08-31` to `2026-09-10` - a period that
+  already had two Finalized invoices, `#jhg` and `#uuuu`, each carrying a full duplicate 68,000.00 EUR Fixed Fee
+  line) via a direct `Invoices_GenerateDraft` API call - came back **0 line items, 0.00 total**, correctly
+  excluding both the already-finalized Fixed Fee and the already-locked Data Quality Audit T&M/expense entries.
+  Confirmed the same result in the UI after a refresh, then deleted that now-empty stale Draft through the app.
+  Deliberately did **not** attempt to retroactively correct the 8 real over-billed Finalized invoices already in
+  the dev DB (a business/accounting decision, not a code fix - each one is a real historical Finalized invoice;
+  the new Void feature above is available if the user wants to correct any of them).
+- **Not fixed, flagged as a separate, narrower known gap**: `FinalizeInvoiceAsync` never re-validates a Draft's
+  *own already-stored* line items against current reality at finalize time - it locks/finalizes whatever the
+  invoice already has, even if a sibling Draft for an overlapping period was finalized first and the first
+  Draft's stored lines are now stale. This applies identically to T&M/Expense/Fixed Fee alike and predates this
+  fix entirely; the fix here (and the earlier T&M/Expense one) closes the *generation-time* half of double-
+  billing, which is what was actually reported and is the same boundary this codebase's existing locking design
+  already draws. Worth a future look if a stale Draft is ever finalized without being regenerated first.
+
 ## Done even later still in this session, 2026-09-10 — Delete a Draft invoice; Void a Finalized invoice, so a mistake can actually be corrected
 
 Immediate follow-up to the double-billing fix above: that fix closed the hole that let a duplicate invoice be

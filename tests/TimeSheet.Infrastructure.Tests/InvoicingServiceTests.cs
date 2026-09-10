@@ -68,7 +68,7 @@ public class InvoicingServiceTests
         new InvoiceRepository(db), new ClientRepository(db), new TimesheetEntryRepository(db), new ExpenseEntryRepository(db),
         new InvoiceGenerationService(
             new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
-            new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
+            new ExpenseEntryRepository(db), new InvoiceRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
         new StubPdfRenderer(), new RecordingNotificationService(), db, new InMemoryFileStorageService());
 
     [Fact]
@@ -222,6 +222,66 @@ public class InvoicingServiceTests
 
         Assert.Empty(secondDraft.LineItems);
         Assert.Equal(0m, secondDraft.TotalAmount);
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_FixedFeeAlreadyFinalized_NotIncludedAgain()
+    {
+        // Reproduces a real bug the user hit live: a Fixed Project Cost project's flat fee has no source
+        // TimesheetEntry/ExpenseEntry row to lock, so it was never excluded from a later draft the way T&M
+        // entries and expenses are - the full fee kept appearing on every subsequent invoice, finalized or not,
+        // even though the FDD describes it as "a fixed one-off piece of time".
+        await using var db = CreateInMemoryDb();
+        var (client, _, user) = await SeedAsync(db, PaymentModel.FixedProjectCost);
+
+        var service = CreateService(db);
+        var firstDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Single(firstDraft.LineItems);
+        await service.FinalizeInvoiceAsync(firstDraft.Id, "INV-FIXED-1", user.Id, CancellationToken.None);
+
+        var secondDraft = await service.GenerateDraftInvoiceAsync(
+            client.Id, PeriodEnd.AddDays(1), PeriodEnd.AddDays(28), null, CancellationToken.None);
+
+        Assert.Empty(secondDraft.LineItems);
+        Assert.Equal(0m, secondDraft.TotalAmount);
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_FixedFeeStillOnAnOpenDraft_RegeneratingThatSameDraftKeepsTheFee()
+    {
+        // The "already invoiced" check must only count a Finalized invoice, not the very Draft being
+        // regenerated - otherwise refreshing a Draft that already carries the fee would incorrectly strip it
+        // back out, since GenerateDraftInvoiceAsync builds the fresh line items BEFORE clearing the existing
+        // Draft's own (still-persisted) ones.
+        await using var db = CreateInMemoryDb();
+        var (client, _, _) = await SeedAsync(db, PaymentModel.FixedProjectCost);
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Single(draft.LineItems);
+
+        var regenerated = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Equal(draft.Id, regenerated.Id);
+        Assert.Single(regenerated.LineItems);
+    }
+
+    [Fact]
+    public async Task VoidInvoiceAsync_FixedFeeLine_MakesTheFeeBillableAgain()
+    {
+        // Mirrors the T&M/Expense unlock behavior: voiding the invoice that carried a Fixed Fee line must make
+        // that one-off fee billable again, not leave it permanently excluded.
+        await using var db = CreateInMemoryDb();
+        var (client, _, user) = await SeedAsync(db, PaymentModel.FixedProjectCost);
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        var finalized = await service.FinalizeInvoiceAsync(draft.Id, "INV-FIXED-VOID-1", user.Id, CancellationToken.None);
+
+        await service.VoidInvoiceAsync(finalized.Id, "Raised in error", user.Id, "Admin User", CancellationToken.None);
+
+        var newDraft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+        Assert.Single(newDraft.LineItems);
     }
 
     [Fact]

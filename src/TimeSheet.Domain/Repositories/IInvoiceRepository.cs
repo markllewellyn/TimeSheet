@@ -24,4 +24,13 @@ public interface IInvoiceRepository
     /// <summary>Clears an existing Draft's line items so it can be rebuilt from scratch (e.g. a late timesheet
     /// entry came in) - nothing has gone to the client yet, so a Draft is always safe to regenerate.</summary>
     void ClearLineItems(Invoice invoice);
+
+    /// <summary>Whether this project's Fixed Fee has already been billed on a Finalized invoice - a Fixed
+    /// Project Cost project's flat fee is a one-off charge (FDD: "a project is either a fixed one-off piece of
+    /// time or repeating time on a monthly basis"), unlike Time &amp; Materials entries and expenses, which bill
+    /// per period. Only Finalized counts, matching the same "Draft locks nothing yet" convention already used
+    /// for TimesheetEntry/ExpenseEntry (so regenerating the very Draft that already carries this project's fee
+    /// doesn't strip it back out); a Voided invoice is deliberately excluded so voiding correctly makes the fee
+    /// billable again.</summary>
+    Task<bool> HasFixedFeeBeenInvoicedAsync(int projectId, CancellationToken ct);
 }

@@ -18,6 +18,7 @@ public class InvoiceGenerationService(
     IProjectRepository projects,
     ITimesheetEntryRepository timesheetEntries,
     IExpenseEntryRepository expenseEntries,
+    IInvoiceRepository invoices,
     ICurrencyConversionService currencyConversion) : IInvoiceGenerationService
 {
     public async Task<Invoice> BuildDraftAsync(int clientId, DateOnly periodStart, DateOnly periodEnd, decimal? manualExchangeRate, CancellationToken ct)
@@ -92,9 +93,11 @@ public class InvoiceGenerationService(
                     });
                 }
             }
-            else // FixedProjectCost - the flat fee billed each invoicing period; hours retained internally only.
+            else // FixedProjectCost - a one-off flat fee (FDD: "a project is either a fixed one-off piece of
+                 // time or repeating time on a monthly basis"), never re-billed once a Finalized invoice has
+                 // already carried it; hours retained internally only.
             {
-                if (project.FixedFeeAmount is > 0)
+                if (project.FixedFeeAmount is > 0 && !await invoices.HasFixedFeeBeenInvoicedAsync(project.Id, ct))
                 {
                     var amount = await ConvertAsync(project.FixedFeeAmount.Value, projectCurrency);
                     lineItems.Add(new InvoiceLineItem

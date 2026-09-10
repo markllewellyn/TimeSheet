@@ -39,7 +39,7 @@ public class BillingRollForwardServiceTests
             new ExpenseEntryRepository(db),
             new InvoiceGenerationService(
                 new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
-                new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
+                new ExpenseEntryRepository(db), new InvoiceRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db)),
             new ThrowingPdfRenderer(),
             new RecordingNotificationService(),
             db,

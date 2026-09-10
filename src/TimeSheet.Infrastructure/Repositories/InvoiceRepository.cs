@@ -48,4 +48,10 @@ public class InvoiceRepository(TimesheetDbContext db) : IInvoiceRepository
         db.InvoiceLineItems.RemoveRange(invoice.LineItems);
         invoice.LineItems.Clear();
     }
+
+    public Task<bool> HasFixedFeeBeenInvoicedAsync(int projectId, CancellationToken ct) =>
+        db.InvoiceLineItems.AnyAsync(l =>
+            l.ProjectId == projectId &&
+            l.Type == InvoiceLineItemType.FixedFee &&
+            l.Invoice!.Status == InvoiceStatus.Finalized, ct);
 }

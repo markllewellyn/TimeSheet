@@ -60,7 +60,7 @@ public class InvoiceGenerationServiceTests
 
     private static InvoiceGenerationService CreateService(TimesheetDbContext db) => new(
         new ClientRepository(db), new ProjectRepository(db), new TimesheetEntryRepository(db),
-        new ExpenseEntryRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db));
+        new ExpenseEntryRepository(db), new InvoiceRepository(db), new CurrencyConversionService(new CurrencyRateRepository(db), new ThrowingRateProvider(), db));
 
     [Fact]
     public async Task BuildDraftAsync_EntryChoiceCurrentInPeriod_Counted()
