@@ -25,3 +25,7 @@ src/TimeSheet.Web/src/environments/environment.development.ts
 # OS/editor
 .DS_Store
 Thumbs.db
+
+# Local dev-session artifacts (Azurite emulator data, dev-server logs)
+.azurite/
+*.log
