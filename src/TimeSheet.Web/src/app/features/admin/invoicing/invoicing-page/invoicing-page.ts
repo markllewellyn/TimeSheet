@@ -5,6 +5,7 @@ import { ClientsService } from '../../../../core/services/clients.service';
 import { Invoice, InvoiceLineItem, InvoicesService } from '../../../../core/services/invoices.service';
 import { BillingRollForwardService } from '../../../../core/services/billing-roll-forward.service';
 import { Client } from '../../../../core/models/project.models';
+import { groupInvoiceLineItemsByProject, InvoiceLineItemGroup } from '../../../../core/utils/invoice-line-grouping';
 
 @Component({
   selector: 'app-invoicing-page',
@@ -124,15 +125,40 @@ export class InvoicingPage {
     });
   }
 
-  protected applyLineItemDiscount(invoice: Invoice, line: InvoiceLineItem, discountPercentInput: string): void {
+  protected groupedLineItems(invoice: Invoice): InvoiceLineItemGroup[] {
+    return groupInvoiceLineItemsByProject(invoice.lineItems);
+  }
+
+  private parseDiscountInput(discountPercentInput: string): number | null | undefined {
     const trimmed = discountPercentInput.trim();
     const discountPercent = trimmed === '' ? null : Number(trimmed);
     if (discountPercent !== null && (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100)) {
       this.error.set('Discount must be between 0 and 100.');
-      return;
+      return undefined;
     }
+    return discountPercent;
+  }
+
+  protected applyLineItemDiscount(invoice: Invoice, line: InvoiceLineItem, discountPercentInput: string): void {
+    const discountPercent = this.parseDiscountInput(discountPercentInput);
+    if (discountPercent === undefined) return;
 
     this.invoicesService.applyLineItemDiscount(invoice.id, line.id, discountPercent).subscribe({
+      next: () => {
+        this.error.set(null);
+        this.refresh(invoice.clientId);
+      },
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not apply the discount.'),
+    });
+  }
+
+  /** Bulk sibling of applyLineItemDiscount - applies one discount to every line for a project on this invoice
+   * at once, so an admin doesn't have to discount a project's per-entry lines one at a time. */
+  protected applyProjectDiscount(invoice: Invoice, projectId: number, discountPercentInput: string): void {
+    const discountPercent = this.parseDiscountInput(discountPercentInput);
+    if (discountPercent === undefined) return;
+
+    this.invoicesService.applyProjectDiscount(invoice.id, projectId, discountPercent).subscribe({
       next: () => {
         this.error.set(null);
         this.refresh(invoice.clientId);

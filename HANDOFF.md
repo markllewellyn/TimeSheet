@@ -4,6 +4,129 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-10 — invoice line items: per-entry detail, closing the audit's biggest finding
+
+Immediate follow-up to the fresh FDD re-audit below, picked as the user's first priority. The FDD says a
+finalized invoice line shows "the staff member's name, the project name, the task date, the description, the
+total hours, the rate and the amount" - the actual app (`InvoiceGenerationService.BuildDraftAsync`) rolled an
+entire project's worth of entries for a billing period into **one single line** (`Description` = just the
+project name, no staff/date/rate anywhere). Planned properly (Plan Mode, one deep Explore agent mapping the
+whole invoicing pipeline, two AskUserQuestion rounds) before writing code, since it touched money-calculation
+correctness and real UX tradeoffs.
+
+- **`InvoiceGenerationService.BuildDraftAsync`** now creates one `InvoiceLineItem` per `TimesheetEntry` (Time &
+  Materials) and one per billable `ExpenseEntry` (both confirmed with the user first - expenses explode too,
+  not just time), instead of one summed line per project. Fixed Fee stays a single line (no natural per-entry
+  shape for a flat fee, unchanged). `GetCountedForInvoicingAsync` already returned everything needed (User,
+  Date, Description, resolved rate) - no repository query change required there, only
+  `ExpenseEntryRepository.GetBillableForProjectAsync` needed a new `.Include(e => e.User)`.
+- **New `InvoiceLineItem` fields**: `StaffId`/`StaffName` (FK + denormalized snapshot, same pattern as
+  `TimesheetEntry.ApprovedByStaffId`/`ApprovedByName` - an invoice must stay reproducible even if the person is
+  later renamed or deactivated), `TaskDate`, `Rate` (the entry's own `ResolvedCustomerRate`, snapshotted as-is
+  in native currency, never re-resolved). New migration `AddInvoiceLineItemStaffAndTaskDetails` - confirmed
+  applied directly against the dev DB (`PRAGMA table_info` showed all 4 new columns).
+- **A real bug caught and fixed before it shipped**: the first design draft resolved the invoice's native
+  currency via `project.Client.ReportingCurrencyCode` - but `IProjectRepository.GetByIdAsync` only
+  `.Include(p => p.Client)`, never `.ThenInclude(c => c.Currency)`, so that property would have silently
+  fallen back to "GBP" for every non-GBP-reporting client. Fixed by fetching the Client separately via
+  `IClientRepository.GetByIdAsync` (which does include `Currency`), mirroring
+  `ReportingService.ResolveNativeProjectCurrencyAsync`'s own identical existing pattern exactly - caught by
+  reading that precedent before writing new code, not after a live bug.
+- **Bulk "discount whole project" added**, confirmed with the user first: exploding one project-rollup line
+  into many per-entry lines would otherwise force an admin to discount a project's dozens of lines one at a
+  time instead of the one click it used to take. New `IInvoicingService.ApplyProjectDiscountAsync` (mirrors the
+  existing single-line `ApplyLineItemDiscountAsync` exactly, just loops every line for one project) + new
+  `Invoices_ApplyProjectDiscount` endpoint (`PUT invoices/{id}/projects/{projectId}/discount`).
+  `LockEntriesAsync` gained a `.DistinctBy(l => l.ProjectId)` since there are now many T&M lines per project
+  instead of one - same correctness, avoids re-running the identical lock query once per entry.
+- **A latent PDF bug caught and fixed proactively, before it could surface for real**: the QuestPDF renderer
+  put the running Total in `page.Footer()`, which QuestPDF repeats on *every* page - harmless at one line per
+  project (invoices never spanned multiple pages), but exploding to per-entry lines makes a busy client's
+  invoice genuinely multi-page, which would have printed "Total: X" at the bottom of every page. Moved the
+  Total into the end of the flowing `page.Content()` instead (after all project groups), and grouped the line
+  table itself by project (heading + subtotal per project, 6 columns: Staff/Date/Description/Hours/Rate/Amount)
+  rather than one flat table mixing every project's entries together.
+- **Admin invoicing UI** (`invoicing-page`) and the read-only PM view (`my-invoices-page`) both now render
+  line items grouped by project (new shared `core/utils/invoice-line-grouping.ts`, used by both), matching the
+  PDF's own new layout.
+- Backend build clean, 50/50 tests pass (2 new: one confirming N entries produce N line items not 1, one for
+  `ApplyProjectDiscountAsync`'s bulk recompute - existing tests needed no changes since they only ever seeded
+  one entry per project and asserted on locking, never on line count). Angular build clean. API host restarted
+  (new migration + endpoint) - confirmed the migration actually applied against the dev DB directly, not just
+  "no error on apply".
+- **Live-verified end-to-end with real proof, not just a UI glance**: generated a real Draft invoice for
+  Everlast (D365 Migration, Time & Materials, USD reporting currency) covering 2026-08-01 to 2026-09-10 - got
+  **10 real per-entry lines** (9 timesheet entries + 1 expense, confirmed the expense line correctly showed
+  blank Hours/Rate) with real staff names, dates, descriptions and rates, not one rolled-up line. Applied the
+  new bulk "discount whole project" control (10%) - confirmed every line's discount updated together and the
+  invoice total recalculated correctly (12,000.00 → 10,800.00). Finalized it (`#MULTILINE-TEST-1`, invoice id
+  16) and fetched its stored line items directly via the API (not the UI) to confirm the persisted shape
+  matched exactly. **Verified the PDF without clicking the in-app "Download PDF" button** (per this session's
+  own established rule) two ways: (1) fetched the real finalized PDF's raw bytes via a script and confirmed
+  real `%PDF` magic bytes; (2) since that one real invoice only spans one page and can't prove the Total-per-
+  page fix on its own, built a synthetic 80-line, 2-project invoice through the *actual*
+  `QuestPdfInvoiceRenderer` class directly (a throwaway console script referencing the real Infrastructure
+  project, no HTTP/token involved, cleaned up after) and extracted its text with PdfPig: a genuine 3-page PDF,
+  **"Total:" appears exactly once** across all 3 pages (the old `page.Footer()` code would have printed it on
+  all 3), and "Subtotal:" appears exactly twice, once per project group - definitive proof the fix works, not
+  just a code-review guess. Also confirmed backward compatibility live: every pre-existing finalized invoice
+  (`#jj`, `#gg`, `#76`, `#right`, `#12`, `#BLOBTEST-1`) still renders correctly in the UI with "-" placeholders
+  for the new Staff/Date/Rate columns on their old rolled-up-shape lines - no error, no broken row.
+- **New demo-data artifact**: invoice `#MULTILINE-TEST-1` (id 16) on Everlast, finalized during live
+  verification - left as-is like every other real test invoice already in this dev DB (`gg`/`jj`/`right`/`76`/
+  `12`/`BLOBTEST-1`), since a finalized invoice can never be un-finalized in this app (by design, per the FDD).
+
+## Done later in this session, 2026-09-10 — a fresh full FDD re-audit, three parallel checks against the real code
+
+Not a fix - the user asked for exactly this after the Project Detail Breakdown work below, rather than trusting
+this file's own accumulated notes from past audits. Extracted the FDD's full text directly from the `.docx`
+itself for the first time (`word/document.xml` + `word/comments.xml` via a throwaway unzip-and-strip-tags
+script - no cached plain-text version existed anywhere in the repo before now), including embedded reviewer
+comments that were never visible from HANDOFF's own past summaries. Three parallel checks (Clients/Projects/
+Rates; Timesheet Entries/Invoicing/Payroll; Auth/Reporting/Notifications), each re-reading the real code fresh
+rather than trusting what a past audit claimed was already done.
+
+**Real, actionable gaps found** (one already fixed, see the entry above):
+
+1. ~~**Invoice line items didn't match the FDD's own spec**~~ - **fixed the same session**, see the entry above.
+2. **No "Team" concept exists anywhere in the app.** FDD: reporting "on a team, role and user basis" - role and
+   user reporting both exist (`IReportingService`'s by-user/by-role breakdowns), but there's no Team/Department
+   entity in the domain model at all (`grep` across `src/TimeSheet.Domain/Entities` for Team/Department: zero
+   hits) - can't be added as "just a report" without first deciding what a team even is in this app. Not
+   started - a business-model decision, not a small fix.
+3. **No per-role rollup on the Estimated Cost/Profit panel.** FDD: "calculated per user *and per role*."
+   `ProjectEstimateLine` already carries `RoleId`/`RoleName` per line - the data is there, just never grouped
+   in the UI. Small, cheap fix, not started.
+4. **"Hours remaining" lives outside the Reporting feature.** FDD describes it as part of Reports/Export;
+   it only exists as this session's separate Budget & Cost Status feature (`ActualHours`/`HoursUsedPercent` vs
+   `BudgetHours`), never surfaced in the Reports page or the CSV export. Not started.
+
+**Business decisions surfaced, not bugs** (the FDD document itself is ambiguous or self-contradictory here -
+flagged for the user rather than silently picked either way):
+
+5. **Should `Project.BudgetHours` reset per billing period** (e.g. monthly) for a repeating-billing project? A
+   reviewer comment embedded in the FDD itself raises this ("Hours might be 800 a month and therefore the
+   budget needs to reset each month") and nobody ever answered it. Confirmed via code: `BudgetHours` is purely
+   an all-time lifetime cumulative figure everywhere it's read (`BudgetMonitoringService`,
+   `ProjectStatusService`, `ITimesheetEntryRepository.GetActualsByProjectIdsAsync`) - no period concept
+   anywhere. Not a literal FDD violation (the main requirements text never actually mandates a reset), but a
+   real, still-open ambiguity.
+6. **Out-of-hours approval timing.** The FDD's main text and the built app both implement *post-hoc* approval
+   (log first, an Admin/PM approves the already-logged entry before payroll aggregation -
+   `TimesheetApprovalFunctions.Approve`). A reviewer comment in the same document argues for *pre-*
+   authorization instead ("can't have guys just choosing to work in evenings at the expense of day") - a real
+   tension inside the source document itself, not something to silently resolve either way.
+
+**Confirmed correct/complete this round** (re-verified fresh, not just trusted from a past audit): 5-tier rate
+resolution, effective-dated `StaffCost`/`RateCard`, discount scope (`RateCard.DiscountPercent` +
+`InvoiceLineItem.DiscountPercent` only, confirmed by grep - nowhere else), `ExpenseEntry`'s own `Currency`
+field, per-entry `BillingPeriodChoice` UI, server-side validation (`TimesheetEntriesFunctions` alone has ~10
+explicit checks), impersonation's audit trail (both the acting admin and the impersonated target are written to
+`AuditLog`, confirmed at two independent call sites), inactive-user exclusion from pickers, the Staff screen's
+filter set, and the CSV export's 3 date-range presets (plus an extra `LastYear` option beyond the FDD's stated
+3 - additive, not a gap). The single-currency `Client` shape (vs the FDD's "charge in" + "invoice in") remains
+the same already-accepted simplification from a past session, not re-litigated as new.
+
 ## Done even later still in this session, 2026-09-10 — Sign Out didn't redirect to the login screen
 
 Not an FDD gap - a real, separate UX bug the user noticed while testing the work above. Root cause, confirmed

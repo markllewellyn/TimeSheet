@@ -10,11 +10,11 @@ using Xunit;
 namespace TimeSheet.Infrastructure.Tests;
 
 /// <summary>Covers InvoicingService.FinalizeInvoiceAsync's entry-locking behavior (FDD: "Finalizing an invoice
-/// locks the entries it was built from"). BuildDraftAsync only persists an aggregated per-project sum on each
-/// Time &amp; Materials line item - the individual TimesheetEntry rows behind it are otherwise never recorded -
-/// so FinalizeInvoiceAsync has to reconstitute that entry set by re-running the same period/project query
-/// (ITimesheetEntryRepository.GetCountedForInvoicingAsync) before stamping InvoiceId. Exercised end to end
-/// against a real database, not mocked.</summary>
+/// locks the entries it was built from"), BuildDraftAsync's per-entry line generation, and the bulk
+/// per-project discount. InvoiceLineItem snapshots StaffId/TaskDate/Description per entry but has no FK back
+/// to the TimesheetEntry it came from, so FinalizeInvoiceAsync has to reconstitute the locked entry set by
+/// re-running the same period/project query (ITimesheetEntryRepository.GetCountedForInvoicingAsync) before
+/// stamping InvoiceId. Exercised end to end against a real database, not mocked.</summary>
 public class InvoicingServiceTests
 {
     private static readonly DateOnly PeriodStart = new(2026, 2, 1);
@@ -115,6 +115,50 @@ public class InvoicingServiceTests
 
         var reloaded = await db.TimesheetEntries.AsNoTracking().SingleAsync(e => e.Id == entry.Id);
         Assert.Null(reloaded.InvoiceId);
+    }
+
+    [Fact]
+    public async Task GenerateDraftInvoiceAsync_TimeAndMaterials_OneLineItemPerEntry()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.AddRange(
+            MakeEntry(client, project, user, new DateOnly(2026, 2, 3), 4m, 100m),
+            MakeEntry(client, project, user, new DateOnly(2026, 2, 10), 2m, 100m),
+            MakeEntry(client, project, user, new DateOnly(2026, 2, 17), 6m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        Assert.Equal(3, draft.LineItems.Count);
+        Assert.All(draft.LineItems, l =>
+        {
+            Assert.Equal(user.Id, l.StaffId);
+            Assert.Equal("Staff", l.StaffName);
+            Assert.Equal("Work", l.Description);
+            Assert.Equal(100m, l.Rate);
+        });
+        Assert.Equal(1200m, draft.TotalAmount); // (4+2+6)*100
+    }
+
+    [Fact]
+    public async Task ApplyProjectDiscountAsync_DiscountsEveryLineForThatProjectAndRecomputesTotal()
+    {
+        await using var db = CreateInMemoryDb();
+        var (client, project, user) = await SeedAsync(db);
+        db.TimesheetEntries.AddRange(
+            MakeEntry(client, project, user, new DateOnly(2026, 2, 3), 4m, 100m),
+            MakeEntry(client, project, user, new DateOnly(2026, 2, 10), 2m, 100m));
+        await db.SaveChangesAsync();
+
+        var service = CreateService(db);
+        var draft = await service.GenerateDraftInvoiceAsync(client.Id, PeriodStart, PeriodEnd, null, CancellationToken.None);
+
+        var discounted = await service.ApplyProjectDiscountAsync(draft.Id, project.Id, 10m, CancellationToken.None);
+
+        Assert.All(discounted.LineItems, l => Assert.Equal(10m, l.DiscountPercent));
+        Assert.Equal(540m, discounted.TotalAmount); // (400+200) * 0.9
     }
 
     private class RecordingNotificationService : INotificationService

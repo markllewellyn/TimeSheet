@@ -13,6 +13,12 @@ export interface InvoiceLineItem {
   discountPercent: number | null;
   amount: number;
   type: string;
+  // One line per TimesheetEntry/ExpenseEntry now (FDD: a line shows the staff member's name, the task date,
+  // the description and the rate) - null for a Fixed Fee line, which has no natural per-entry shape.
+  staffId: number | null;
+  staffName: string | null;
+  taskDate: string | null;
+  rate: number | null;
 }
 
 export interface Invoice {
@@ -75,6 +81,12 @@ export class InvoicesService {
 
   applyLineItemDiscount(invoiceId: number, lineItemId: number, discountPercent: number | null): Observable<Invoice> {
     return this.http.put<Invoice>(`${this.baseUrl}/invoices/${invoiceId}/line-items/${lineItemId}/discount`, { discountPercent });
+  }
+
+  /** Bulk sibling of applyLineItemDiscount - applies one discount to every line for a project on this invoice
+   * at once, since generation now produces one line per entry instead of one per project. */
+  applyProjectDiscount(invoiceId: number, projectId: number, discountPercent: number | null): Observable<Invoice> {
+    return this.http.put<Invoice>(`${this.baseUrl}/invoices/${invoiceId}/projects/${projectId}/discount`, { discountPercent });
   }
 
   downloadPdf(invoiceId: number): Observable<Blob> {

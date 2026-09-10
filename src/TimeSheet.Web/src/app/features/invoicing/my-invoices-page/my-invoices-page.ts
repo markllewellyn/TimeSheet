@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { InvoicesService, ProjectManagerInvoice } from '../../../core/services/invoices.service';
 import { LoadingSpinner } from '../../../core/components/loading-spinner/loading-spinner';
+import { groupInvoiceLineItemsByProject, InvoiceLineItemGroup } from '../../../core/utils/invoice-line-grouping';
 
 /**
  * FDD: "Project managers can view the staged invoice for their projects." Read-only - a PM never generates,
@@ -33,5 +34,9 @@ export class MyInvoicesPage {
         this.error.set(err?.error?.error ?? 'Could not load your invoices.');
       },
     });
+  }
+
+  protected groupedLineItems(invoice: ProjectManagerInvoice): InvoiceLineItemGroup[] {
+    return groupInvoiceLineItemsByProject(invoice.lineItems);
   }
 }

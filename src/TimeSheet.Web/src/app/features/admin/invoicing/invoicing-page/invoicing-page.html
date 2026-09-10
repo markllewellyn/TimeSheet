@@ -83,45 +83,73 @@
             </div>
           </div>
 
-          <table class="table-clean">
-            <thead>
-              <tr>
-                <th>Description</th>
-                <th>Hours</th>
+          @for (group of groupedLineItems(invoice); track group.projectId) {
+            <div class="mb-4">
+              <div class="mb-2 flex items-center justify-between">
+                <span class="font-medium text-foreground">{{ group.projectName }}</span>
                 @if (invoice.status === 'Draft') {
-                  <th>Discount %</th>
+                  <label class="flex items-center gap-2 text-xs text-muted-foreground">
+                    Discount whole project
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.1"
+                      class="input w-20"
+                      placeholder="%"
+                      #projectDiscountInput
+                      (change)="applyProjectDiscount(invoice, group.projectId, projectDiscountInput.value)"
+                    />
+                  </label>
                 }
-                <th>Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (line of invoice.lineItems; track line.id) {
-                <tr>
-                  <td>{{ line.description }}</td>
-                  <td class="text-muted-foreground">{{ line.hours ?? '-' }}</td>
-                  @if (invoice.status === 'Draft') {
-                    <td>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        class="input w-20"
-                        [ngModel]="line.discountPercent"
-                        (change)="applyLineItemDiscount(invoice, line, $any($event.target).value)"
-                      />
-                    </td>
-                  }
-                  <td class="text-muted-foreground">
-                    @if (line.discountPercent) {
-                      <span class="mr-1 text-xs line-through">{{ line.grossAmount | number: '1.2-2' }}</span>
+              </div>
+              <table class="table-clean">
+                <thead>
+                  <tr>
+                    <th>Staff</th>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Hours</th>
+                    <th>Rate</th>
+                    @if (invoice.status === 'Draft') {
+                      <th>Discount %</th>
                     }
-                    {{ line.amount | number: '1.2-2' }}
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+                    <th>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (line of group.lines; track line.id) {
+                    <tr>
+                      <td class="text-muted-foreground">{{ line.staffName ?? '-' }}</td>
+                      <td class="text-muted-foreground">{{ line.taskDate ?? '-' }}</td>
+                      <td>{{ line.description }}</td>
+                      <td class="text-muted-foreground">{{ line.hours ?? '-' }}</td>
+                      <td class="text-muted-foreground">{{ line.rate ?? '-' }}</td>
+                      @if (invoice.status === 'Draft') {
+                        <td>
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            class="input w-20"
+                            [ngModel]="line.discountPercent"
+                            (change)="applyLineItemDiscount(invoice, line, $any($event.target).value)"
+                          />
+                        </td>
+                      }
+                      <td class="text-muted-foreground">
+                        @if (line.discountPercent) {
+                          <span class="mr-1 text-xs line-through">{{ line.grossAmount | number: '1.2-2' }}</span>
+                        }
+                        {{ line.amount | number: '1.2-2' }}
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
 
           @if (invoice.status === 'Draft') {
             <div class="mt-4 flex items-center gap-3">

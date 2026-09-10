@@ -81,6 +81,8 @@ public class InvoiceLineItemConfiguration : IEntityTypeConfiguration<InvoiceLine
         builder.Property(li => li.Hours).HasPrecision(9, 2);
         builder.Property(li => li.Amount).HasPrecision(18, 2);
         builder.Property(li => li.Type).HasConversion<string>().HasMaxLength(20);
+        builder.Property(li => li.StaffName).HasMaxLength(100);
+        builder.Property(li => li.Rate).HasPrecision(18, 2);
 
         builder.HasOne(li => li.Project).WithMany().HasForeignKey(li => li.ProjectId).OnDelete(DeleteBehavior.Restrict);
     }

@@ -18,6 +18,12 @@ public interface IInvoicingService
     /// frozen GrossAmount and the invoice's TotalAmount from all lines. Passing null clears any discount.</summary>
     Task<Invoice> ApplyLineItemDiscountAsync(int invoiceId, int lineItemId, decimal? discountPercent, CancellationToken ct);
 
+    /// <summary>Bulk sibling of ApplyLineItemDiscountAsync - applies the same discount to every line on this
+    /// invoice for one project, in one call, so an admin doesn't have to discount a project's dozens of
+    /// per-entry lines one at a time. Same Draft-only/0-100 rules; passing null clears the discount on every
+    /// matching line.</summary>
+    Task<Invoice> ApplyProjectDiscountAsync(int invoiceId, int projectId, decimal? discountPercent, CancellationToken ct);
+
     /// <summary>Requires a non-empty, unique (per client) invoice number. Renders the PDF at this point (so the
     /// invoice number appears on the document) and freezes the record - no further edits possible after.</summary>
     Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct);
@@ -36,7 +42,8 @@ public record InvoiceDocumentModel(
     IReadOnlyList<InvoiceDocumentLine> LineItems,
     decimal TotalAmount);
 
-public record InvoiceDocumentLine(string Description, decimal? Hours, decimal Amount);
+public record InvoiceDocumentLine(
+    string ProjectName, string? StaffName, DateOnly? TaskDate, string Description, decimal? Hours, decimal? Rate, decimal Amount);
 
 /// <summary>The renderer never touches EF entities directly - only this plain DTO - keeping the PDF library
 /// (QuestPDF today) fully swappable.</summary>

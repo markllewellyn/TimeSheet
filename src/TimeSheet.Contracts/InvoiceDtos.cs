@@ -1,6 +1,8 @@
 namespace TimeSheet.Contracts;
 
-public record InvoiceLineItemDto(int Id, int ProjectId, string ProjectName, string Description, decimal? Hours, decimal GrossAmount, decimal? DiscountPercent, decimal Amount, string Type);
+public record InvoiceLineItemDto(
+    int Id, int ProjectId, string ProjectName, string Description, decimal? Hours, decimal GrossAmount, decimal? DiscountPercent, decimal Amount, string Type,
+    int? StaffId, string? StaffName, DateOnly? TaskDate, decimal? Rate);
 
 public record InvoiceDto(
     int Id, int ClientId, string ClientName, DateOnly PeriodStart, DateOnly PeriodEnd,

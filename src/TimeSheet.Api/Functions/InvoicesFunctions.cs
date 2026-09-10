@@ -115,6 +115,30 @@ public class InvoicesFunctions(
         }
     }
 
+    /// <summary>Bulk sibling of Invoices_ApplyLineItemDiscount - applies one discount to every line for a
+    /// project on this invoice at once, since generation now produces one line per entry instead of one per
+    /// project.</summary>
+    [Function("Invoices_ApplyProjectDiscount")]
+    public async Task<IActionResult> ApplyProjectDiscount(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "put", Route = "invoices/{id:int}/projects/{projectId:int}/discount")] HttpRequest req, int id, int projectId, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var body = await req.ReadFromJsonAsync<ApplyLineItemDiscountRequest>(ct)
+            ?? throw new BadHttpRequestException("Missing request body.");
+
+        try
+        {
+            var invoice = await invoicing.ApplyProjectDiscountAsync(id, projectId, body.DiscountPercent, ct);
+            var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
+            return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
+        }
+        catch (InvalidOperationException ex)
+        {
+            return new BadRequestObjectResult(new { error = ex.Message });
+        }
+    }
+
     [Function("Invoices_Pdf")]
     public async Task<IActionResult> Pdf(
         [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "invoices/{id:int}/pdf")] HttpRequest req, int id, CancellationToken ct)
@@ -138,5 +162,6 @@ public class InvoicesFunctions(
         i.LineItems.Select(ToLineItemDto).ToList());
 
     private static InvoiceLineItemDto ToLineItemDto(InvoiceLineItem l) => new(
-        l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.GrossAmount, l.DiscountPercent, l.Amount, l.Type.ToString());
+        l.Id, l.ProjectId, l.Project?.Name ?? "", l.Description, l.Hours, l.GrossAmount, l.DiscountPercent, l.Amount, l.Type.ToString(),
+        l.StaffId, l.StaffName, l.TaskDate, l.Rate);
 }

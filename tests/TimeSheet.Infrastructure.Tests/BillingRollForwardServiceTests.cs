@@ -181,6 +181,9 @@ public class BillingRollForwardServiceTests
         public Task<Invoice> ApplyLineItemDiscountAsync(int invoiceId, int lineItemId, decimal? discountPercent, CancellationToken ct) =>
             inner.ApplyLineItemDiscountAsync(invoiceId, lineItemId, discountPercent, ct);
 
+        public Task<Invoice> ApplyProjectDiscountAsync(int invoiceId, int projectId, decimal? discountPercent, CancellationToken ct) =>
+            inner.ApplyProjectDiscountAsync(invoiceId, projectId, discountPercent, ct);
+
         public Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct) =>
             inner.FinalizeInvoiceAsync(invoiceId, invoiceNumber, finalizedByUserId, ct);
 

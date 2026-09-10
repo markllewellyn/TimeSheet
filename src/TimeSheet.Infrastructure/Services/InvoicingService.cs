@@ -67,6 +67,39 @@ public class InvoicingService(
         return invoice;
     }
 
+    public async Task<Invoice> ApplyProjectDiscountAsync(int invoiceId, int projectId, decimal? discountPercent, CancellationToken ct)
+    {
+        if (discountPercent is { } discount && (discount < 0 || discount > 100))
+        {
+            throw new InvalidOperationException("Discount must be between 0 and 100.");
+        }
+
+        var invoice = await invoices.GetByIdAsync(invoiceId, ct)
+            ?? throw new InvalidOperationException($"Invoice {invoiceId} not found.");
+
+        if (invoice.Status != InvoiceStatus.Draft)
+        {
+            throw new InvalidOperationException("A line item discount can only be applied while the invoice is a Draft.");
+        }
+
+        var lines = invoice.LineItems.Where(l => l.ProjectId == projectId).ToList();
+        if (lines.Count == 0)
+        {
+            throw new InvalidOperationException($"No line items for project {projectId} on this invoice.");
+        }
+
+        foreach (var line in lines)
+        {
+            line.DiscountPercent = discountPercent;
+            line.Amount = discountPercent is { } d ? Math.Round(line.GrossAmount * (1 - d / 100m), 2) : line.GrossAmount;
+        }
+        invoice.TotalAmount = Math.Round(invoice.LineItems.Sum(l => l.Amount), 2);
+
+        invoices.Update(invoice);
+        await uow.SaveChangesAsync(ct);
+        return invoice;
+    }
+
     public async Task<Invoice> FinalizeInvoiceAsync(int invoiceId, string invoiceNumber, int finalizedByUserId, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(invoiceNumber))
@@ -98,7 +131,8 @@ public class InvoicingService(
             invoice.PeriodEnd,
             invoice.ReportingCurrency,
             invoice.ExchangeRate,
-            invoice.LineItems.Select(l => new InvoiceDocumentLine(l.Description, l.Hours, l.Amount)).ToList(),
+            invoice.LineItems.Select(l => new InvoiceDocumentLine(
+                l.Project?.Name ?? "", l.StaffName, l.TaskDate, l.Description, l.Hours, l.Rate, l.Amount)).ToList(),
             invoice.TotalAmount);
 
         var pdfBytes = await pdfRenderer.RenderAsync(document, ct);
@@ -134,16 +168,18 @@ public class InvoicingService(
         return await fileStorage.OpenReadAsync(invoice.PdfStorageKey, ct);
     }
 
-    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." Nothing persists which
-    /// individual TimesheetEntry rows fed a Time &amp; Materials line item (BuildDraftAsync only keeps the
-    /// aggregated sum) - so the entry set is reconstituted here by re-running the exact same period/project
-    /// query that built the line item in the first place, then stamping each one with this invoice's id.
-    /// Fixed Fee and Expense line items don't derive from TimesheetEntry rows, so there's nothing to lock for
-    /// those. Idempotent-safe to call more than once (an already-locked entry is simply re-stamped with the
-    /// same value), though FinalizeInvoiceAsync's Draft-only guard means that never actually happens.</summary>
+    /// <summary>FDD: "Finalizing an invoice locks the entries it was built from." InvoiceLineItem has no FK
+    /// back to the TimesheetEntry it came from (only a StaffId/TaskDate/Description snapshot) - so the entry
+    /// set is reconstituted here by re-running the exact same period/project query that built the line items in
+    /// the first place, then stamping each one with this invoice's id. Fixed Fee and Expense line items don't
+    /// derive from TimesheetEntry rows, so there's nothing to lock for those. Idempotent-safe to call more than
+    /// once (an already-locked entry is simply re-stamped with the same value), though FinalizeInvoiceAsync's
+    /// Draft-only guard means that never actually happens.</summary>
     private async Task LockEntriesAsync(Invoice invoice, CancellationToken ct)
     {
-        foreach (var line in invoice.LineItems.Where(l => l.Type == InvoiceLineItemType.TimeAndMaterials))
+        // DistinctBy(ProjectId) - there's now one InvoiceLineItem per entry rather than one per project, so
+        // without this the identical GetCountedForInvoicingAsync query would otherwise re-run once per entry.
+        foreach (var line in invoice.LineItems.Where(l => l.Type == InvoiceLineItemType.TimeAndMaterials).DistinctBy(l => l.ProjectId))
         {
             var counted = await entries.GetCountedForInvoicingAsync(line.ProjectId, invoice.PeriodStart, invoice.PeriodEnd, ct);
             foreach (var entry in counted)

@@ -7,10 +7,11 @@ namespace TimeSheet.Infrastructure.Services;
 
 /// <summary>
 /// Collates a billing period's TimesheetEntry/ExpenseEntry rows per client into presentation-ready
-/// InvoiceLineItems: grouped by project (not by day/raw row), rates/fixed-fee applied by payment model,
-/// internal-only fields (raw descriptions, UserId, escalation history) never surfaced, everything converted
-/// into the CLIENT's single reporting currency so the invoice totals in one coherent currency even when
-/// individual projects carry a CurrencyOverride for their own reporting.
+/// InvoiceLineItems: one line per entry for Time & Materials and Expenses (FDD: a line shows the staff
+/// member's name, the task date, the description and the rate - not just a project total), a single line per
+/// Fixed Project Cost project (no natural per-entry shape for a flat fee), everything converted into the
+/// CLIENT's single reporting currency so the invoice totals in one coherent currency even when individual
+/// projects carry a CurrencyOverride for their own reporting.
 /// </summary>
 public class InvoiceGenerationService(
     IClientRepository clients,
@@ -64,21 +65,27 @@ public class InvoiceGenerationService(
 
             if (project.PaymentModel == PaymentModel.TimeAndMaterials)
             {
+                // One InvoiceLineItem per entry, not a project-level rollup - FDD: a finalized invoice line
+                // shows "the staff member's name, the project name, the task date, the description... the
+                // rate". Rate/amount come from each entry's own stamped ResolvedCustomerRate (see
+                // TimesheetEntry), not re-resolved via IRateResolver here - so the rate that actually applied
+                // when the entry was recorded is what gets billed, never "today's" rate.
                 var entries = await timesheetEntries.GetCountedForInvoicingAsync(project.Id, periodStart, periodEnd, ct);
-                if (entries.Count > 0)
+                foreach (var entry in entries)
                 {
-                    // Summed from each entry's stamped ResolvedCustomerRate (see TimesheetEntry), not
-                    // re-resolved via IRateResolver here - so the rate that actually applied when the entry
-                    // was recorded is what gets billed, never "today's" rate.
-                    var totalHours = entries.Sum(e => e.WorkHours + e.OutOfHoursHours);
-                    var amountNative = entries.Sum(e => (e.WorkHours + e.OutOfHoursHours) * (e.ResolvedCustomerRate ?? 0));
-
+                    var hours = entry.WorkHours + entry.OutOfHoursHours;
+                    var amountNative = hours * (entry.ResolvedCustomerRate ?? 0);
                     var amount = await ConvertAsync(amountNative, projectCurrency);
+
                     lineItems.Add(new InvoiceLineItem
                     {
                         ProjectId = project.Id,
-                        Description = project.Name,
-                        Hours = totalHours,
+                        Description = entry.Description,
+                        Hours = hours,
+                        Rate = entry.ResolvedCustomerRate,
+                        StaffId = entry.UserId,
+                        StaffName = entry.User?.DisplayName,
+                        TaskDate = entry.Date,
                         GrossAmount = amount,
                         Amount = amount,
                         Type = InvoiceLineItemType.TimeAndMaterials,
@@ -102,22 +109,23 @@ public class InvoiceGenerationService(
                 }
             }
 
+            // One line per expense, same reasoning as the T&M entries above - who incurred it, when, and what
+            // it was for, not a single rolled-up "Project - Expenses" total.
             var billableExpenses = await expenseEntries.GetBillableForProjectAsync(project.Id, periodStart, periodEnd, ct);
-            if (billableExpenses.Count > 0)
+            foreach (var expense in billableExpenses)
             {
-                decimal expenseTotal = 0;
-                foreach (var expense in billableExpenses)
-                {
-                    expenseTotal += await ConvertAsync(expense.Amount, expense.Currency);
-                }
-
+                var amount = Math.Round(await ConvertAsync(expense.Amount, expense.Currency), 2);
                 lineItems.Add(new InvoiceLineItem
                 {
                     ProjectId = project.Id,
-                    Description = $"{project.Name} - Expenses",
+                    Description = expense.Description ?? "Expense",
                     Hours = null,
-                    GrossAmount = Math.Round(expenseTotal, 2),
-                    Amount = Math.Round(expenseTotal, 2),
+                    Rate = null,
+                    StaffId = expense.UserId,
+                    StaffName = expense.User?.DisplayName,
+                    TaskDate = expense.Date,
+                    GrossAmount = amount,
+                    Amount = amount,
                     Type = InvoiceLineItemType.Expense,
                 });
             }
