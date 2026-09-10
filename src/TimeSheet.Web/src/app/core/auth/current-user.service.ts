@@ -28,9 +28,18 @@ export class CurrentUserService {
   private readonly notProvisionedSignal = signal(false);
   readonly notProvisioned = this.notProvisionedSignal.asReadonly();
 
+  // Resolves once the initial /api/me fetch (if any) has settled - adminGuard awaits this before reading
+  // isAdmin(), since a fresh page load (cold URL, bookmark, refresh) otherwise evaluates the route guard
+  // before this async call returns, sending a genuine Admin back to /timesheet because isAdmin() was still
+  // false at that instant. Resolves immediately if there's no session to load a profile for.
+  private resolveMeLoaded!: () => void;
+  readonly meLoaded: Promise<void> = new Promise((resolve) => (this.resolveMeLoaded = resolve));
+
   constructor() {
     if (this.isSignedIn()) {
       this.loadMe();
+    } else {
+      this.resolveMeLoaded();
     }
   }
 
@@ -50,9 +59,11 @@ export class CurrentUserService {
       next: (me) => {
         this.meSignal.set(me);
         this.notProvisionedSignal.set(false);
+        this.resolveMeLoaded();
       },
       error: (err) => {
         if (err?.status === 403) this.notProvisionedSignal.set(true);
+        this.resolveMeLoaded();
       },
     });
   }

@@ -7,8 +7,9 @@ import { CurrentUserService } from './current-user.service';
  * the Api's own [AdminOnly]-equivalent check against User.Role (see AuthorizationExtensions.RequireAdmin in
  * TimeSheet.Api). Never rely on this guard alone.
  */
-export const adminGuard: CanActivateFn = () => {
+export const adminGuard: CanActivateFn = async () => {
   const currentUser = inject(CurrentUserService);
   const router = inject(Router);
+  await currentUser.meLoaded;
   return currentUser.isAdmin() ? true : router.parseUrl('/');
 };

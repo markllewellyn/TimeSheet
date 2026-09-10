@@ -1,8 +1,18 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-09)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-10)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-10 — finished an unfinished, uncommitted fix left in the working tree: adminGuard could bounce a genuine Admin on a cold page load
+
+Not an FDD gap — a real, separate app-level bug. Found `current-user.service.ts` sitting modified but uncommitted at the start of this session, with no HANDOFF note at all: a `meLoaded` promise had been added to `CurrentUserService` but never wired up — `loadMe()` never resolved it, and `admin.guard.ts` was still fully synchronous. Read the code to work out the intent: `adminGuard` reads `currentUser.isAdmin()` synchronously, but on a cold page load (fresh URL, bookmark, browser refresh) the constructor's own `/api/me` fetch hasn't resolved yet, so a genuine Admin hitting an admin route directly would get bounced to `/` because `isAdmin()` was still `false` at that instant. (Navigating to an admin route *from within* the already-running SPA was never affected — by then `/api/me` has long since resolved.)
+
+- **`current-user.service.ts`**: `loadMe()` now calls the pre-existing-but-unwired `resolveMeLoaded()` in both the success and error subscribe callbacks, so `meLoaded` always settles once the initial `/api/me` call finishes one way or the other (it already resolved immediately in the constructor when there's no session to load at all).
+- **`admin.guard.ts`**: now `async`, `await`s `currentUser.meLoaded` before reading `isAdmin()`. `authGuard` needed no change — it only checks `LocalAuthService.isSignedIn()`, a synchronous token-expiry check with no `/api/me` dependency.
+- Angular build clean.
+- **Live-verified with a real before/after, not just the after-state**: started Azurite, the API host, and Angular fresh for this session (nothing was running at the start). Signed in as Mark Llewellyn (Admin) via SSO, confirmed full Admin nav. Cold-navigated (full browser `navigate`, not an in-app link — the exact scenario this bug needed) straight to `/admin/users` — landed there correctly. Then, to prove this was a genuine fix and not something that already worked: temporarily reverted `admin.guard.ts` back to synchronous, let `ng serve` recompile, and repeated the exact same cold navigation to `/admin/users` — **reproduced the bug live**, landing on `/timesheet` instead. Restored the fix, let it recompile again, repeated the same cold navigation a third time — back to landing correctly on `/admin/users`. Confirmed the working-tree diff afterward matched exactly what was intended (the revert/restore round-trip left no residue). Did not additionally re-test the non-admin-blocked path, since that half of `adminGuard`'s logic (`isAdmin() ? true : redirect`) was untouched by this change — only the timing of when it runs changed.
+- All three dev processes (Azurite, API host, Angular) left running at the end of this session.
 
 ## Done later still in this session, 2026-09-09 — closed the attachments-under-impersonation gap the moment it was actually hit
 
