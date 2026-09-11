@@ -4,6 +4,36 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done last in this session, 2026-09-11 — a UI polish sweep, honestly reported: found the app already in good shape
+
+With the FDD list and known loose ends closed, the user asked for "a bit of UI polish and testing." Rather than
+inventing busywork, re-ran the same class of checks the 2026-09-08 polish pass used (native `confirm()`/
+`alert()`, hardcoded Tailwind colors instead of theme tokens, missing confirm-before-destructive-action,
+inconsistent empty-state treatment) across everything built since then (Team, per-role rollup, Hours Remaining,
+Void/Delete invoice, Project Detail Breakdown, My Projects) - all clean, no regressions found. A live visual
+walk of Reports, Invoicing, Export, My Projects, and the Breakdown page also turned up nothing obviously broken.
+
+- **One real thing found and fixed, though its actual impact couldn't be confirmed**: while investigating why
+  the Project Detail Breakdown's pie charts render smaller than their card (a purely cosmetic observation, not
+  a functional bug), a `javascript_tool` measurement of the actual `<canvas>` elements returned a wildly
+  implausible `clientWidth`/`clientHeight` (~2453px, bigger than the whole page) that didn't reconcile with the
+  correct-looking rendered screenshot at all, and further investigation (checking for CSS transforms/zoom -
+  none found) couldn't explain the discrepancy. **`chart-canvas.ts`'s wrapper div was missing `position:
+  relative`**, which Chart.js's own docs require on a canvas's immediate parent for its responsive-resize
+  logic to measure the correct ancestor - a real, independently-justified gap regardless of the mystery
+  reading, so fixed it. Confirmed via a fresh measurement afterward that this did **not** change the odd
+  number (so it wasn't the actual explanation for that specific reading) and confirmed via screenshot the
+  visual rendering is pixel-identical before/after - a safe, correct-per-the-docs addition, not a fix for a
+  confirmed live bug. Flagging the unexplained measurement here rather than quietly dropping it, in case it
+  points at something real that a future session with a differently-behaving browser environment can actually
+  pin down.
+- Angular build clean. Frontend-only change (`chart-canvas.ts`), no backend/DB change, no API host restart
+  needed.
+- **Nothing else was changed** - the honest result of this pass is that the app doesn't have an obvious backlog
+  of small polish items left; the last two sessions' work (loading-state consistency, confirm-dialog coverage,
+  color tokens, empty-state structure) already covers the codebase pretty thoroughly. Told the user this
+  directly rather than manufacturing changes to look busy.
+
 ## Done later still in this session, 2026-09-11 — actually found the Entry Flags search bug, plus closed two other "Known loose ends" verification gaps
 
 With the FDD-numbered backlog closed, picked up two items from "Known loose ends" at the user's request: (1)

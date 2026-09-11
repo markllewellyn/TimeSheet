@@ -8,12 +8,16 @@ Chart.register(...registerables);
  * `ng2-charts`, whose Angular peer-dependency range risks a conflict against this app's very new Angular
  * version) hand-wrapped in one generic component is simplest. Rebuilds the chart wholesale on any input
  * change rather than diffing - fine since each chart here is fetched once per page load, never live-updated.
+ *
+ * The wrapper div needs `position: relative` - Chart.js's own responsive-sizing docs require it on a
+ * canvas's immediate parent, since its resize logic measures the nearest *positioned* ancestor; without it,
+ * sizing can be computed against the wrong ancestor's box instead of this component's own height.
  */
 @Component({
   selector: 'app-chart-canvas',
   standalone: true,
   template: `
-    <div [style.height.px]="height()">
+    <div class="relative" [style.height.px]="height()">
       <canvas #canvasRef></canvas>
     </div>
   `,
