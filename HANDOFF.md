@@ -478,12 +478,22 @@ flagged for the user rather than silently picked either way):
    an all-time lifetime cumulative figure everywhere it's read (`BudgetMonitoringService`,
    `ProjectStatusService`, `ITimesheetEntryRepository.GetActualsByProjectIdsAsync`) - no period concept
    anywhere. Not a literal FDD violation (the main requirements text never actually mandates a reset), but a
-   real, still-open ambiguity.
+   real, still-open ambiguity. **Discussed with the user 2026-09-11, deliberately deferred, not built**: laid
+   out the tradeoffs (a global behavior change would break one-off/Fixed-Fee projects where "reset" makes no
+   sense; a per-project opt-in flag would be the safer shape if this is ever built) and recommended not building
+   it speculatively, since only a reviewer comment - not the main FDD text - asks for it and no specific
+   client/project need has surfaced. User agreed to leave `BudgetHours` as all-time/cumulative for now. Revisit
+   if a real client contract actually needs a resetting allowance.
 6. **Out-of-hours approval timing.** The FDD's main text and the built app both implement *post-hoc* approval
    (log first, an Admin/PM approves the already-logged entry before payroll aggregation -
    `TimesheetApprovalFunctions.Approve`). A reviewer comment in the same document argues for *pre-*
    authorization instead ("can't have guys just choosing to work in evenings at the expense of day") - a real
-   tension inside the source document itself, not something to silently resolve either way.
+   tension inside the source document itself, not something to silently resolve either way. **Discussed with the
+   user 2026-09-11, deliberately deferred, not built**: pre-authorization would be a materially new
+   request-then-approve workflow (closer to a leave-request system than a tweak), touching the same
+   entry-locking/payroll-timing logic this session already hardened against double-billing - not something to
+   build speculatively off a single reviewer comment with no specific incident behind it. User agreed to keep
+   today's post-hoc approval flow. Revisit if OOH abuse actually becomes a real, reported problem.
 
 **Confirmed correct/complete this round** (re-verified fresh, not just trusted from a past audit): 5-tier rate
 resolution, effective-dated `StaffCost`/`RateCard`, discount scope (`RateCard.DiscountPercent` +
