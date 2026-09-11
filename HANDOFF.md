@@ -4,6 +4,72 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-11 — "Hours remaining" surfaced in Reports and CSV Export, item #4 from the last FDD re-audit
+
+Picked up from the same open-items list as the per-role rollup above, at the user's own choice from a menu of
+the remaining non-business-decision gaps. FDD places "hours remaining" inside the Reports/Export feature; it
+only existed via the separate Budget & Cost Status feature (`IProjectStatusService`), never in Reports or the
+CSV export. Researched first via a dedicated Explore agent mapping the whole Reports/Export pipeline and
+`IProjectStatusService`'s exact shape before writing any code.
+
+- **A real design decision made and documented, not guessed silently**: `Project.BudgetHours` is an all-time,
+  non-period-resetting figure everywhere else it's used (see item #5 below, still an open ambiguity) - so the
+  new `BudgetHours`/`HoursRemaining` fields are **all-time figures, deliberately not scoped to the report's own
+  date Range**, exactly matching `IProjectStatusService`'s own existing convention. This means, e.g., a "Last 7
+  Days" report can show `TotalHours: 5` (in-range) alongside `HoursRemaining` computed against the project's
+  real all-time actual hours (which may be much larger) - intentional, not a bug, and heavily doc-commented in
+  `IReportingService.cs` so a future reader doesn't "fix" the apparent mismatch.
+- **A second real design decision**: `GetTimeOnClientReportAsync`'s own client-wide `TimeSummary` deliberately
+  leaves `BudgetHours`/`HoursRemaining` **null**, not a summed aggregate - a client's projects can have
+  different budgets or none at all, and there's no single honest "hours remaining" number across them (same
+  reasoning precedent as the existing Cost/Profit-by-Role Client-scope exclusion documented in
+  `IReportingService`'s own doc comment). The per-project truth instead lives on each `TimeByProjectLine` in the
+  breakdown, where it belongs.
+- **`IReportingService.cs`**: `TimeSummary` and `TimeByProjectLine` both gained optional trailing
+  `BudgetHours`/`HoursRemaining` fields (nullable, default `null`) - optional/trailing meant no existing
+  positional-record call site needed updating except the ones deliberately populating them.
+- **`ReportingService.cs`**: new `IProjectStatusService` constructor dependency (already-registered Scoped
+  service, no DI cycle). `GetTimeOnProjectReportAsync`/`GetTimeOnProjectByRoleReportAsync` fetch the project's
+  `ProjectStatus` once and thread it through `SummarizeTime`. `GetTimeOnClientReportAsync` bulk-fetches every
+  one of the client's projects (`IProjectRepository.GetByClientIdAsync`, `includeInactive: true` - same
+  precedent as `InvoiceGenerationService`) and calls `IProjectStatusService.GetStatusesAsync` once for all of
+  them (not per project group - avoids an N+1), then looks each project's status up per breakdown line.
+- **`AdminExportFunctions.cs`** (CSV export): two new trailing columns, "Project Budget Hours"/"Project Hours
+  Remaining", stamped on every row for that entry's project - the same "repeat static per-project context on
+  every row" convention the existing Client/Project name columns already use, rather than inventing a separate
+  summary section that would turn one flat CSV table into two. Distinct projects across the exported rows are
+  bulk-status-fetched once (`IProjectStatusService.GetStatusesAsync`), same N+1-avoidance as the Reports change.
+- **No Angular changes needed for Reports** - confirmed by reading `reports-page.ts`/`.html` first: the page
+  already renders whatever fields a report's JSON happens to contain, fully generically (`Object.keys()` +
+  `keyvalue` pipe, camelCase-to-Title-Case label conversion) - the two new fields appear as a new summary tile
+  and a new breakdown column automatically. No dedicated Export frontend change needed either (backend-only CSV
+  shape change, download is a raw blob).
+- Backend build clean. 66/66 tests pass (3 new, all in `ReportingServiceTests.cs`: `GetTimeOnProjectReportAsync`
+  with a project's `BudgetHours` set proves `HoursRemaining` reflects true **all-time** actuals - deliberately
+  seeds one entry inside the report's date range and one well outside it, asserting `HoursRemaining` accounts
+  for both while the report's own `TotalHours` only reflects the in-range one; the same report with no
+  `BudgetHours` set asserts both new fields are null, not a misleading zero; `GetTimeOnClientReportAsync` with
+  one budgeted and one unbudgeted project proves each `TimeByProjectLine` carries its own correct figures while
+  the client-level `Summary` stays null throughout - **confirmed the first two tests genuinely fail without the
+  fix** by temporarily hardcoding the new `HoursRemaining` helper to always return `null` and re-running before
+  restoring it, same rigor as every other fix this session). No dedicated test added for `AdminExportFunctions`
+  - matches this codebase's already-established bar of no test coverage for that thin Functions-layer class.
+  Existing 5 `ReportingServiceTests` call sites updated for the new constructor dependency, no assertions
+  changed. Angular build unaffected (no frontend files touched). API host restarted (new constructor
+  dependencies on two classes) - confirmed clean startup.
+- **Live-verified in the browser against real Acme data, both surfaces**: ran a "Time on Project" report
+  (ERP Migration Phase 2, Last Year) - summary tiles showed real `Budget Hours: 600` / `Hours Remaining: 496.6`
+  alongside the pre-existing tiles, with no template changes needed. Ran "Time on Client" for the same client -
+  the client-level summary correctly showed blank Budget Hours/Hours Remaining tiles, while the per-project
+  breakdown table showed each project's own real figures, including a genuine **negative** Hours Remaining
+  (`-1`) on the small over-budget "Notif Threshold Test" project - real proof the "can go negative" design
+  works, not just a happy-path number. Downloaded the real CSV export (filtered to Acme / ERP Migration Phase 2,
+  2026 date range, with the user's explicit permission for the file download) and confirmed every row carried
+  "Project Budget Hours" `600.0` / "Project Hours Remaining" `496.6`, matching the Reports figures exactly.
+- **New demo-data artifact**: a real CSV file, `timesheet-export-2026-09-11.csv`, saved to the user's own
+  Downloads folder as part of the live-verification download above - their own file space, left as-is rather
+  than deleted on their behalf.
+
 ## Done in this session, 2026-09-11 — per-role rollup on the Estimated Cost/Profit panel, item #3 from the last FDD re-audit
 
 Picked up from the 2026-09-10 re-audit's open-items list (this file's "What's still open" section) at the
@@ -387,9 +453,10 @@ rather than trusting what a past audit claimed was already done.
    that session's own "Done" entry above. FDD: "calculated per user *and per role*."
    `ProjectEstimateLine` already carries `RoleId`/`RoleName` per line - the data is there, just never grouped
    in the UI. Small, cheap fix, not started.
-4. **"Hours remaining" lives outside the Reporting feature.** FDD describes it as part of Reports/Export;
-   it only exists as this session's separate Budget & Cost Status feature (`ActualHours`/`HoursUsedPercent` vs
-   `BudgetHours`), never surfaced in the Reports page or the CSV export. Not started.
+4. ~~**"Hours remaining" lives outside the Reporting feature.**~~ - **fixed 2026-09-11, a later session**, see
+   that session's own "Done" entry above. FDD describes it as part of Reports/Export; it only existed as this
+   session's separate Budget & Cost Status feature (`ActualHours`/`HoursUsedPercent` vs `BudgetHours`), never
+   surfaced in the Reports page or the CSV export.
 
 **Business decisions surfaced, not bugs** (the FDD document itself is ambiguous or self-contradictory here -
 flagged for the user rather than silently picked either way):

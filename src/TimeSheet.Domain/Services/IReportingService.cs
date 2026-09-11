@@ -9,9 +9,22 @@ public record ReportEnvelope<TSummary, TLine>(ReportDateRange Range, string Curr
 // EntryCount (raw TimesheetEntry row count, not day-count or hour-sum) is on every summary/line - FDD:
 // "the number of entries... on a team, role and user basis." ("Team" has no entity in this app's model and
 // isn't addressed here - see IReportingService's own doc comment below.)
-public record TimeSummary(decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
+//
+// BudgetHours/HoursRemaining (FDD's "hours remaining" ask, previously only visible via the separate Budget &
+// Cost Status feature - see IProjectStatusService) are ALL-TIME figures against Project.BudgetHours, exactly
+// like IProjectStatusService's own ActualHours/BudgetHours - NOT scoped to the report's own date Range, since
+// a budget isn't a per-period concept in this app (see HANDOFF's still-open "should BudgetHours reset per
+// billing period" ambiguity). Both are null when the project has no BudgetHours set, same "no misleading 0%"
+// convention as ProjectStatus. Only ever populated on a genuinely project-scoped summary/line - see each
+// record's own site below for which.
+public record TimeSummary(decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount, decimal? BudgetHours = null, decimal? HoursRemaining = null);
 public record TimeByUserLine(int UserId, string UserName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
-public record TimeByProjectLine(int ProjectId, string ProjectName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
+/// <summary>BudgetHours/HoursRemaining here are this specific project's own all-time figures (see the doc
+/// comment above) - populated on every line, since each line already is one project. Deliberately NOT also
+/// summed onto GetTimeOnClientReportAsync's own TimeSummary: a client's "hours remaining" isn't one honest
+/// number when its projects have different (or no) budgets, so that summary leaves both fields null rather
+/// than publish a misleading aggregate - the per-project truth lives here instead.</summary>
+public record TimeByProjectLine(int ProjectId, string ProjectName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount, decimal? BudgetHours = null, decimal? HoursRemaining = null);
 public record TimeByRoleLine(int? RoleId, string RoleName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
 
 public record CostSummary(decimal LaborCost, decimal ExpenseCost, decimal TotalCost, int EntryCount);

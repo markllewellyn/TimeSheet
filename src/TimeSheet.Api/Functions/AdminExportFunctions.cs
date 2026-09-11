@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.Functions.Worker;
 using TimeSheet.Api.Auth;
+using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Repositories;
 using TimeSheet.Domain.Services;
 
@@ -14,7 +15,8 @@ namespace TimeSheet.Api.Functions;
 /// entries (optionally narrowed further by project) - clientId/userId/projectManagerUserId are silently
 /// ignored for a non-admin caller, enforced here rather than only hidden in the UI. Date-range presets (last 7
 /// days / last calendar month / custom) are a frontend-only concern - the API just takes from/to.</summary>
-public class AdminExportFunctions(ITimesheetEntryRepository entries, IProjectRepository projects, ICurrentUserAccessor currentUser)
+public class AdminExportFunctions(
+    ITimesheetEntryRepository entries, IProjectRepository projects, ICurrentUserAccessor currentUser, IProjectStatusService projectStatus)
 {
     [Function("Admin_ExportTimesheetEntries")]
     public async Task<IActionResult> ExportTimesheetEntries(
@@ -47,14 +49,24 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, IProjectRep
 
         var rows = await entries.GetAllInRangeAsync(from, to, clientId, projectId, projectIds, userId, ct);
 
+        // FDD's "hours remaining" ask, same all-time-against-Project.BudgetHours figure as the Reports page and
+        // the Budget & Cost Status panel (see IReportingService's own doc comment on why this is never scoped to
+        // the export's own date range) - stamped per row like Client/Project already are, not a separate summary
+        // section, so the CSV stays one flat table a spreadsheet can filter/pivot directly.
+        var exportedProjects = rows.Select(e => e.Project).Where(p => p is not null).Cast<Project>().DistinctBy(p => p.Id).ToList();
+        var statuses = await projectStatus.GetStatusesAsync(exportedProjects, ct);
+
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(',', [
             "Staff Name", "Client", "Project", "Date", "Description", "Work Hours", "Out of Hours", "Total Hours",
             "To Payroll", "Approved for Payroll", "Sent to Payroll", "Posting Batch",
+            "Project Budget Hours", "Project Hours Remaining",
         ]));
 
         foreach (var e in rows)
         {
+            var status = statuses.GetValueOrDefault(e.ProjectId);
+
             csv.AppendLine(string.Join(',', [
                 CsvField(e.User?.DisplayName),
                 CsvField(e.Client?.Name),
@@ -68,6 +80,8 @@ public class AdminExportFunctions(ITimesheetEntryRepository entries, IProjectRep
                 CsvField(e.ApprovedPayroll ? "Yes" : "No"),
                 CsvField(e.SentToPayroll ? "Yes" : "No"),
                 CsvField(e.PostingBatch),
+                CsvField(status?.BudgetHours?.ToString()),
+                CsvField(status?.BudgetHours is null ? null : (status.BudgetHours.Value - status.ActualHours).ToString()),
             ]));
         }
 

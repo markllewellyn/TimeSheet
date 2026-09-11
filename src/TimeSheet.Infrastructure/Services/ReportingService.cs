@@ -10,7 +10,8 @@ public class ReportingService(
     IClientRepository clients,
     IProjectRepository projects,
     ICurrencyConversionService currencyConversion,
-    IRevenueRecognitionService revenueRecognition) : IReportingService
+    IRevenueRecognitionService revenueRecognition,
+    IProjectStatusService projectStatus) : IReportingService
 {
     public async Task<ReportEnvelope<TimeSummary, TimeByUserLine>> GetTimeOnProjectReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
     {
@@ -23,7 +24,8 @@ public class ReportingService(
             .OrderByDescending(l => l.TotalHours)
             .ToList();
 
-        return new ReportEnvelope<TimeSummary, TimeByUserLine>(range, currency, SummarizeTime(rows), byUser);
+        var status = await GetProjectStatusAsync(projectId, ct);
+        return new ReportEnvelope<TimeSummary, TimeByUserLine>(range, currency, SummarizeTime(rows, status), byUser);
     }
 
     public async Task<ReportEnvelope<TimeSummary, TimeByProjectLine>> GetTimeOnClientReportAsync(int clientId, ReportDateRange range, CancellationToken ct)
@@ -32,12 +34,27 @@ public class ReportingService(
         var client = await clients.GetByIdAsync(clientId, ct);
         var currency = client?.ReportingCurrencyCode ?? "GBP";
 
+        // Bulk-fetched once for the whole client, not per project group below - same batching precedent as
+        // IProjectStatusService's own GetStatusesAsync call sites (Projects_ListAll etc.), avoiding an N+1 over
+        // however many projects this client has.
+        var clientProjects = await projects.GetByClientIdAsync(clientId, includeInactive: true, ct);
+        var statuses = await projectStatus.GetStatusesAsync(clientProjects, ct);
+
         var byProject = rows
             .GroupBy(r => (r.ProjectId, r.ProjectName))
-            .Select(g => new TimeByProjectLine(g.Key.ProjectId, g.Key.ProjectName, g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours), g.Sum(x => x.WorkHours + x.OutOfHoursHours), g.Sum(x => x.EntryCount)))
+            .Select(g =>
+            {
+                var status = statuses.GetValueOrDefault(g.Key.ProjectId);
+                return new TimeByProjectLine(
+                    g.Key.ProjectId, g.Key.ProjectName, g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours),
+                    g.Sum(x => x.WorkHours + x.OutOfHoursHours), g.Sum(x => x.EntryCount),
+                    status?.BudgetHours, HoursRemaining(status?.BudgetHours, status?.ActualHours));
+            })
             .OrderByDescending(l => l.TotalHours)
             .ToList();
 
+        // No budgetHours passed here deliberately - see TimeByProjectLine's own doc comment on why a client-wide
+        // "hours remaining" isn't published as a single aggregate.
         return new ReportEnvelope<TimeSummary, TimeByProjectLine>(range, currency, SummarizeTime(rows), byProject);
     }
 
@@ -54,7 +71,8 @@ public class ReportingService(
             .OrderByDescending(l => l.TotalHours)
             .ToList();
 
-        return new ReportEnvelope<TimeSummary, TimeByRoleLine>(range, currency, SummarizeTime(rows), byRole);
+        var status = await GetProjectStatusAsync(projectId, ct);
+        return new ReportEnvelope<TimeSummary, TimeByRoleLine>(range, currency, SummarizeTime(rows, status), byRole);
     }
 
     public async Task<ReportEnvelope<CostSummary, CostByUserLine>> GetCostOnProjectReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
@@ -246,8 +264,21 @@ public class ReportingService(
             byProject.OrderByDescending(l => l.Profit).ToList());
     }
 
-    private static TimeSummary SummarizeTime(IReadOnlyList<TimeEntryAggregateRow> rows) => new(
-        rows.Sum(r => r.WorkHours), rows.Sum(r => r.OutOfHoursHours), rows.Sum(r => r.WorkHours + r.OutOfHoursHours), rows.Sum(r => r.EntryCount));
+    private static TimeSummary SummarizeTime(IReadOnlyList<TimeEntryAggregateRow> rows, ProjectStatus? status = null) => new(
+        rows.Sum(r => r.WorkHours), rows.Sum(r => r.OutOfHoursHours), rows.Sum(r => r.WorkHours + r.OutOfHoursHours), rows.Sum(r => r.EntryCount),
+        status?.BudgetHours, HoursRemaining(status?.BudgetHours, status?.ActualHours));
+
+    private static decimal? HoursRemaining(decimal? budgetHours, decimal? actualHours) =>
+        budgetHours.HasValue ? budgetHours.Value - (actualHours ?? 0) : null;
+
+    /// <summary>Null-safe wrapper for a report method's own project fetch + IProjectStatusService call - a
+    /// project that's somehow gone (deleted mid-request) just means no budget figures on this report, not a
+    /// failed report.</summary>
+    private async Task<ProjectStatus?> GetProjectStatusAsync(int projectId, CancellationToken ct)
+    {
+        var project = await projects.GetByIdAsync(projectId, ct);
+        return project is null ? null : await projectStatus.GetStatusAsync(project, ct);
+    }
 
     private async Task<decimal> SumConvertedAsync(IEnumerable<(decimal Amount, string Currency, DateOnly Date)> amounts, string targetCurrency, CancellationToken ct)
     {

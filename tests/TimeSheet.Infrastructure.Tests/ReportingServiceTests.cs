@@ -65,8 +65,9 @@ public class ReportingServiceTests
         var reportingRepo = new ReportingRepository(db);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
 
-        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
@@ -122,7 +123,8 @@ public class ReportingServiceTests
         var reportingRepo = new ReportingRepository(db);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
-        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
@@ -174,7 +176,8 @@ public class ReportingServiceTests
         var reportingRepo = new ReportingRepository(db);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
-        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
@@ -230,7 +233,8 @@ public class ReportingServiceTests
         var reportingRepo = new ReportingRepository(db);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
-        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetProfitOnProjectReportAsync(project.Id, range, CancellationToken.None);
@@ -289,7 +293,8 @@ public class ReportingServiceTests
         var reportingRepo = new ReportingRepository(db);
         var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
         var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
-        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
 
         var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
         var report = await reportingService.GetTimeOnProjectByRoleReportAsync(project.Id, range, CancellationToken.None);
@@ -307,6 +312,169 @@ public class ReportingServiceTests
 
         Assert.Equal(8m, report.Summary.TotalHours);
         Assert.Equal(2, report.Summary.EntryCount);
+    }
+
+    /// <summary>FDD's "hours remaining" ask. Deliberately seeds one entry inside the report's own date range and
+    /// one entry well outside it, on the same project, to prove HoursRemaining reflects the project's real
+    /// ALL-TIME actual hours (matching IProjectStatusService's own convention) rather than only what the
+    /// selected date range happens to cover - the report's own TotalHours (5h, in-range only) and the budget
+    /// figure's ActualHours baked into HoursRemaining (8h, all-time) are deliberately different numbers here.</summary>
+    [Fact]
+    public async Task GetTimeOnProjectReportAsync_ProjectHasBudgetHours_HoursRemainingReflectsAllTimeActuals()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 1, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 1, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
+            BudgetHours = 20m,
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // In the report's own August date range.
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 5m, OutOfHoursHours = 0m, Description = "In range", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        // Well outside it (January) - still counts toward the project's all-time actual hours.
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 1, 15),
+            WorkHours = 3m, OutOfHoursHours = 0m, Description = "Out of range", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetTimeOnProjectReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(5m, report.Summary.TotalHours); // only the in-range entry
+        Assert.Equal(20m, report.Summary.BudgetHours);
+        Assert.Equal(12m, report.Summary.HoursRemaining); // 20 - (5 + 3) all-time, not 20 - 5
+    }
+
+    [Fact]
+    public async Task GetTimeOnProjectReportAsync_ProjectHasNoBudgetHours_HoursRemainingIsNullNotZero()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
+        };
+        db.Projects.Add(project);
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetTimeOnProjectReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Null(report.Summary.BudgetHours);
+        Assert.Null(report.Summary.HoursRemaining);
+    }
+
+    /// <summary>The FDD's "hours remaining" ask on a client-wide report: each project's own line carries its own
+    /// truth (one has a budget, one doesn't), but the client-level summary deliberately leaves both fields null
+    /// rather than publish a single aggregate across projects with different (or absent) budgets - see
+    /// TimeByProjectLine's own doc comment.</summary>
+    [Fact]
+    public async Task GetTimeOnClientReportAsync_PerProjectLinesCarryHoursRemaining_ButClientSummaryDoesNot()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        await db.SaveChangesAsync();
+
+        var budgeted = new Project
+        {
+            ClientId = client.Id, Name = "Budgeted", Code = "BUDGETED", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
+            BudgetHours = 20m,
+        };
+        var unbudgeted = new Project
+        {
+            ClientId = client.Id, Name = "Unbudgeted", Code = "UNBUDGETED", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
+        };
+        db.Projects.AddRange(budgeted, unbudgeted);
+        await db.SaveChangesAsync();
+
+        var user = new User
+        {
+            EntraObjectId = "oid-1", Email = "mark@svgit.co.uk", DisplayName = "Mark Llewellyn",
+            PayrollNumber = "P0001", Role = UserRole.User, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = budgeted.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 5m, OutOfHoursHours = 0m, Description = "Budgeted work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = user.Id, ClientId = client.Id, ProjectId = unbudgeted.Id, Date = new DateOnly(2026, 8, 11),
+            WorkHours = 2m, OutOfHoursHours = 0m, Description = "Unbudgeted work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetTimeOnClientReportAsync(client.Id, range, CancellationToken.None);
+
+        var budgetedLine = Assert.Single(report.Breakdown, l => l.ProjectId == budgeted.Id);
+        Assert.Equal(20m, budgetedLine.BudgetHours);
+        Assert.Equal(15m, budgetedLine.HoursRemaining);
+
+        var unbudgetedLine = Assert.Single(report.Breakdown, l => l.ProjectId == unbudgeted.Id);
+        Assert.Null(unbudgetedLine.BudgetHours);
+        Assert.Null(unbudgetedLine.HoursRemaining);
+
+        Assert.Null(report.Summary.BudgetHours);
+        Assert.Null(report.Summary.HoursRemaining);
     }
 
     /// <summary>Never called in this test - same-currency conversions short-circuit before reaching the
