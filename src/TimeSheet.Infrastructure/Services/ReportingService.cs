@@ -75,6 +75,23 @@ public class ReportingService(
         return new ReportEnvelope<TimeSummary, TimeByRoleLine>(range, currency, SummarizeTime(rows, status), byRole);
     }
 
+    /// <summary>FDD's "team... basis" ask - see IReportingService's doc comment. Mirrors
+    /// GetTimeOnProjectByRoleReportAsync exactly, grouping by Team instead of Role.</summary>
+    public async Task<ReportEnvelope<TimeSummary, TimeByTeamLine>> GetTimeOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
+    {
+        var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
+        var currency = await ResolveProjectCurrencyAsync(projectId, ct);
+
+        var byTeam = rows
+            .GroupBy(r => (r.TeamId, r.TeamName))
+            .Select(g => new TimeByTeamLine(g.Key.TeamId, g.Key.TeamName, g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours), g.Sum(x => x.WorkHours + x.OutOfHoursHours), g.Sum(x => x.EntryCount)))
+            .OrderByDescending(l => l.TotalHours)
+            .ToList();
+
+        var status = await GetProjectStatusAsync(projectId, ct);
+        return new ReportEnvelope<TimeSummary, TimeByTeamLine>(range, currency, SummarizeTime(rows, status), byTeam);
+    }
+
     public async Task<ReportEnvelope<CostSummary, CostByUserLine>> GetCostOnProjectReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
     {
         var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
@@ -113,6 +130,27 @@ public class ReportingService(
         var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
         var summary = new CostSummary(byRole.Sum(l => l.LaborCost), expenseCost, byRole.Sum(l => l.LaborCost) + expenseCost, rows.Sum(r => r.EntryCount));
         return new ReportEnvelope<CostSummary, CostByRoleLine>(range, currency, summary, byRole.OrderByDescending(l => l.TotalCost).ToList());
+    }
+
+    /// <summary>FDD's "team... basis" ask - see GetTimeOnProjectByTeamReportAsync/IReportingService's doc
+    /// comment. ExpenseCost is always 0 per team-line - see CostByTeamLine.</summary>
+    public async Task<ReportEnvelope<CostSummary, CostByTeamLine>> GetCostOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
+    {
+        var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
+        var expenseRows = await reportingRepository.GetExpenseAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
+        var currency = await ResolveProjectCurrencyAsync(projectId, ct);
+        var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectId, ct);
+
+        var byTeam = new List<CostByTeamLine>();
+        foreach (var g in rows.GroupBy(r => (r.TeamId, r.TeamName)))
+        {
+            var laborCost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+            byTeam.Add(new CostByTeamLine(g.Key.TeamId, g.Key.TeamName, laborCost.Amount, 0, laborCost.Amount, g.Sum(x => x.EntryCount)));
+        }
+
+        var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
+        var summary = new CostSummary(byTeam.Sum(l => l.LaborCost), expenseCost, byTeam.Sum(l => l.LaborCost) + expenseCost, rows.Sum(r => r.EntryCount));
+        return new ReportEnvelope<CostSummary, CostByTeamLine>(range, currency, summary, byTeam.OrderByDescending(l => l.TotalCost).ToList());
     }
 
     public async Task<ReportEnvelope<CostSummary, CostByProjectLine>> GetCostOnClientReportAsync(int clientId, ReportDateRange range, CancellationToken ct)
@@ -221,6 +259,51 @@ public class ReportingService(
         var margin = totalBilled == 0 ? 0 : Math.Round(profit / totalBilled * 100, 2);
         return new ReportEnvelope<ProfitSummary, ProfitByRoleLine>(
             range, currency, new ProfitSummary(totalBilled, totalCost, profit, margin, rows.Sum(r => r.EntryCount)), byRole.OrderByDescending(l => l.Profit).ToList());
+    }
+
+    /// <summary>FDD's "team... basis" ask - see GetTimeOnProjectByTeamReportAsync/IReportingService's doc
+    /// comment. Fixed Fee revenue is recognized at the whole-project level (billedAmount 0 per team-line, same
+    /// as ProfitByRoleLine's existing precedent), then added once into the summary's totalBilled below - never
+    /// double counted or silently dropped.</summary>
+    public async Task<ReportEnvelope<ProfitSummary, ProfitByTeamLine>> GetProfitOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
+    {
+        var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
+        var expenseRows = await reportingRepository.GetExpenseAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
+        var currency = await ResolveProjectCurrencyAsync(projectId, ct);
+        var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectId, ct);
+        var project = await projects.GetByIdAsync(projectId, ct);
+
+        var byTeam = new List<ProfitByTeamLine>();
+        foreach (var g in rows.GroupBy(r => (r.TeamId, r.TeamName)))
+        {
+            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+
+            decimal billedAmount;
+            if (project?.PaymentModel == PaymentModel.FixedProjectCost)
+            {
+                billedAmount = 0;
+            }
+            else
+            {
+                var billed = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct);
+                billedAmount = billed.Amount;
+            }
+
+            byTeam.Add(new ProfitByTeamLine(g.Key.TeamId, g.Key.TeamName, billedAmount, cost.Amount, billedAmount - cost.Amount, g.Sum(x => x.EntryCount)));
+        }
+
+        var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
+        var totalHours = rows.Sum(r => r.WorkHours + r.OutOfHoursHours);
+        var totalCost = byTeam.Sum(l => l.Cost) + expenseCost;
+
+        var totalBilled = project?.PaymentModel == PaymentModel.FixedProjectCost
+            ? await revenueRecognition.GetRecognizedRevenueAsync(projectId, totalHours, currency, range.End, ct)
+            : byTeam.Sum(l => l.Billed);
+
+        var profit = totalBilled - totalCost;
+        var margin = totalBilled == 0 ? 0 : Math.Round(profit / totalBilled * 100, 2);
+        return new ReportEnvelope<ProfitSummary, ProfitByTeamLine>(
+            range, currency, new ProfitSummary(totalBilled, totalCost, profit, margin, rows.Sum(r => r.EntryCount)), byTeam.OrderByDescending(l => l.Profit).ToList());
     }
 
     public async Task<ReportEnvelope<ProfitSummary, ProfitByProjectLine>> GetProfitOnClientReportAsync(int clientId, ReportDateRange range, CancellationToken ct)

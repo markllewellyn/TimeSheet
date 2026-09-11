@@ -11,6 +11,7 @@ export interface InviteUserRequest {
   displayName: string;
   role: 'Admin' | 'User';
   jobRoleId: number | null;
+  teamId: number | null;
   // Leave blank to auto-generate a placeholder - fill in when the real payroll number is known.
   payrollNumber?: string | null;
 }
@@ -25,6 +26,7 @@ export interface UpdateUserRequest {
   displayName: string;
   role: 'Admin' | 'User';
   jobRoleId: number | null;
+  teamId: number | null;
   isActive: boolean;
   payrollNumber: string;
 }

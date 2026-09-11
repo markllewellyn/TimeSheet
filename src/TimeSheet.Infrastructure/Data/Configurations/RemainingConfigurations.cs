@@ -145,6 +145,15 @@ public class RoleConfiguration : IEntityTypeConfiguration<Role>
     }
 }
 
+public class TeamConfiguration : IEntityTypeConfiguration<Team>
+{
+    public void Configure(EntityTypeBuilder<Team> builder)
+    {
+        builder.Property(t => t.Name).HasMaxLength(100).IsRequired();
+        builder.HasIndex(t => t.Name).IsUnique();
+    }
+}
+
 public class RateCardConfiguration : IEntityTypeConfiguration<RateCard>
 {
     public void Configure(EntityTypeBuilder<RateCard> builder)

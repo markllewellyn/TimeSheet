@@ -7,8 +7,9 @@ public record ReportDateRange(DateOnly Start, DateOnly End, ReportRangePreset Pr
 public record ReportEnvelope<TSummary, TLine>(ReportDateRange Range, string Currency, TSummary Summary, IReadOnlyList<TLine> Breakdown);
 
 // EntryCount (raw TimesheetEntry row count, not day-count or hour-sum) is on every summary/line - FDD:
-// "the number of entries... on a team, role and user basis." ("Team" has no entity in this app's model and
-// isn't addressed here - see IReportingService's own doc comment below.)
+// "the number of entries... on a team, role and user basis." Team is a plain admin-managed staff grouping (see
+// Team.cs) - a second, independent reporting axis alongside Role and User, with no billing significance of its
+// own (see IReportingService's own doc comment below for the "OnProjectByTeam" reports this powers).
 //
 // BudgetHours/HoursRemaining (FDD's "hours remaining" ask, previously only visible via the separate Budget &
 // Cost Status feature - see IProjectStatusService) are ALL-TIME figures against Project.BudgetHours, exactly
@@ -26,6 +27,7 @@ public record TimeByUserLine(int UserId, string UserName, decimal WorkHours, dec
 /// than publish a misleading aggregate - the per-project truth lives here instead.</summary>
 public record TimeByProjectLine(int ProjectId, string ProjectName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount, decimal? BudgetHours = null, decimal? HoursRemaining = null);
 public record TimeByRoleLine(int? RoleId, string RoleName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
+public record TimeByTeamLine(int? TeamId, string TeamName, decimal WorkHours, decimal OutOfHoursHours, decimal TotalHours, int EntryCount);
 
 public record CostSummary(decimal LaborCost, decimal ExpenseCost, decimal TotalCost, int EntryCount);
 public record CostByUserLine(int UserId, string UserName, decimal LaborCost, decimal ExpenseCost, decimal TotalCost, int EntryCount);
@@ -34,11 +36,15 @@ public record CostByProjectLine(int ProjectId, string ProjectName, decimal Labor
 /// project, so there's no way to attribute one to a specific role. Matches CostByUserLine's existing precedent
 /// of the same limitation (also always 0 there, for the same reason).</summary>
 public record CostByRoleLine(int? RoleId, string RoleName, decimal LaborCost, decimal ExpenseCost, decimal TotalCost, int EntryCount);
+/// <summary>Same ExpenseCost-always-0 limitation as CostByRoleLine, for the same reason (expenses have no
+/// team dimension either).</summary>
+public record CostByTeamLine(int? TeamId, string TeamName, decimal LaborCost, decimal ExpenseCost, decimal TotalCost, int EntryCount);
 
 public record ProfitSummary(decimal Billed, decimal Cost, decimal Profit, decimal MarginPercent, int EntryCount);
 public record ProfitByUserLine(int UserId, string UserName, decimal Billed, decimal Cost, decimal Profit, int EntryCount);
 public record ProfitByProjectLine(int ProjectId, string ProjectName, decimal Billed, decimal Cost, decimal Profit, decimal MarginPercent, int EntryCount);
 public record ProfitByRoleLine(int? RoleId, string RoleName, decimal Billed, decimal Cost, decimal Profit, int EntryCount);
+public record ProfitByTeamLine(int? TeamId, string TeamName, decimal Billed, decimal Cost, decimal Profit, int EntryCount);
 
 /// <summary>
 /// One strongly-typed method per report (not a fully generic dispatcher - the six reports genuinely differ in
@@ -46,20 +52,21 @@ public record ProfitByRoleLine(int? RoleId, string RoleName, decimal Billed, dec
 /// aren't duplicated six times. "On Client" reports break down by Project; "On Project" reports break down by
 /// User - never three levels nested in one payload.
 ///
-/// The 3 "OnProjectByRole" methods are FDD's "role... basis" ask - a Role-grouped alternate view of the same
-/// per-project data the User-basis reports already show (RoleName "Unassigned" for a staff member with no
-/// JobRoleId). Deliberately NOT added for "on Client" too: a client's report already spans multiple projects
-/// that can mix Time&Materials and Fixed Fee payment models, and Fixed Fee revenue is recognized at the whole-
-/// project level (IRevenueRecognitionService) - there's no honest way to slice that recognized revenue down
-/// to "this role's share of it", so a Client-scoped Profit/Cost-by-Role would either misrepresent recognized
-/// revenue or need a materially bigger design (Time-by-Role-on-Client alone would be safe as hours have no such
-/// attribution problem, but was left out too for consistency - all three metrics or none, per scope). Flag for
-/// a human call if Client-scoped role reporting turns out to be wanted after all.
+/// The 3 "OnProjectByRole" and 3 "OnProjectByTeam" methods are FDD's "role... [and] team... basis" ask - a
+/// Role-grouped or Team-grouped alternate view of the same per-project data the User-basis reports already show
+/// (RoleName/TeamName "Unassigned" for a staff member with no JobRoleId/TeamId). Deliberately NOT added for "on
+/// Client" too, for either dimension: a client's report already spans multiple projects that can mix Time&
+/// Materials and Fixed Fee payment models, and Fixed Fee revenue is recognized at the whole-project level
+/// (IRevenueRecognitionService) - there's no honest way to slice that recognized revenue down to "this role's
+/// [or team's] share of it", so a Client-scoped Profit/Cost-by-Role/Team would either misrepresent recognized
+/// revenue or need a materially bigger design (Time-by-Role/Team-on-Client alone would be safe as hours have no
+/// such attribution problem, but was left out too for consistency - all three metrics or none, per scope). Flag
+/// for a human call if Client-scoped role/team reporting turns out to be wanted after all.
 ///
-/// Role itself is NOT effective-dated (see Role.cs) - a role-basis report reflects each staff member's CURRENT
-/// role, not whatever role they held on the entry's own date. This is an accepted, already-existing limitation
-/// (RateCard-tier resolution has exactly the same "role today assumed = role back then" caveat), not a new one
-/// introduced here.
+/// Neither Role nor Team is effective-dated (see Role.cs/Team.cs) - a role/team-basis report reflects each
+/// staff member's CURRENT role/team, not whatever they held on the entry's own date. This is an accepted,
+/// already-existing limitation (RateCard-tier resolution has exactly the same "role today assumed = role back
+/// then" caveat for Role), not a new one introduced for Team.
 /// </summary>
 public interface IReportingService
 {
@@ -73,6 +80,10 @@ public interface IReportingService
     Task<ReportEnvelope<TimeSummary, TimeByRoleLine>> GetTimeOnProjectByRoleReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
     Task<ReportEnvelope<CostSummary, CostByRoleLine>> GetCostOnProjectByRoleReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
     Task<ReportEnvelope<ProfitSummary, ProfitByRoleLine>> GetProfitOnProjectByRoleReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
+
+    Task<ReportEnvelope<TimeSummary, TimeByTeamLine>> GetTimeOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
+    Task<ReportEnvelope<CostSummary, CostByTeamLine>> GetCostOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
+    Task<ReportEnvelope<ProfitSummary, ProfitByTeamLine>> GetProfitOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct);
 }
 
 /// <summary>

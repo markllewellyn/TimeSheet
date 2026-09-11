@@ -108,6 +108,15 @@
           </select>
         </label>
         <label class="field">
+          <span class="field-label">Team</span>
+          <select class="input" [ngModel]="teamId()" (ngModelChange)="teamId.set($event)">
+            <option [ngValue]="null">(none)</option>
+            @for (t of teams(); track t.id) {
+              <option [ngValue]="t.id">{{ t.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
           <span class="field-label">Payroll Number</span>
           <input class="input" placeholder="(auto-generated if left blank)" [ngModel]="payrollNumber()" (ngModelChange)="payrollNumber.set($event)" />
         </label>
@@ -136,6 +145,15 @@
         <option [ngValue]="null">(all roles)</option>
         @for (r of roles(); track r.id) {
           <option [ngValue]="r.id">{{ r.name }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span class="field-label">Team</span>
+      <select class="input" [ngModel]="teamFilter()" (ngModelChange)="teamFilter.set($event)">
+        <option [ngValue]="null">(all teams)</option>
+        @for (t of teams(); track t.id) {
+          <option [ngValue]="t.id">{{ t.name }}</option>
         }
       </select>
     </label>
@@ -170,6 +188,7 @@
           <th>Account</th>
           <th>Role</th>
           <th>Job Role</th>
+          <th>Team</th>
           <th>Status</th>
           <th>Payroll Number</th>
           <th></th>
@@ -191,6 +210,14 @@
                 <option [ngValue]="null">(none)</option>
                 @for (r of roles(); track r.id) {
                   <option [ngValue]="r.id">{{ r.name }}</option>
+                }
+              </select>
+            </td>
+            <td>
+              <select class="input w-40" [ngModel]="u.teamId" (ngModelChange)="updateTeam(u, $event)">
+                <option [ngValue]="null">(none)</option>
+                @for (t of teams(); track t.id) {
+                  <option [ngValue]="t.id">{{ t.name }}</option>
                 }
               </select>
             </td>
@@ -219,7 +246,7 @@
           </tr>
           @if (expandedUserId() === u.id) {
             <tr>
-              <td colspan="8" class="bg-[var(--muted)]/40 px-4 py-4">
+              <td colspan="9" class="bg-[var(--muted)]/40 px-4 py-4">
                 <div class="grid grid-cols-2 gap-6">
                   <div>
                     <h3 class="mb-2 text-sm font-semibold text-foreground">Cost History</h3>

@@ -7,14 +7,14 @@ using TimeSheet.Domain.Services;
 namespace TimeSheet.Api.Functions;
 
 /// <summary>
-/// The 6 reports (Time/Cost/Profit x Project/Client) plus 3 "OnProjectByRole" variants (FDD: "...on a team,
-/// role and user basis" - see IReportingService's doc comment for why Role-basis exists only for Project scope),
-/// each filterable by 7 days/1 month/1 year/custom range. Returns IReportingService's plain Domain records
-/// directly rather than mirroring them into Contracts DTOs - an intentional exception to the usual
-/// Contracts-only-over-the-wire convention, since these are already pure read-model shapes with no
-/// EF/business-logic entanglement and mirroring them would be pure boilerplate. Time-on-* is visible to any
-/// authenticated user (their own logged time); Cost/Profit expose internal rates and margin, so those two (and
-/// their By-Role variants) are Admin-only.
+/// The 6 reports (Time/Cost/Profit x Project/Client) plus 3 "OnProjectByRole" and 3 "OnProjectByTeam" variants
+/// (FDD: "...on a team, role and user basis" - see IReportingService's doc comment for why Role/Team-basis
+/// exists only for Project scope), each filterable by 7 days/1 month/1 year/custom range. Returns
+/// IReportingService's plain Domain records directly rather than mirroring them into Contracts DTOs - an
+/// intentional exception to the usual Contracts-only-over-the-wire convention, since these are already pure
+/// read-model shapes with no EF/business-logic entanglement and mirroring them would be pure boilerplate.
+/// Time-on-* is visible to any authenticated user (their own logged time); Cost/Profit expose internal rates
+/// and margin, so those two (and their By-Role/By-Team variants) are Admin-only.
 /// </summary>
 public class ReportsFunctions(IReportingService reporting, ICurrentUserAccessor currentUser)
 {
@@ -66,6 +66,36 @@ public class ReportsFunctions(IReportingService reporting, ICurrentUserAccessor 
         var (projectId, range, error) = ParseProjectRequest(req);
         if (error is not null) return error;
         return new OkObjectResult(await reporting.GetProfitOnProjectByRoleReportAsync(projectId, range, ct));
+    }
+
+    [Function("Reports_TimeOnProjectByTeam")]
+    public async Task<IActionResult> TimeOnProjectByTeam(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "reports/time-on-project-by-team")] HttpRequest req, CancellationToken ct)
+    {
+        currentUser.RequireUser();
+        var (projectId, range, error) = ParseProjectRequest(req);
+        if (error is not null) return error;
+        return new OkObjectResult(await reporting.GetTimeOnProjectByTeamReportAsync(projectId, range, ct));
+    }
+
+    [Function("Reports_CostOnProjectByTeam")]
+    public async Task<IActionResult> CostOnProjectByTeam(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "reports/cost-on-project-by-team")] HttpRequest req, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var (projectId, range, error) = ParseProjectRequest(req);
+        if (error is not null) return error;
+        return new OkObjectResult(await reporting.GetCostOnProjectByTeamReportAsync(projectId, range, ct));
+    }
+
+    [Function("Reports_ProfitOnProjectByTeam")]
+    public async Task<IActionResult> ProfitOnProjectByTeam(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "reports/profit-on-project-by-team")] HttpRequest req, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+        var (projectId, range, error) = ParseProjectRequest(req);
+        if (error is not null) return error;
+        return new OkObjectResult(await reporting.GetProfitOnProjectByTeamReportAsync(projectId, range, ct));
     }
 
     [Function("Reports_CostOnProject")]

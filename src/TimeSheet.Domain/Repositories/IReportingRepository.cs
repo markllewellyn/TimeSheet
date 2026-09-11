@@ -12,13 +12,16 @@ public record ReportScope(int? ClientId, int? ProjectId);
 /// impact) - see Project.IsCostExempt for the flag that zeroes cost instead.
 /// RoleId/RoleName reflect the staff member's CURRENT User.JobRoleId/Role - not effective-dated, same accepted
 /// limitation as RateCard-tier resolution (see Role.cs). RoleName is "Unassigned" when JobRoleId is null.
-/// Adding Role to the grouping key alongside User is a no-op on row count/granularity - a user's role is a
-/// simple current-state fact of that user, so it can never split an existing (Project,Client,User,Date) group
-/// into more than one row. EntryCount is the raw TimesheetEntry row count within this bucket, for reports that
-/// want "number of entries" (FDD) rather than just hours/amounts.</summary>
+/// TeamId/TeamName are the same idea for the separate staff-grouping Team (see Team.cs) - CURRENT team, not
+/// effective-dated, "Unassigned" when TeamId is null. Adding Role/Team to the grouping key alongside User is a
+/// no-op on row count/granularity - a user's role/team are simple current-state facts of that user, so neither
+/// can ever split an existing (Project,Client,User,Date) group into more than one row. EntryCount is the raw
+/// TimesheetEntry row count within this bucket, for reports that want "number of entries" (FDD) rather than
+/// just hours/amounts.</summary>
 public record TimeEntryAggregateRow(
     int ProjectId, string ProjectName, int ClientId, string ClientName,
-    int UserId, string UserName, int? RoleId, string RoleName, DateOnly Date, decimal WorkHours, decimal OutOfHoursHours,
+    int UserId, string UserName, int? RoleId, string RoleName, int? TeamId, string TeamName,
+    DateOnly Date, decimal WorkHours, decimal OutOfHoursHours,
     decimal BilledAmountNative, decimal CostAmountNative, int EntryCount);
 
 public record ExpenseAggregateRow(int ProjectId, int ClientId, DateOnly Date, decimal Amount, string Currency);

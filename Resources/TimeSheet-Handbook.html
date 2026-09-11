@@ -748,23 +748,24 @@
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <div class="prose">
-      <p>Pick a report, optionally narrow to one client, choose a range, <strong>Run</strong>. Nine report types,
-        on three axes:</p>
+      <p>Pick a report, optionally narrow to one client, choose a range, <strong>Run</strong>. Twelve report
+        types, on four axes:</p>
     </div>
     <div class="table-scroll">
       <table class="field-table">
-        <thead><tr><th>Measure</th><th>By Client</th><th>By Project</th><th>By Role</th></tr></thead>
+        <thead><tr><th>Measure</th><th>By Client</th><th>By Project</th><th>By Role</th><th>By Team</th></tr></thead>
         <tbody>
-          <tr><td>Time</td><td class="desc">Time on Client</td><td class="desc">Time on Project</td><td class="desc">Time on Project (by Role)</td></tr>
-          <tr><td>Cost to Business</td><td class="desc">Cost on Client</td><td class="desc">Cost on Project</td><td class="desc">Cost on Project (by Role)</td></tr>
-          <tr><td>Profit to Business</td><td class="desc">Profit on Client</td><td class="desc">Profit on Project</td><td class="desc">Profit on Project (by Role)</td></tr>
+          <tr><td>Time</td><td class="desc">Time on Client</td><td class="desc">Time on Project</td><td class="desc">Time on Project (by Role)</td><td class="desc">Time on Project (by Team)</td></tr>
+          <tr><td>Cost to Business</td><td class="desc">Cost on Client</td><td class="desc">Cost on Project</td><td class="desc">Cost on Project (by Role)</td><td class="desc">Cost on Project (by Team)</td></tr>
+          <tr><td>Profit to Business</td><td class="desc">Profit on Client</td><td class="desc">Profit on Project</td><td class="desc">Profit on Project (by Role)</td><td class="desc">Profit on Project (by Team)</td></tr>
         </tbody>
       </table>
     </div>
-    <p class="lead">The "by Role" reports group by each staff member's <em>current</em> job role, not whichever
-      role they held on the entry's own date — and bucket anyone with no role set under "Unassigned" rather than
-      dropping their hours. Role reports are project-scoped only, not client-scoped, since a client can span
-      Fixed Fee and Time &amp; Materials projects whose revenue can't honestly be split by role.</p>
+    <p class="lead">The "by Role"/"by Team" reports group by each staff member's <em>current</em> job role/team,
+      not whichever they held on the entry's own date — and bucket anyone with no role or team set under
+      "Unassigned" rather than dropping their hours. Both are project-scoped only, not client-scoped, since a
+      client can span Fixed Fee and Time &amp; Materials projects whose revenue can't honestly be split by role
+      or team.</p>
     <p class="lead">A project-scoped Time report also shows <strong>Budget Hours</strong>/<strong>Hours
       Remaining</strong> in its summary (the project's own all-time figures, same as
       <a href="#my-projects">My Projects</a>'s badge — not just what the selected date range covers, so these can
@@ -780,7 +781,7 @@
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <div class="prose">
-      <p>Seven screens under the <strong>Admin ▾</strong> menu, top right — the one-time setup work rather than
+      <p>Eight screens under the <strong>Admin ▾</strong> menu, top right — the one-time setup work rather than
         day-to-day workflow, which is why they're tucked away from the main nav.</p>
     </div>
     <div class="registry">
@@ -802,7 +803,11 @@
       </div>
       <div class="registry-row">
         <div class="name">Staff</div>
-        <div class="desc">Invite, deactivate, promote to Admin, force a password reset, edit payroll number, and — per person — every project assignment with its resolved rate and where that rate came from.</div>
+        <div class="desc">Invite, deactivate, promote to Admin, force a password reset, edit payroll number, and — per person — every project assignment with its resolved rate and where that rate came from. A Team can be set alongside Job Role — filterable and reportable the same way, but purely a grouping with no billing significance of its own.</div>
+      </div>
+      <div class="registry-row">
+        <div class="name">Teams</div>
+        <div class="desc">A plain staff grouping (e.g. Delivery Pod A, North Region) — a second reporting/filtering axis alongside Role, with no rate or billing significance. Same Add/Deactivate/Reactivate pattern as Roles.</div>
       </div>
       <div class="registry-row">
         <div class="name">Settings</div>

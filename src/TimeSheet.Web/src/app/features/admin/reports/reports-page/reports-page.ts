@@ -9,6 +9,7 @@ import { Client, Project } from '../../../../core/models/project.models';
 const PROJECT_SCOPED: ReportType[] = [
   'time-on-project', 'cost-on-project', 'profit-on-project',
   'time-on-project-by-role', 'cost-on-project-by-role', 'profit-on-project-by-role',
+  'time-on-project-by-team', 'cost-on-project-by-team', 'profit-on-project-by-team',
 ];
 
 @Component({

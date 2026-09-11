@@ -17,6 +17,8 @@ export interface AppUser {
   role: 'Admin' | 'User';
   jobRoleId: number | null;
   jobRoleName: string | null;
+  teamId: number | null;
+  teamName: string | null;
   isActive: boolean;
   payrollNumber: string;
 }

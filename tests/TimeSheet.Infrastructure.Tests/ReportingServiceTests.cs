@@ -314,6 +314,77 @@ public class ReportingServiceTests
         Assert.Equal(2, report.Summary.EntryCount);
     }
 
+    /// <summary>FDD's "team... basis" ask - mirrors GetTimeOnProjectByRoleReportAsync's own
+    /// GroupsByCurrentRole_UnassignedBucketForNoJobRole test exactly, for Team instead of Role.</summary>
+    [Fact]
+    public async Task GetTimeOnProjectByTeamReportAsync_GroupsByCurrentTeam_UnassignedBucketForNoTeam()
+    {
+        await using var db = CreateInMemoryDb();
+
+        var client = new Client { Name = "Antigua", AccountCode = "C13673", StartDate = new DateOnly(2026, 8, 1), CreatedUtc = DateTimeOffset.UtcNow };
+        db.Clients.Add(client);
+        var team = new Team { Name = "Delivery Pod A", CreatedUtc = DateTimeOffset.UtcNow };
+        db.Teams.Add(team);
+        await db.SaveChangesAsync();
+
+        var project = new Project
+        {
+            ClientId = client.Id, Name = "FDD-3145", Code = "FDD-3145", PaymentModel = PaymentModel.TimeAndMaterials,
+            StartDate = new DateOnly(2026, 8, 1), IsActive = true, CreatedUtc = DateTimeOffset.UtcNow, CanInvoice = true,
+        };
+        db.Projects.Add(project);
+
+        var withTeam = new User
+        {
+            EntraObjectId = "oid-1", Email = "with-team@svgit.co.uk", DisplayName = "Has Team",
+            PayrollNumber = "P0001", TeamId = team.Id, CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        var withoutTeam = new User
+        {
+            EntraObjectId = "oid-2", Email = "no-team@svgit.co.uk", DisplayName = "No Team",
+            PayrollNumber = "P0002", CreatedUtc = DateTimeOffset.UtcNow,
+        };
+        db.Users.AddRange(withTeam, withoutTeam);
+        await db.SaveChangesAsync();
+
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = withTeam.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 10),
+            WorkHours = 5m, OutOfHoursHours = 0m, Description = "Pod A work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        db.TimesheetEntries.Add(new TimesheetEntry
+        {
+            UserId = withoutTeam.Id, ClientId = client.Id, ProjectId = project.Id, Date = new DateOnly(2026, 8, 11),
+            WorkHours = 3m, OutOfHoursHours = 0m, Description = "No team work", CreatedUtc = DateTimeOffset.UtcNow,
+        });
+        await db.SaveChangesAsync();
+
+        var clients = new ClientRepository(db);
+        var projects = new ProjectRepository(db);
+        var reportingRepo = new ReportingRepository(db);
+        var currencyConversion = new CurrencyConversionService(new CurrencyRateRepository(db), new NoopCurrencyRateProvider(), db);
+        var revenueRecognition = new RevenueRecognitionService(projects, currencyConversion);
+        var projectStatus = new ProjectStatusService(new TimesheetEntryRepository(db));
+        var reportingService = new ReportingService(reportingRepo, clients, projects, currencyConversion, revenueRecognition, projectStatus);
+
+        var range = new ReportDateRange(new DateOnly(2026, 8, 1), new DateOnly(2026, 8, 31), ReportRangePreset.Custom);
+        var report = await reportingService.GetTimeOnProjectByTeamReportAsync(project.Id, range, CancellationToken.None);
+
+        Assert.Equal(2, report.Breakdown.Count);
+        var podALine = Assert.Single(report.Breakdown, l => l.TeamId == team.Id);
+        Assert.Equal("Delivery Pod A", podALine.TeamName);
+        Assert.Equal(5m, podALine.TotalHours);
+        Assert.Equal(1, podALine.EntryCount);
+
+        var unassignedLine = Assert.Single(report.Breakdown, l => l.TeamId == null);
+        Assert.Equal("Unassigned", unassignedLine.TeamName);
+        Assert.Equal(3m, unassignedLine.TotalHours);
+        Assert.Equal(1, unassignedLine.EntryCount);
+
+        Assert.Equal(8m, report.Summary.TotalHours);
+        Assert.Equal(2, report.Summary.EntryCount);
+    }
+
     /// <summary>FDD's "hours remaining" ask. Deliberately seeds one entry inside the report's own date range and
     /// one entry well outside it, on the same project, to prove HoursRemaining reflects the project's real
     /// ALL-TIME actual hours (matching IProjectStatusService's own convention) rather than only what the

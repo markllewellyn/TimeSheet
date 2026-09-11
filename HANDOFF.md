@@ -4,6 +4,87 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-11 — the "Team" concept, item #2 and the last item on the FDD audit's numbered backlog
+
+FDD's only mention of "team" anywhere in the whole document, confirmed by a fresh extraction of the docx's raw
+text (no cached copy existed): "...totals for projects and clients on a team, role and user basis." No
+definition anywhere, no reviewer comment either - genuinely undefined in the source, which is exactly why this
+was flagged as a business-model decision rather than guessed at. Quoted this to the user directly, offered a
+few shapes it could take (a staff grouping like Role, a project's assigned staff, a department/practice area, or
+"not sure, discuss"); their answer: **"just make it a staff grouping like Roles, don't overthink it."**
+
+- **A dedicated research pass mapped the entire Role feature first** (entity, EF config, migration, repository,
+  Functions CRUD, Contracts DTOs, User's FK, the admin CRUD page, nav/routing, and the "by Role" Reports
+  pipeline end to end - `IReportingRepository`'s LEFT JOIN, `IReportingService`'s 3 "OnProjectByRole" methods,
+  `ReportsFunctions`'s gating, the frontend's fully-generic report rendering) before writing a single line, so
+  Team could mirror it point-for-point rather than half-copy it.
+- **New `Team` entity** (`TimeSheet.Domain/Entities/Team.cs`) - Id/Name/IsActive/CreatedUtc, a literal copy of
+  `Role.cs`'s shape, explicitly documented as having **no rate/billing significance of any kind** (unlike Role,
+  which `RateCard` resolves against) - Team exists purely as a second, independent reporting/filtering axis.
+  New `TeamConfiguration` (unique `Name` index, same as `RoleConfiguration`), new `ITeamRepository`/
+  `TeamRepository` (identical shape to `IRoleRepository`/`RoleRepository`, ordered by `Name` - no SQLite
+  `ORDER BY DateTimeOffset` trap since nothing orders by `CreatedUtc`), new `TeamDtos.cs`, new `TeamsFunctions`
+  (`Teams_List`/`Create`/`Update`, Admin-only, no audit logging - matching `RolesFunctions`'s own precedent
+  exactly, including its narrower-than-full-CRUD surface: create + list + soft-deactivate/reactivate, no rename
+  UI despite the DTO supporting one).
+- **New migration `AddTeam`** - confirmed by the Role-feature research to need none of the original
+  `AddRoleAndRateCard` migration's raw-SQL table-rebuild complexity (that was only needed because it *also*
+  reshaped `StaffCosts`/`StaffProjects`/dropped legacy columns in the same migration) - a plain EF-auto-diffed
+  `CreateTable "Teams"` + `AddColumn Staff.TeamId` + FK + index, generated via `dotnet ef migrations add`
+  without incident.
+- **`User.TeamId`/`User.Team`** (nullable FK + navigation, mirroring `JobRoleId`/`JobRole` exactly) -
+  `UserConfiguration` gained the matching `HasOne(u => u.Team)...OnDelete(Restrict)`; `UserRepository.GetByIdAsync`/
+  `GetAllAsync` both gained `.Include(u => u.Team)` alongside the existing `.Include(u => u.JobRole)`, without
+  which `ToDto`'s `u.Team?.Name` would have silently stayed null after a save. `UserDto`/`InviteUserRequest`/
+  `UpdateUserRequest` all gained `TeamId`(`/TeamName`); `UsersFunctions` validates a given `TeamId` exists
+  (404 otherwise) exactly like it already does for `JobRoleId`.
+- **The FDD's actual "team... basis" reporting ask, not just an inert entity**: `IReportingRepository`'s
+  `TimeEntryAggregateRow` gained `TeamId`/`TeamName` via a second LEFT JOIN (`db.Teams`) right alongside the
+  existing Role join in `ReportingRepository.GetTimeEntryAggregatesAsync` - same "Unassigned" sentinel pattern
+  when `TeamId` is null. New `TimeByTeamLine`/`CostByTeamLine`/`ProfitByTeamLine` records and 3 new
+  `IReportingService` methods (`GetTimeOnProjectByTeamReportAsync`/`GetCostOnProjectByTeamReportAsync`/
+  `GetProfitOnProjectByTeamReportAsync`), each a line-for-line mirror of its by-Role counterpart - including the
+  same Fixed-Fee-revenue-recognition caveat that keeps by-Role/by-Team reports Project-scoped only, never
+  Client-scoped (a client can span Fixed Fee and T&M projects whose recognized revenue can't honestly be split
+  by role *or* team - same reasoning, now explicitly extended to Team in `IReportingService`'s own doc comment
+  rather than only covering Role). 3 new `ReportsFunctions` endpoints, same Admin-only gating on Cost/Profit as
+  their by-Role siblings.
+- **No Angular rendering changes needed for the new reports** - confirmed by the Role-feature research before
+  writing frontend code: `reports-page.ts`/`.html` render summary tiles and breakdown columns fully generically
+  (`Object.keys()` + `keyvalue` pipe) - the 3 new report types only needed adding to `ReportType`'s union,
+  `PROJECT_SCOPED`'s array, and 3 new `<option>`s in the dropdown; the results table needed zero changes.
+- **New `teams-page`** (`/admin/teams`, Admin-only), new `teams.service.ts` - both a direct copy of
+  `roles-page`/`roles.service.ts`, new "Teams" link in the Admin nav dropdown (after Staff, alphabetically
+  last). **`users-list-page`** (Staff screen) gained a Team column mirroring Job Role exactly: an invite-form
+  select, a list-filter dropdown, a per-row inline reassignment select (`updateTeam()`, copying
+  `updateJobRole()`), and every existing `UpdateUserRequest`-building call site (`toggleActive`/`toggleRole`/
+  `saveEditPayroll`) threaded `teamId: user.teamId` through unchanged, since none of those actions intend to
+  touch a user's team - a genuinely new 9th column meant the expanded "Manage" panel's `colspan` also needed
+  bumping from 8 to 9, caught by checking for `colspan` usages before considering the HTML done, not after.
+- Backend build clean. 67/67 tests pass (1 new, mirroring the existing by-Role "Unassigned bucket" test exactly
+  for Team - two users on the same project, one with a Team, one without, asserting both real-team and
+  "Unassigned" lines come back correctly grouped and summed - confirmed this test genuinely fails without the
+  fix by temporarily hardcoding the repository's `TeamName` fallback to always `"Unassigned"` and re-running
+  before restoring it, same rigor as every other fix this session). Angular build clean. API host restarted
+  (new `TeamsFunctions` class + `UsersFunctions`/`ReportingService` constructor changes) - confirmed clean
+  startup, migration applied (Teams page loaded with an empty list, not an error).
+- **Live-verified end-to-end in the browser with real data, not just the happy path**: created two real teams
+  ("Delivery Pod A", "North Region") through the app itself, assigned Mark Llewellyn to one and Sarah Chen to
+  the other via the Staff screen's new inline picker (confirmed the assignment persisted after a refresh). Ran
+  "Time on Project (by Team)" for Acme's ERP Migration Phase 2 (Last Year range) - got back real per-team
+  hours/entry-counts (North Region 84h/17 entries, Delivery Pod A 19.4h/16 entries) alongside the pre-existing
+  Budget Hours/Hours Remaining summary tiles, unaffected by the new breakdown. Ran "Profit to Business on
+  Project (by Team)" on the same Fixed-Fee project - confirmed each team line correctly showed `Billed: 0` with
+  the real recognized revenue appearing once at the summary level only, proving the Fixed-Fee-attribution
+  mirroring actually works, not just compiles.
+- **New demo-data artifacts**: two real Teams ("Delivery Pod A", "North Region") and two real staff-to-team
+  assignments (Mark Llewellyn, Sarah Chen) created during live verification - left in place as genuine, useful
+  demo data rather than cleaned up, since they're exactly the kind of real setup this feature needs to be usable
+  going forward, not test noise.
+- **This closes the FDD re-audit's numbered backlog entirely** - all 4 items from the 2026-09-10 re-audit are
+  now either fixed (1, 3, 4) or this one (2), with the two remaining "business decisions surfaced, not bugs"
+  (BudgetHours reset, OOH approval timing) deliberately deferred per the user's own call, see the entry below.
+
 ## Done later still in this session, 2026-09-11 — "Hours remaining" surfaced in Reports and CSV Export, item #4 from the last FDD re-audit
 
 Picked up from the same open-items list as the per-role rollup above, at the user's own choice from a menu of
@@ -452,14 +533,15 @@ comments that were never visible from HANDOFF's own past summaries. Three parall
 Rates; Timesheet Entries/Invoicing/Payroll; Auth/Reporting/Notifications), each re-reading the real code fresh
 rather than trusting what a past audit claimed was already done.
 
-**Real, actionable gaps found** (two now fixed, see the entries above):
+**Real, actionable gaps found** (all four now fixed, see the entries above - this numbered backlog is fully
+closed):
 
 1. ~~**Invoice line items didn't match the FDD's own spec**~~ - **fixed the same session**, see the entry above.
-2. **No "Team" concept exists anywhere in the app.** FDD: reporting "on a team, role and user basis" - role and
-   user reporting both exist (`IReportingService`'s by-user/by-role breakdowns), but there's no Team/Department
-   entity in the domain model at all (`grep` across `src/TimeSheet.Domain/Entities` for Team/Department: zero
-   hits) - can't be added as "just a report" without first deciding what a team even is in this app. Not
-   started - a business-model decision, not a small fix.
+2. ~~**No "Team" concept exists anywhere in the app.**~~ - **fixed 2026-09-11, a later session**, see that
+   session's own "Done" entry above. FDD: reporting "on a team, role and user basis" - role and user reporting
+   both existed (`IReportingService`'s by-user/by-role breakdowns), but there was no Team entity in the domain
+   model at all. User's own call once asked directly: "just make it a staff grouping like Roles, don't overthink
+   it" - built as a literal mirror of the existing Role feature, including the by-Team Reports breakdowns.
 3. ~~**No per-role rollup on the Estimated Cost/Profit panel.**~~ - **fixed 2026-09-11, a later session**, see
    that session's own "Done" entry above. FDD: "calculated per user *and per role*."
    `ProjectEstimateLine` already carries `RoleId`/`RoleName` per line - the data is there, just never grouped

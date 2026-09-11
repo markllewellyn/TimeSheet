@@ -1,0 +1,52 @@
+<div class="flex flex-col gap-4">
+  <h1 class="page-title">Teams</h1>
+  <p class="-mt-2 text-xs text-muted-foreground">
+    A plain staff grouping (e.g. Delivery Pod A, North Region) - a second reporting/filtering axis alongside
+    Role, with no billing significance of its own. Set a person's Team on the Staff screen.
+  </p>
+
+  @if (error(); as e) {
+    <div class="banner-error">{{ e }}</div>
+  }
+
+  <div class="card-padded flex items-end gap-3">
+    <label class="field">
+      <span class="field-label">Name</span>
+      <input class="input" [ngModel]="newName()" (ngModelChange)="newName.set($event)" />
+    </label>
+    <button class="btn-primary" [disabled]="saving()" (click)="add()">{{ saving() ? 'Saving…' : 'Add Team' }}</button>
+  </div>
+
+  @if (loading()) {
+    <app-loading-spinner />
+  } @else {
+    <div class="card overflow-hidden px-4">
+      <table class="table-clean">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (t of teams(); track t.id) {
+            <tr>
+              <td class="font-medium text-foreground">{{ t.name }}</td>
+              <td>
+                <span [class]="t.isActive ? 'badge-success' : 'badge-danger'">{{ t.isActive ? 'Active' : 'Inactive' }}</span>
+              </td>
+              <td class="text-right">
+                <button class="btn-link" (click)="toggleActive(t)">{{ t.isActive ? 'Deactivate' : 'Reactivate' }}</button>
+              </td>
+            </tr>
+          } @empty {
+            <tr>
+              <td colspan="3" class="text-center text-sm text-muted-foreground">No teams yet.</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</div>

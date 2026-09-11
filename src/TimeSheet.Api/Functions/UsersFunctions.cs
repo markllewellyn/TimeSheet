@@ -13,6 +13,7 @@ namespace TimeSheet.Api.Functions;
 public class UsersFunctions(
     IUserRepository users,
     IRoleRepository roles,
+    ITeamRepository teams,
     ILocalUserPasswordService localUserPasswordService,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
@@ -54,6 +55,13 @@ public class UsersFunctions(
             if (jobRole is null) return new NotFoundObjectResult(new { error = "Role not found." });
         }
 
+        Team? team = null;
+        if (body.TeamId is { } teamId)
+        {
+            team = await teams.GetByIdAsync(teamId, ct);
+            if (team is null) return new NotFoundObjectResult(new { error = "Team not found." });
+        }
+
         var allUsers = await users.GetAllAsync(true, ct);
         if (!string.IsNullOrWhiteSpace(body.PayrollNumber) && allUsers.Any(u => u.PayrollNumber == body.PayrollNumber))
         {
@@ -70,6 +78,7 @@ public class UsersFunctions(
             DisplayName = body.DisplayName,
             PayrollNumber = string.IsNullOrWhiteSpace(body.PayrollNumber) ? Guid.NewGuid().ToString("N")[..10] : body.PayrollNumber,
             JobRoleId = body.JobRoleId,
+            TeamId = body.TeamId,
             Role = role,
             IsActive = true,
             CreatedUtc = DateTimeOffset.UtcNow,
@@ -85,7 +94,7 @@ public class UsersFunctions(
         await users.AddAsync(user, ct);
         await uow.SaveChangesAsync(ct);
 
-        return new CreatedResult($"/api/users/{user.Id}", new InviteUserResponse(ToDtoWith(user, jobRole), temporaryPassword));
+        return new CreatedResult($"/api/users/{user.Id}", new InviteUserResponse(ToDtoWith(user, jobRole, team), temporaryPassword));
     }
 
     [Function("Users_Update")]
@@ -115,6 +124,11 @@ public class UsersFunctions(
             return new NotFoundObjectResult(new { error = "Role not found." });
         }
 
+        if (body.TeamId is { } teamId && await teams.GetByIdAsync(teamId, ct) is null)
+        {
+            return new NotFoundObjectResult(new { error = "Team not found." });
+        }
+
         if (body.PayrollNumber != user.PayrollNumber)
         {
             var allUsers = await users.GetAllAsync(true, ct);
@@ -127,6 +141,7 @@ public class UsersFunctions(
         user.DisplayName = body.DisplayName;
         user.Role = role;
         user.JobRoleId = body.JobRoleId;
+        user.TeamId = body.TeamId;
         user.IsActive = body.IsActive;
         user.PayrollNumber = body.PayrollNumber;
         user.ModifiedUtc = DateTimeOffset.UtcNow;
@@ -139,10 +154,10 @@ public class UsersFunctions(
     }
 
     private static UserDto ToDto(User u) => new(
-        u.Id, u.EntraObjectId, u.IsLocalAccount, u.Email, u.DisplayName, u.Role.ToString(), u.JobRoleId, u.JobRole?.Name, u.IsActive,
-        u.PayrollNumber);
+        u.Id, u.EntraObjectId, u.IsLocalAccount, u.Email, u.DisplayName, u.Role.ToString(), u.JobRoleId, u.JobRole?.Name,
+        u.TeamId, u.Team?.Name, u.IsActive, u.PayrollNumber);
 
-    private static UserDto ToDtoWith(User u, Role? jobRole) => new(
-        u.Id, u.EntraObjectId, u.IsLocalAccount, u.Email, u.DisplayName, u.Role.ToString(), u.JobRoleId, jobRole?.Name, u.IsActive,
-        u.PayrollNumber);
+    private static UserDto ToDtoWith(User u, Role? jobRole, Team? team) => new(
+        u.Id, u.EntraObjectId, u.IsLocalAccount, u.Email, u.DisplayName, u.Role.ToString(), u.JobRoleId, jobRole?.Name,
+        u.TeamId, team?.Name, u.IsActive, u.PayrollNumber);
 }

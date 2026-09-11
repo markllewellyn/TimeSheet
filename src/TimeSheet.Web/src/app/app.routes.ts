@@ -145,6 +145,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/roles/roles-page/roles-page').then((m) => m.RolesPage),
   },
   {
+    path: 'admin/teams',
+    canActivate: [authGuard, adminGuard],
+    loadComponent: () => import('./features/admin/teams/teams-page/teams-page').then((m) => m.TeamsPage),
+  },
+  {
     path: 'admin/rate-cards',
     canActivate: [authGuard, adminGuard],
     loadComponent: () => import('./features/admin/rate-cards/rate-cards-page/rate-cards-page').then((m) => m.RateCardsPage),

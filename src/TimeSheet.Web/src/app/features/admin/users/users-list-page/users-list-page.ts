@@ -3,6 +3,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { UsersAdminService } from '../../../../core/services/users-admin.service';
 import { RolesService, Role } from '../../../../core/services/roles.service';
+import { TeamsService, Team } from '../../../../core/services/teams.service';
 import { StaffCostsService } from '../../../../core/services/staff-costs.service';
 import { AssignmentsService, StaffAssignment } from '../../../../core/services/assignments.service';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
@@ -21,6 +22,7 @@ import { LoadingSpinner } from '../../../../core/components/loading-spinner/load
 export class UsersListPage {
   private readonly usersAdmin = inject(UsersAdminService);
   private readonly rolesService = inject(RolesService);
+  private readonly teamsService = inject(TeamsService);
   private readonly staffCostsService = inject(StaffCostsService);
   private readonly assignmentsService = inject(AssignmentsService);
   private readonly projectsAdmin = inject(ProjectsAdminService);
@@ -31,14 +33,16 @@ export class UsersListPage {
   // reset it.
   protected readonly loading = signal(true);
   protected readonly roles = signal<Role[]>([]);
+  protected readonly teams = signal<Team[]>([]);
   protected readonly allProjects = signal<Project[]>([]);
 
   // Filters - FDD: "filterable and searchable, at a minimum on administrator, active or
-  // inactive, role and project."
+  // inactive, role and project." Team filter is additive, not FDD-required.
   protected readonly searchText = signal('');
   protected readonly adminsOnly = signal(false);
   protected readonly activeOnly = signal(true);
   protected readonly roleFilter = signal<number | null>(null);
+  protected readonly teamFilter = signal<number | null>(null);
   protected readonly projectFilter = signal<number | null>(null);
   protected readonly projectFilterUserIds = signal<Set<number> | null>(null);
 
@@ -50,6 +54,7 @@ export class UsersListPage {
       if (this.adminsOnly() && u.role !== 'Admin') return false;
       if (this.activeOnly() && !u.isActive) return false;
       if (this.roleFilter() !== null && u.jobRoleId !== this.roleFilter()) return false;
+      if (this.teamFilter() !== null && u.teamId !== this.teamFilter()) return false;
       if (this.projectFilter() !== null && !(projectUserIds?.has(u.id) ?? false)) return false;
       return true;
     });
@@ -62,6 +67,7 @@ export class UsersListPage {
   protected readonly displayName = signal('');
   protected readonly role = signal<'Admin' | 'User'>('User');
   protected readonly jobRoleId = signal<number | null>(null);
+  protected readonly teamId = signal<number | null>(null);
   protected readonly payrollNumber = signal('');
   protected readonly error = signal<string | null>(null);
   protected readonly newTemporaryPassword = signal<string | null>(null);
@@ -99,6 +105,7 @@ export class UsersListPage {
   constructor() {
     this.refresh();
     this.rolesService.list().subscribe((roles) => this.roles.set(roles));
+    this.teamsService.list().subscribe((teams) => this.teams.set(teams));
     this.projectsAdmin.listAll().subscribe((projects) => this.allProjects.set(projects));
   }
 
@@ -165,6 +172,7 @@ export class UsersListPage {
         displayName: this.displayName(),
         role: this.role(),
         jobRoleId: this.jobRoleId(),
+        teamId: this.teamId(),
         payrollNumber: this.payrollNumber() || null,
       })
       .subscribe({
@@ -174,6 +182,7 @@ export class UsersListPage {
           this.email.set('');
           this.displayName.set('');
           this.jobRoleId.set(null);
+          this.teamId.set(null);
           this.payrollNumber.set('');
           this.directorySearchQuery.set('');
           this.directoryResults.set([]);
@@ -192,6 +201,7 @@ export class UsersListPage {
         displayName: user.displayName,
         role: user.role,
         jobRoleId: user.jobRoleId,
+        teamId: user.teamId,
         isActive: !user.isActive,
         payrollNumber: user.payrollNumber,
       })
@@ -205,6 +215,7 @@ export class UsersListPage {
         displayName: user.displayName,
         role: newRole,
         jobRoleId: user.jobRoleId,
+        teamId: user.teamId,
         isActive: user.isActive,
         payrollNumber: user.payrollNumber,
       })
@@ -217,6 +228,20 @@ export class UsersListPage {
         displayName: user.displayName,
         role: user.role,
         jobRoleId,
+        teamId: user.teamId,
+        isActive: user.isActive,
+        payrollNumber: user.payrollNumber,
+      })
+      .subscribe(() => this.refresh());
+  }
+
+  protected updateTeam(user: AppUser, teamId: number | null): void {
+    this.usersAdmin
+      .update(user.id, {
+        displayName: user.displayName,
+        role: user.role,
+        jobRoleId: user.jobRoleId,
+        teamId,
         isActive: user.isActive,
         payrollNumber: user.payrollNumber,
       })
@@ -244,6 +269,7 @@ export class UsersListPage {
         displayName: user.displayName,
         role: user.role,
         jobRoleId: user.jobRoleId,
+        teamId: user.teamId,
         isActive: user.isActive,
         payrollNumber: this.editPayrollNumber().trim(),
       })

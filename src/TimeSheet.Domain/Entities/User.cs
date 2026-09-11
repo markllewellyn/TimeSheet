@@ -40,6 +40,12 @@ public class User
     public int? JobRoleId { get; set; }
     public Role? JobRole { get; set; }
 
+    /// <summary>The staff-grouping Team (e.g. "Delivery Pod A") this person currently belongs to - see Team.cs.
+    /// Purely a reporting/filtering axis, no billing significance (unlike JobRoleId). Nullable: not every
+    /// person needs a team.</summary>
+    public int? TeamId { get; set; }
+    public Team? Team { get; set; }
+
     /// <summary>Soft-disable leavers; preserves FK history on timesheets/assignments/costs.</summary>
     public bool IsActive { get; set; } = true;
 

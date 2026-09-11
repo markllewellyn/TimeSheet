@@ -35,5 +35,6 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
         builder.Ignore(u => u.IsLocalAccount);
 
         builder.HasOne(u => u.JobRole).WithMany().HasForeignKey(u => u.JobRoleId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne(u => u.Team).WithMany().HasForeignKey(u => u.TeamId).OnDelete(DeleteBehavior.Restrict);
     }
 }

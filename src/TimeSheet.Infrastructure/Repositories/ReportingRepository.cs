@@ -15,6 +15,8 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
             join u in db.Users on e.UserId equals u.Id
             join r in db.Roles on u.JobRoleId equals r.Id into roleJoin
             from role in roleJoin.DefaultIfEmpty()
+            join t in db.Teams on u.TeamId equals t.Id into teamJoin
+            from team in teamJoin.DefaultIfEmpty()
             where e.Date >= start && e.Date <= end
                   && (scope.ClientId == null || p.ClientId == scope.ClientId)
                   && (scope.ProjectId == null || p.Id == scope.ProjectId)
@@ -28,6 +30,8 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
                 UserName = u.DisplayName,
                 RoleId = u.JobRoleId,
                 RoleName = role != null ? role.Name : "Unassigned",
+                TeamId = u.TeamId,
+                TeamName = team != null ? team.Name : "Unassigned",
                 e.Date,
                 e.WorkHours,
                 e.OutOfHoursHours,
@@ -40,12 +44,12 @@ public class ReportingRepository(TimesheetDbContext db) : IReportingRepository
             group flat by new
             {
                 flat.ProjectId, flat.ProjectName, flat.ClientId, flat.ClientName,
-                flat.UserId, flat.UserName, flat.RoleId, flat.RoleName, flat.Date,
+                flat.UserId, flat.UserName, flat.RoleId, flat.RoleName, flat.TeamId, flat.TeamName, flat.Date,
             }
             into g
             select new TimeEntryAggregateRow(
                 g.Key.ProjectId, g.Key.ProjectName, g.Key.ClientId, g.Key.ClientName,
-                g.Key.UserId, g.Key.UserName, g.Key.RoleId, g.Key.RoleName, g.Key.Date,
+                g.Key.UserId, g.Key.UserName, g.Key.RoleId, g.Key.RoleName, g.Key.TeamId, g.Key.TeamName, g.Key.Date,
                 g.Sum(x => x.WorkHours), g.Sum(x => x.OutOfHoursHours),
                 g.Sum(x => x.BilledAmount), g.Sum(x => x.CostAmount),
                 g.Count());
