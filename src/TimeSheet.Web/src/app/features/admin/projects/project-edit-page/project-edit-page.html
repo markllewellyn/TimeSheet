@@ -169,6 +169,32 @@
           <span>Estimated Revenue: <strong>{{ e.estimatedRevenue | number: '1.2-2' }}</strong></span>
           <span>Estimated Profit: <strong>{{ e.estimatedProfit | number: '1.2-2' }}</strong></span>
         </div>
+
+        <h3 class="mb-1 text-xs font-semibold text-muted-foreground">By Role</h3>
+        <table class="table-clean mb-4">
+          <thead>
+            <tr>
+              <th>Role</th>
+              <th>Est. Hours</th>
+              <th>Cost</th>
+              <th>Revenue</th>
+              <th>Profit</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (role of estimateByRole(); track role.roleId ?? -1) {
+              <tr>
+                <td class="font-medium text-foreground">{{ role.roleName }}</td>
+                <td class="text-muted-foreground">{{ role.allocatedHours | number: '1.1-1' }}</td>
+                <td class="text-muted-foreground">{{ role.estimatedCost | number: '1.2-2' }}</td>
+                <td class="text-muted-foreground">{{ role.estimatedRevenue | number: '1.2-2' }}</td>
+                <td class="text-muted-foreground">{{ role.estimatedProfit | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        <h3 class="mb-1 text-xs font-semibold text-muted-foreground">By User</h3>
         <table class="table-clean">
           <thead>
             <tr>

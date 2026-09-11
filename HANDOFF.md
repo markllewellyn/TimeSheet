@@ -1,8 +1,38 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-10)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-11)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-11 — per-role rollup on the Estimated Cost/Profit panel, item #3 from the last FDD re-audit
+
+Picked up from the 2026-09-10 re-audit's open-items list (this file's "What's still open" section) at the
+user's own choice, offered among the audit's non-business-decision gaps. FDD: the Estimated Cost/Profit
+figures are "calculated per user *and per role*" - the per-user table already existed, but there was no
+role-level rollup anywhere.
+
+- **No backend change needed at all** - `ProjectEstimateLine`/`ProjectEstimateLineDto` already carried
+  `RoleId`/`RoleName` per line (`ProjectEstimateService.EstimateAsync` already resolves each assignee's role),
+  so this was a pure frontend aggregation of data already being returned.
+- **New `core/utils/estimate-role-grouping.ts`** - `groupEstimateLinesByRole()`, mirroring the existing
+  `groupInvoiceLineItemsByProject()`'s exact shape (a `Map`-keyed sum, sorted by name). A line with a
+  rate-resolution `warning` already carries `estimatedCost`/`Revenue`/`Profit` of `0` (set that way in
+  `ProjectEstimateService`), so it sums in safely with no special-casing; an unrolled line (`roleId === null`)
+  groups under "Unspecified" rather than being dropped, so the rollup's totals always match the per-user
+  table's totals exactly.
+- **`project-edit-page`**: new computed `estimateByRole` signal, new "By Role" table (Role/Est. Hours/Cost/
+  Revenue/Profit) rendered above the existing "By User" table inside the same "Estimated Cost/Profit" card,
+  both now under their own subheadings.
+- Backend build clean (no change, confirmed anyway since `TimeSheet.slnx` was touched by nothing here).
+  Angular build clean. No API host restart needed (frontend-only).
+- **Live-verified in the browser** (as Mark Llewellyn, Admin) on two real projects with Budget Hours set -
+  "ERP Migration Phase 2" (Director + Senior Consultant) and another Development project (Director +
+  Consultant) - the new "By Role" table's rows summed exactly to the card's overall Estimated Cost/Revenue/
+  Profit figures in both cases. Also confirmed the empty-budget state (a project with no Budget Hours set)
+  still renders its existing "Set Budget Hours above to see an estimate." message unaffected. Both real
+  projects checked happened to have exactly one person per role, so this didn't exercise multi-person-per-role
+  summation against real data specifically - not worth fabricating demo data just to prove it, since the
+  grouping itself is a straightforward `Map`-based sum copying an already-proven pattern.
 
 ## Done still later again in this session, 2026-09-10 — closed the last double-billing hole: a stale sibling Draft for an overlapping period is now blocked at generation time
 
@@ -311,7 +341,7 @@ comments that were never visible from HANDOFF's own past summaries. Three parall
 Rates; Timesheet Entries/Invoicing/Payroll; Auth/Reporting/Notifications), each re-reading the real code fresh
 rather than trusting what a past audit claimed was already done.
 
-**Real, actionable gaps found** (one already fixed, see the entry above):
+**Real, actionable gaps found** (two now fixed, see the entries above):
 
 1. ~~**Invoice line items didn't match the FDD's own spec**~~ - **fixed the same session**, see the entry above.
 2. **No "Team" concept exists anywhere in the app.** FDD: reporting "on a team, role and user basis" - role and
@@ -319,7 +349,8 @@ rather than trusting what a past audit claimed was already done.
    entity in the domain model at all (`grep` across `src/TimeSheet.Domain/Entities` for Team/Department: zero
    hits) - can't be added as "just a report" without first deciding what a team even is in this app. Not
    started - a business-model decision, not a small fix.
-3. **No per-role rollup on the Estimated Cost/Profit panel.** FDD: "calculated per user *and per role*."
+3. ~~**No per-role rollup on the Estimated Cost/Profit panel.**~~ - **fixed 2026-09-11, a later session**, see
+   that session's own "Done" entry above. FDD: "calculated per user *and per role*."
    `ProjectEstimateLine` already carries `RoleId`/`RoleName` per line - the data is there, just never grouped
    in the UI. Small, cheap fix, not started.
 4. **"Hours remaining" lives outside the Reporting feature.** FDD describes it as part of Reports/Export;

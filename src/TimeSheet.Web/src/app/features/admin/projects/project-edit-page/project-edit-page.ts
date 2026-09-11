@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { ProjectsAdminService } from '../../../../core/services/projects-admin.service';
@@ -9,6 +9,7 @@ import { AppUser } from '../../../../core/models/user.models';
 import { ConfirmService } from '../../../../core/services/confirm.service';
 import { LoadingSpinner } from '../../../../core/components/loading-spinner/loading-spinner';
 import { projectStatusBadgeClass, projectStatusBarColor } from '../../../../core/utils/project-status.utils';
+import { groupEstimateLinesByRole } from '../../../../core/utils/estimate-role-grouping';
 
 @Component({
   selector: 'app-project-edit-page',
@@ -49,6 +50,10 @@ export class ProjectEditPage {
   protected readonly saving = signal(false);
 
   protected readonly estimate = signal<ProjectEstimate | null>(null);
+  protected readonly estimateByRole = computed(() => {
+    const e = this.estimate();
+    return e ? groupEstimateLinesByRole(e.lines) : [];
+  });
   protected readonly status = signal<ProjectStatus | null>(null);
 
   protected readonly attachments = signal<ProjectAttachment[]>([]);
