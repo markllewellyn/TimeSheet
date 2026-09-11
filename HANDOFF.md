@@ -34,6 +34,40 @@ role-level rollup anywhere.
   summation against real data specifically - not worth fabricating demo data just to prove it, since the
   grouping itself is a straightforward `Map`-based sum copying an already-proven pattern.
 
+## Done later in this session, 2026-09-11 — caught the end-user handbook badly out of date, brought it current
+
+The user asked directly, after the per-role rollup fix above, whether `Resources/TimeSheet-Handbook.html` (the
+end-user guide, first written 2026-09-04) still reflected the app. Checked before assuming: it had zero
+mentions of anything from the entire 2026-09-10 session or the per-role rollup just above it - My Projects,
+Project Detail Breakdown, Budget & Cost Status/On Track badges, the Estimated Cost/Profit panel, Delete
+Draft/Void invoice, or the per-entry invoice line detail that replaced the old one-line-per-project rollup. It
+had kept pace with smaller features along the way (attachments, Save & Attach, search fixes) but not with any
+of the larger session's work. **The user's own words: "we should be doing this as we go."** - saved as a
+standing practice in this session's memory (`feedback_handbook_maintenance`), so future feature work updates
+the handbook in the same pass rather than letting a backlog accumulate again.
+
+- **New §9 "My Projects" chapter** (PM pill) - the On Track badge (Hours %/Cost % vs Budget Hours/Fixed Fee
+  Amount, green/amber/red at 75%/100%, "No budget set" otherwise) and the Breakdown drill-down (pie: by staff,
+  pie: by entry type, bar: by month; a Fixed Fee project's per-person revenue/profit deliberately left blank in
+  favour of one "Recognized Revenue to date" figure, matching Reports' own existing Fixed Fee logic). Everything
+  after it renumbered (§10 Payroll Periods … §14 Glossary).
+- **§11 Invoicing rewritten**: step 1 now describes real per-entry line items (staff/date/description/hours/
+  rate) grouped by project instead of the old one-line-per-project description, mentions already-invoiced
+  exclusion and the overlapping-Draft block; step 2 adds the bulk "Discount whole project" control alongside
+  the existing per-line discount; step 3 clarifies Fixed Fee locking; step 4 covers Voided PDFs. New "Made a
+  mistake?" note covering Delete Draft vs Void (kept record/number/PDF, unlocks entries) - the two big features
+  the old text never mentioned at all.
+- **§13 Admin → Projects registry row** extended to mention the On Track badge/Breakdown link on the Admin
+  project lists and the Budget & Cost Status + Estimated Cost/Profit (by role and by user) panels on a
+  project's own Edit page, cross-linked to the new My Projects chapter rather than duplicating its explanation.
+- **Glossary**: two new entries, "Voided (invoice)" and "On Track badge", matching the glossary's existing
+  status-vocabulary convention.
+- No app code touched - documentation only. **Visually verified in the browser**: served the `Resources/`
+  folder locally (`npx http-server`, port 8123 - `file://` URLs aren't reachable by the browser automation tool)
+  and screenshotted the new My Projects, Invoicing, Admin, and Glossary sections in both the jump-nav and
+  content areas - correct dark-mode styling, correct anchor links, correct chapter numbering throughout, no
+  layout breakage. Preview server stopped and its log file removed afterward, no artifact left behind.
+
 ## Done still later again in this session, 2026-09-10 — closed the last double-billing hole: a stale sibling Draft for an overlapping period is now blocked at generation time
 
 Immediate follow-up to the Fixed Fee fix above, the user's own suggested fix for a gap flagged in that entry's

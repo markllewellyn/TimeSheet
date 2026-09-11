@@ -412,6 +412,7 @@
     <a href="#approvals">Approvals</a>
     <a href="#flags">Entry Flags</a>
     <a href="#my-invoices">My Invoices</a>
+    <a href="#my-projects">My Projects</a>
     <a href="#payroll">Payroll Periods</a>
     <a href="#invoicing">Invoicing</a>
     <a href="#reports">Reports</a>
@@ -655,9 +656,37 @@
     </div>
   </section>
 
-  <section class="chapter" id="payroll">
+  <section class="chapter" id="my-projects">
     <div class="chapter-head">
       <span class="chapter-num">§9</span>
+      <h2>My Projects</h2>
+      <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
+    </div>
+    <div class="prose">
+      <p>Only appears in the nav if you're the nominated manager for at least one project (or an Admin is
+        impersonating someone who is). Lists every project you manage, each with an <strong>On Track</strong>
+        badge — up to two pills, <strong>Hours X%</strong> and <strong>Cost X%</strong>, showing actual logged
+        hours against that project's Budget Hours and actual cost against its Fixed Fee Amount. Green under 75%,
+        amber to 100%, red over. A project with neither figure set shows a plain "No budget set" badge instead of
+        a misleading 0%.</p>
+      <p><strong>Breakdown</strong>, on each row, opens that project's all-time drill-down: three charts — hours
+        by staff member, hours by entry type, and a monthly hours trend — each paired with the underlying table.
+        For a Fixed Fee project, per-person revenue and profit are deliberately left blank rather than a naive
+        hours × rate guess; a single "Recognized Revenue to date" figure is shown instead, prorated by how much
+        of the project's Budget Hours has actually been consumed — the same logic Reports already uses for a
+        Fixed Fee project, kept consistent rather than inventing a second way to count the same money.</p>
+    </div>
+    <div class="note tip">
+      <span class="note-label">Admins see this too</span>
+      The same On Track badges appear as an extra column on the Admin Projects list (every project, not just
+      ones you manage), and each project's own Edit page carries a fuller version — see
+      <a href="#admin">Admin → Projects</a>.
+    </div>
+  </section>
+
+  <section class="chapter" id="payroll">
+    <div class="chapter-head">
+      <span class="chapter-num">§10</span>
       <h2>Payroll Periods</h2>
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
@@ -672,19 +701,33 @@
 
   <section class="chapter" id="invoicing">
     <div class="chapter-head">
-      <span class="chapter-num">§10</span>
+      <span class="chapter-num">§11</span>
       <h2>Invoicing</h2>
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <ol class="steps">
-      <li><strong>Pick a client and period</strong>, then <strong>Generate Draft</strong>. Time &amp; Materials
-        lines pull straight from logged entries in that window; Fixed Fee lines use the project's own fee; expenses
-        add on top.</li>
-      <li><strong>Review the Draft</strong> — adjust a line's discount % if needed, give it an invoice number.</li>
-      <li><strong>Finalize.</strong> This is the point of no return: finalizing locks every Time &amp; Materials
-        entry the invoice was built from — they can no longer be edited, duplicated or deleted.</li>
-      <li><strong>Download PDF</strong> any time, Draft or Finalized.</li>
+      <li><strong>Pick a client and period</strong>, then <strong>Generate Draft</strong>. You get one line per
+        logged Time &amp; Materials entry (staff, date, description, hours, rate) and one per billable expense,
+        grouped by project; a Fixed Fee project adds its own one-off fee as a single line. Anything already
+        invoiced — an entry, an expense, or a project's Fixed Fee — is automatically excluded, so re-running this
+        for an overlapping period can't double-bill it. Generating a second Draft for a period that overlaps an
+        existing open Draft for the same client is blocked outright; finish or delete that Draft first.</li>
+      <li><strong>Review the Draft</strong> — adjust a single line's discount %, or use
+        <strong>Discount whole project</strong> to apply one % across every line in that project's group at once,
+        then give it an invoice number.</li>
+      <li><strong>Finalize.</strong> The point of no return for what it covers: every Time &amp; Materials entry
+        and billable expense on it becomes locked — no longer editable, duplicable or deletable — and its
+        project's Fixed Fee (if any) won't be added to a future invoice again.</li>
+      <li><strong>Download PDF</strong> any time — Draft, Finalized, or Voided.</li>
     </ol>
+    <div class="note admin-note">
+      <span class="note-label">Made a mistake?</span>
+      A <strong>Draft</strong> can simply be <strong>deleted</strong> — nothing on it was ever locked, so nothing
+      needs unwinding. A <strong>Finalized</strong> invoice is instead <strong>Voided</strong>, with an optional
+      typed reason: its record, real invoice number, and PDF all stay permanently (a correction trail, not an
+      erasure) — that number can never be reused — and every entry, expense, and Fixed Fee it had locked becomes
+      invoiceable again on the next Draft.
+    </div>
     <div class="note admin-note">
       <span class="note-label">Monthly clients</span>
       A client set to Monthly billing (their own Edit page → Billing Period) rolls forward automatically — a Draft
@@ -696,7 +739,7 @@
 
   <section class="chapter" id="reports">
     <div class="chapter-head">
-      <span class="chapter-num">§11</span>
+      <span class="chapter-num">§12</span>
       <h2>Reports</h2>
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
@@ -722,7 +765,7 @@
 
   <section class="chapter" id="admin">
     <div class="chapter-head">
-      <span class="chapter-num">§12</span>
+      <span class="chapter-num">§13</span>
       <h2>Admin</h2>
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
@@ -737,7 +780,7 @@
       </div>
       <div class="registry-row">
         <div class="name">Projects</div>
-        <div class="desc">Per client. Payment model (Time &amp; Materials / Fixed Cost), budget hours, project manager, Can Invoice flag, staff Assignments, Entry Types, and a Documents card for uploading supporting files (contracts, statements of work, anything worth keeping alongside the project). A separate <strong>Cost Exempt</strong> flag marks a project as pure internal hour-tracking (e.g. Training) — time logged against it carries no cost to the business, and staff can log hours there without needing a cost rate configured at all.</div>
+        <div class="desc">Per client. Payment model (Time &amp; Materials / Fixed Cost), budget hours, project manager, Can Invoice flag, staff Assignments, Entry Types, and a Documents card for uploading supporting files (contracts, statements of work, anything worth keeping alongside the project). A separate <strong>Cost Exempt</strong> flag marks a project as pure internal hour-tracking (e.g. Training) — time logged against it carries no cost to the business, and staff can log hours there without needing a cost rate configured at all. The project list itself carries the same <strong>On Track</strong> badge and <strong>Breakdown</strong> link described under <a href="#my-projects">My Projects</a>, for every project, not just ones you manage. Opening a project's own Edit page adds two more panels below the form: <strong>Budget &amp; Cost Status</strong> (the same hours/cost-vs-budget figures as the badge, as two progress bars) and <strong>Estimated Cost / Profit</strong> — a forward-looking estimate, split both <strong>by role</strong> and <strong>by user</strong>, of what the project's Budget Hours will cost and earn once fully consumed, based on each assignee's allocated share of it.</div>
       </div>
       <div class="registry-row">
         <div class="name">Rate Cards</div>
@@ -769,7 +812,7 @@
 
   <section class="chapter" id="glossary">
     <div class="chapter-head">
-      <span class="chapter-num">§13</span>
+      <span class="chapter-num">§14</span>
       <h2>Glossary</h2>
     </div>
     <dl class="glossary">
@@ -781,6 +824,10 @@
       <dd>Set on an entry when logged (Time &amp; Materials projects only). <span class="mono">Current</span> counts toward the invoice period the entry's date falls in, as normal. <span class="mono">Next</span> excludes it from that period and defers it to the following one — and only that one; skip a period entirely and a deferred entry needs re-flagging by hand.</dd>
       <dt>Locked</dt>
       <dd>An entry that can no longer be edited, duplicated, or deleted — because it's been approved for payroll, sent to payroll, or built into a finalized invoice. The Log Time grid always says which.</dd>
+      <dt>Voided (invoice)</dt>
+      <dd>A Finalized invoice that's been corrected rather than deleted — its record, invoice number, and PDF are kept permanently, but every entry, expense, and Fixed Fee it had locked becomes invoiceable again. A Draft, by contrast, has nothing locked yet and is simply deleted outright. See <a href="#invoicing">Invoicing</a>.</dd>
+      <dt>On Track badge</dt>
+      <dd>A project's actual hours/cost measured against its Budget Hours/Fixed Fee Amount — green under 75%, amber to 100%, red over, or "No budget set" if neither figure is configured. Purely visual; unrelated to the Settings-configurable thresholds that trigger a budget notification. See <a href="#my-projects">My Projects</a>.</dd>
       <dt>Resolved Rate</dt>
       <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a person-specific override, then a project-specific rate, then a client-specific rate, then the role's plain default. A later rate change never retroactively touches an entry already logged.</dd>
     </dl>
