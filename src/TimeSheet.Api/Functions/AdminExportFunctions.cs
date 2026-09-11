@@ -49,24 +49,14 @@ public class AdminExportFunctions(
 
         var rows = await entries.GetAllInRangeAsync(from, to, clientId, projectId, projectIds, userId, ct);
 
-        // FDD's "hours remaining" ask, same all-time-against-Project.BudgetHours figure as the Reports page and
-        // the Budget & Cost Status panel (see IReportingService's own doc comment on why this is never scoped to
-        // the export's own date range) - stamped per row like Client/Project already are, not a separate summary
-        // section, so the CSV stays one flat table a spreadsheet can filter/pivot directly.
-        var exportedProjects = rows.Select(e => e.Project).Where(p => p is not null).Cast<Project>().DistinctBy(p => p.Id).ToList();
-        var statuses = await projectStatus.GetStatusesAsync(exportedProjects, ct);
-
         var csv = new StringBuilder();
         csv.AppendLine(string.Join(',', [
             "Staff Name", "Client", "Project", "Date", "Description", "Work Hours", "Out of Hours", "Total Hours",
             "To Payroll", "Approved for Payroll", "Sent to Payroll", "Posting Batch",
-            "Project Budget Hours", "Project Hours Remaining",
         ]));
 
         foreach (var e in rows)
         {
-            var status = statuses.GetValueOrDefault(e.ProjectId);
-
             csv.AppendLine(string.Join(',', [
                 CsvField(e.User?.DisplayName),
                 CsvField(e.Client?.Name),
@@ -80,9 +70,32 @@ public class AdminExportFunctions(
                 CsvField(e.ApprovedPayroll ? "Yes" : "No"),
                 CsvField(e.SentToPayroll ? "Yes" : "No"),
                 CsvField(e.PostingBatch),
-                CsvField(status?.BudgetHours?.ToString()),
-                CsvField(status?.BudgetHours is null ? null : (status.BudgetHours.Value - status.ActualHours).ToString()),
             ]));
+        }
+
+        // FDD's "hours remaining" ask, same all-time-against-Project.BudgetHours figure as the Reports page and
+        // the Budget & Cost Status panel (see IReportingService's own doc comment on why this is never scoped to
+        // the export's own date range). A trailing summary section, one row per distinct project actually
+        // exported, rather than repeating an identical value on every one of that project's entry rows - the
+        // user's own call after seeing the repeated-per-row version look like duplicated data at a glance for a
+        // single-project export. Omitted entirely (no blank line, no header) when nothing was exported.
+        var exportedProjects = rows.Select(e => e.Project).Where(p => p is not null).Cast<Project>().DistinctBy(p => p.Id)
+            .OrderBy(p => p.Name).ToList();
+        if (exportedProjects.Count > 0)
+        {
+            var statuses = await projectStatus.GetStatusesAsync(exportedProjects, ct);
+
+            csv.AppendLine();
+            csv.AppendLine(string.Join(',', ["Project", "Project Budget Hours", "Project Hours Remaining"]));
+            foreach (var project in exportedProjects)
+            {
+                var status = statuses.GetValueOrDefault(project.Id);
+                csv.AppendLine(string.Join(',', [
+                    CsvField(project.Name),
+                    CsvField(status?.BudgetHours?.ToString()),
+                    CsvField(status?.BudgetHours is null ? null : (status.BudgetHours.Value - status.ActualHours).ToString()),
+                ]));
+            }
         }
 
         var bytes = Encoding.UTF8.GetPreamble().Concat(Encoding.UTF8.GetBytes(csv.ToString())).ToArray();

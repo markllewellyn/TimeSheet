@@ -34,11 +34,18 @@ CSV export. Researched first via a dedicated Explore agent mapping the whole Rep
   one of the client's projects (`IProjectRepository.GetByClientIdAsync`, `includeInactive: true` - same
   precedent as `InvoiceGenerationService`) and calls `IProjectStatusService.GetStatusesAsync` once for all of
   them (not per project group - avoids an N+1), then looks each project's status up per breakdown line.
-- **`AdminExportFunctions.cs`** (CSV export): two new trailing columns, "Project Budget Hours"/"Project Hours
-  Remaining", stamped on every row for that entry's project - the same "repeat static per-project context on
-  every row" convention the existing Client/Project name columns already use, rather than inventing a separate
-  summary section that would turn one flat CSV table into two. Distinct projects across the exported rows are
-  bulk-status-fetched once (`IProjectStatusService.GetStatusesAsync`), same N+1-avoidance as the Reports change.
+- **`AdminExportFunctions.cs`** (CSV export) - **first design rejected by the user, fixed the same session**:
+  the first version added two trailing columns, "Project Budget Hours"/"Project Hours Remaining", stamped on
+  every row for that entry's project (the same "repeat static per-project context on every row" convention the
+  existing Client/Project name columns already use). Live-verified, then the user reported it back immediately:
+  "The export looks off, looks to be repeating data in there?" - correctly reading an identical value repeated
+  across dozens of rows (for a single-project export especially) as looking like duplicated data, even though no
+  entries were actually duplicated. Asked the user directly rather than re-guessing; they chose a **trailing
+  summary section** instead - the per-entry rows now stay exactly as they were before this session touched them
+  (no new columns at all), with a blank line then one small `Project,Project Budget Hours,Project Hours
+  Remaining` table underneath, one row per **distinct project actually exported** (sorted by name), omitted
+  entirely when nothing was exported. Distinct projects are bulk-status-fetched once
+  (`IProjectStatusService.GetStatusesAsync`), same N+1-avoidance as the Reports change.
 - **No Angular changes needed for Reports** - confirmed by reading `reports-page.ts`/`.html` first: the page
   already renders whatever fields a report's JSON happens to contain, fully generically (`Object.keys()` +
   `keyvalue` pipe, camelCase-to-Title-Case label conversion) - the two new fields appear as a new summary tile
@@ -63,12 +70,16 @@ CSV export. Researched first via a dedicated Explore agent mapping the whole Rep
   the client-level summary correctly showed blank Budget Hours/Hours Remaining tiles, while the per-project
   breakdown table showed each project's own real figures, including a genuine **negative** Hours Remaining
   (`-1`) on the small over-budget "Notif Threshold Test" project - real proof the "can go negative" design
-  works, not just a happy-path number. Downloaded the real CSV export (filtered to Acme / ERP Migration Phase 2,
-  2026 date range, with the user's explicit permission for the file download) and confirmed every row carried
-  "Project Budget Hours" `600.0` / "Project Hours Remaining" `496.6`, matching the Reports figures exactly.
-- **New demo-data artifact**: a real CSV file, `timesheet-export-2026-09-11.csv`, saved to the user's own
-  Downloads folder as part of the live-verification download above - their own file space, left as-is rather
-  than deleted on their behalf.
+  works, not just a happy-path number. Downloaded the real CSV export twice, with the user's explicit permission
+  each time for the file download: first filtered to Acme / ERP Migration Phase 2 (2026 date range) - confirmed
+  the *reported* problem for real, every row repeating `600.0`/`496.6`; after the fix, re-downloaded with no
+  filters at all (every client/project) - confirmed the per-entry rows were back to their original, unmodified
+  shape, followed by exactly one trailing summary row per distinct project actually in the export (8 projects,
+  including two with no Budget Hours set showing correctly blank, and the same over-budget "Notif Threshold
+  Test" project again showing a negative `-1.0` Hours Remaining).
+- **New demo-data artifacts**: three real CSV files (`timesheet-export-2026-09-11.csv`,
+  ` (1).csv`, ` (2).csv`) saved to the user's own Downloads folder across the two rounds of live-verification
+  download above - their own file space, left as-is rather than deleted on their behalf.
 
 ## Done in this session, 2026-09-11 — per-role rollup on the Estimated Cost/Profit panel, item #3 from the last FDD re-audit
 
