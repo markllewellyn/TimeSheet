@@ -146,7 +146,14 @@ public class TimesheetEntryRepository(TimesheetDbContext db) : ITimesheetEntryRe
             ? query.Where(e => e.Id == entryId)
             : ApplyStaffClientProjectSearch(query, term);
 
-        return await query.OrderByDescending(e => e.Date).Take(take).ToListAsync(ct);
+        // OrderByDescending(Date) alone has no deterministic tiebreak for same-date rows - real dev data
+        // confirmed multiple broad searches (e.g. "test", "Mark", "Sarah") land the take-25 cutoff squarely
+        // inside a run of same-date entries, where SQLite's own implementation-defined tie order (effectively
+        // insertion order, not recency) decided which one survived into the results and which quietly vanished
+        // - a very plausible match for a previously-unreproducible "my own entry went missing from search"
+        // report. Id (autoincrement) as a secondary key makes the ordering, and therefore the truncation
+        // boundary, both deterministic and a better proxy for "most recently logged" among same-date entries.
+        return await query.OrderByDescending(e => e.Date).ThenByDescending(e => e.Id).Take(take).ToListAsync(ct);
     }
 
     /// <summary>Requires each whitespace-separated word in the search term to match somewhere across staff/

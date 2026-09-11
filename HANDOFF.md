@@ -4,6 +4,74 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done later still in this session, 2026-09-11 — actually found the Entry Flags search bug, plus closed two other "Known loose ends" verification gaps
+
+With the FDD-numbered backlog closed, picked up two items from "Known loose ends" at the user's request: (1)
+try to reproduce the long-standing, never-confirmed "my own entries go missing from an Entry Flags search"
+report, and (2) live-verify the two items previously only verified by code review (Clients' BillingPeriod
+fields, the PM-scoped batch-rejection path).
+
+**(1) Found a real, previously-undiscovered root cause - not just re-confirmed the existing 25-result-cap
+mitigation.** `SearchForFlaggingAsync`'s `OrderByDescending(e => e.Date)` has no secondary sort key. Queried the
+real dev DB directly (a throwaway `Microsoft.Data.Sqlite` console script, cleaned up after) for three broad
+searches ("test", "Mark", "Sarah") ordered exactly like the real query, and in **all three**, the take-25 cutoff
+landed squarely inside a run of same-date entries - meaning which entry survived into the results and which
+silently vanished was decided by SQLite's own implementation-defined tie order (in practice, ascending
+insertion order), not any real recency signal. A very plausible match for the original report.
+
+- **Fix**: `.OrderByDescending(e => e.Date).ThenByDescending(e => e.Id)` - `Id` (autoincrement) as a tiebreak
+  makes the ordering deterministic and biases same-date ties toward the most-recently-created entry, matching
+  what "most recent first" actually implies.
+- **New `TimesheetEntryRepositoryTests.cs`** (first test file for this repository) - seeds 30 same-date entries
+  matching one search term (more than the take=25 cap), asserts the result is identical across two calls
+  (deterministic) and is exactly the 25 highest-Id rows. **Confirmed this genuinely fails without the fix** -
+  reverting to `OrderByDescending(Date)` alone made the in-memory SQLite provider return the 25 **oldest** rows
+  (Ids 1-25 ascending), the opposite of "most recent," which is an even stronger confirmation than expected.
+- Backend build clean, 68/68 Infrastructure tests pass (1 new). **Live-verified against the exact real data that
+  proved the bug**: searched "test" in the raise-a-flag picker as Admin - entry #117 ("second verification
+  entry", Sarah Chen, Aug 21), confirmed via the same DB script to be excluded under the old ordering, now
+  correctly appears in the results. API host restarted (repository method body change) - confirmed clean
+  startup.
+- **This is now believed fixed, not just mitigated** - upgrading the "Known loose ends" entry below accordingly,
+  though the original report was never reproduced under controlled conditions, so keep an eye out.
+
+**(2a) Clients' BillingPeriod/CurrentPeriodStart/CurrentPeriodEnd fields, live-verified directly against
+`Clients_Create`/`Clients_Update`** (previously only verified indirectly via the roll-forward timer). Used
+Antigua (client 5) as a real, reversible test: switched Billing Period to Monthly via the UI, confirmed via
+`read_network_requests` a real `PUT /api/clients/5` returned 200, then reloaded the Edit page and confirmed
+`CurrentPeriodStart`/`CurrentPeriodEnd` had round-tripped correctly (`2026-09-01`/`2026-09-30`, the current
+calendar month - `ResolveBillingPeriod`'s own fallback for switching to Monthly with no explicit dates given).
+Reverted back to One-off afterward (a stray first attempt didn't register - the click-flakiness this form has
+been noted for before - confirmed via `read_network_requests` that a second attempt's `PUT` actually fired
+before trusting the revert) - confirmed Current Period Start/End correctly disappeared again.
+
+**(2b) The PM-scoped batch-rejection path (`CheckOutOfScopeAsync`), live-verified as far as safely possible,
+plus a new proper test closing the rest of the gap.** Reset Sarah Chen's password (Admin action, temp password
+generated) to sign in as a real non-admin PM rather than test as Admin (whose `IsAdmin` bypasses the whole
+check) - confirmed her Approval Queue is correctly scoped to only her own managed project (25 entries, all ERP
+Migration Phase 2), reconfirming the underlying `GetManagedByUserAsync`-based scoping. Attempted to go further
+and forge an actual mixed-project batch request (the real UI never shows an out-of-scope entry to select, so
+only a hand-crafted request could exercise the true rejection branch) via a `fetch()` call using the browser's
+own stored session token - **blocked by this session's own safety classifier** (reading/using the local auth
+token is treated as sensitive regardless of purpose). Did not attempt to work around this; pivoted to the
+legitimate alternative instead:
+- **New `tests/TimeSheet.Api.Tests/TimesheetApprovalFunctionsTests.cs`** - the first test for this codebase's
+  Functions layer, which had zero test coverage before now. Constructs a real `TimesheetApprovalFunctions`
+  against real in-memory-SQLite-backed repositories, a stub `ICurrentUserAccessor` (a genuine non-admin PM), and
+  a hand-built `HttpRequest` (`DefaultHttpContext` + a JSON body stream - no auth/network involved at all).
+  2 tests: a PM's batch mixing one managed-project entry with one entirely unrelated project's entry is rejected
+  with a real `BadRequestObjectResult`, **and** the in-scope entry is confirmed NOT partially approved (the
+  class's own documented no-partial-success intent); a control test confirms an all-in-scope batch still
+  succeeds normally. **Confirmed the rejection test genuinely fails without the fix** (temporarily short-
+  circuited `CheckOutOfScopeAsync` to always return null/no-rejection, re-ran, saw the mixed batch wrongly
+  succeed, restored it).
+- Backend build clean, 2/2 new Api.Tests pass (70/70 total across both test projects). This closes the loose
+  end for real, not just re-stating "verified by code review."
+- **New demo-data side effect**: Sarah Chen's local-account password was reset during this verification (a
+  one-time temporary password was generated and used to sign in as her, then discarded) - same as the
+  established 2026-09-08 precedent for testing as a real PM. No lasting behavior change, just a changed
+  password on a fictional dev-seeded account.
+
 ## Done later still in this session, 2026-09-11 — the "Team" concept, item #2 and the last item on the FDD audit's numbered backlog
 
 FDD's only mention of "team" anywhere in the whole document, confirmed by a fresh extraction of the docx's raw
@@ -2503,14 +2571,14 @@ session's earlier entry above respectively. They are not part of the new numbere
   session's own "Done" entry above for the new global `sessionExpiredInterceptor` - this was a real, app-wide
   gap (any page's API call 401ing would have shown the same symptom, not just this one), not something specific
   to Add Expense.
-- **Not resolved, mitigated further 2026-09-10**: the user reported their own logged entries missing from an
-  Entry Flags search while signed in as Admin. Still could not be reproduced (asked again this session for the
-  exact search term/how old the entry was - no specifics remembered either time) and still no code path found
-  that would exclude the searcher's own entries. Exact Entry ID search (2026-09-04) and, this session, a
-  visible "showing the 25 most recent matches" hint when a search is truncated (see that session's own "Done"
-  entry above) both target the most likely cause (the picker's 25-result, most-recent-first cap silently
-  pushing an older entry out) - but neither is a confirmed fix, since the root cause was never actually
-  confirmed. If it happens again, get the exact search term used.
+- ~~**Not resolved, mitigated further 2026-09-10**: the user reported their own logged entries missing from an
+  Entry Flags search while signed in as Admin.~~ — **believed fixed 2026-09-11, a later session**, see that
+  session's own "Done" entry above. Root cause found (not just re-mitigated): `SearchForFlaggingAsync` ordered
+  by Date alone with no deterministic tiebreak - real dev data confirmed the take-25 cutoff routinely lands
+  inside a run of same-date entries, where SQLite's own tie order (not recency) decided what survived.
+  `.ThenByDescending(e => e.Id)` fixes it; live-verified the exact entry proven excluded under the old ordering
+  now appears. The original report was still never reproduced under controlled conditions, so keep an eye out
+  regardless.
 - **EntryType rows exist on only one project** (ERP Migration Phase 2) after this session's cleanup - every
   other project in the app still has zero, so the Entry Type picker on Add Entry stays hidden for them. Adding
   more is a "which projects, what types" business decision, not something to guess at - ask the user first.
@@ -2544,17 +2612,17 @@ session's earlier entry above respectively. They are not part of the new numbere
   editing an *existing* Function's body seems to work without a restart, but don't trust that
   either — if a new/changed endpoint 404s or behaves stale, restart the API host first before
   assuming there's a code bug.
-- **The Clients admin API's new `BillingPeriod`/`CurrentPeriodStart`/`CurrentPeriodEnd` fields**
-  were live-verified indirectly (you set a real client to Monthly with a past period end via the
-  browser, and `MonthlyBillingRollForward` picked it up correctly), but not the raw
-  `Clients_Create`/`Clients_Update` request/response shape directly against the API — low risk
-  given how thin `ClientsFunctions.ResolveBillingPeriod` is, and the roll-forward timer's success
-  implicitly proves the save path worked.
-- **The batch-rejection path for PM-scoped Approve/SendToPayroll (mixing in an entry outside the
-  PM's managed projects → 400) was verified by code review, not live.** Exercising it live would
-  need a second project managed by someone else with a pending entry, which wasn't available
-  without full Admin access this session. The list-scoping and same-project cross-staff approval
-  paths (the more commonly hit cases) *were* live-verified — see the `5a79f83` commit message.
+- ~~**The Clients admin API's new `BillingPeriod`/`CurrentPeriodStart`/`CurrentPeriodEnd` fields**
+  were live-verified indirectly...~~ — **live-verified directly 2026-09-11, a later session**, see that
+  session's own "Done" entry above: a real `Clients_Update` PUT, confirmed 200, with `CurrentPeriodStart`/
+  `CurrentPeriodEnd` round-tripping correctly on both switching to Monthly and back to One-off.
+- ~~**The batch-rejection path for PM-scoped Approve/SendToPayroll (mixing in an entry outside the
+  PM's managed projects → 400) was verified by code review, not live.**~~ — **closed properly 2026-09-11, a
+  later session**, see that session's own "Done" entry above: a genuine live UI attempt (as a real, freshly-
+  password-reset PM) confirmed the list-scoping half, but forging the actual cross-project batch request was
+  blocked by this session's own safety classifier (using the stored auth token programmatically) - closed
+  instead with a new dedicated Functions-level test (the first for this codebase), confirmed to genuinely fail
+  without the fix.
 - ~~**Left-over demo-data artifacts from this session's live verification**~~ — **reverted 2026-09-04, a later
   session**, at the user's explicit approval (this bypassed the app's own API/business-logic layer, so it was
   flagged before doing it - see that session's own "Done" entry above for the full mechanism and a genuine
