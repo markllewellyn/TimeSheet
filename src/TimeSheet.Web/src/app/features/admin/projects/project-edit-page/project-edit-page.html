@@ -98,8 +98,9 @@
   </div>
 
   <p class="mt-4 text-xs text-muted-foreground">
-    Billing rates are set per staff member on the client's Staff Costs section, not per project - a person
-    assigned to this project must have a rate configured for {{ isEditMode ? "this project's client" : "the client" }} first.
+    Billing rates come from <a routerLink="/admin/rate-cards" class="btn-link">Rate Cards</a> - a role's default,
+    optionally narrowed to {{ isEditMode ? "this project's client" : "the client" }} or to this project - plus any
+    per-person overrides on the client's page. A person assigned to this project must resolve to a rate first.
   </p>
   <p class="mt-1 text-xs text-muted-foreground">
     Consumption notifications for this project's Budget Hours fire at firm-wide percentages set on the

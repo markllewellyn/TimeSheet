@@ -31,12 +31,18 @@ export class EntryActionsCell implements ICellRendererAngularComp {
     this.params = params;
   }
 
+  // Mirrors the server's lock rule (TimesheetEntriesFunctions Update/Delete/Duplicate): approval alone locks
+  // an entry, not only sending it to payroll.
   locked(): boolean {
-    return this.params.data?.sentToPayroll === true || this.params.data?.invoiced === true;
+    const e = this.params.data;
+    return e?.approvedPayroll === true || e?.sentToPayroll === true || e?.invoiced === true;
   }
 
   lockedReason(): string {
-    return this.params.data?.invoiced === true ? 'Locked (invoiced)' : 'Locked (sent to payroll)';
+    const e = this.params.data;
+    if (e?.invoiced === true) return 'Locked (invoiced)';
+    if (e?.sentToPayroll === true) return 'Locked (sent to payroll)';
+    return 'Locked (approved)';
   }
 
   refresh(): boolean {
