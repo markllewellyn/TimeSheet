@@ -49,6 +49,10 @@ before). Chrome was **not connected** this session, so there was no live browser
 - **Fixed later the same session**: Profit reports' per-user/role/team rows showed Billed 0 / negative Profit on
   Fixed Fee projects (revenue is recognized once, in the summary). `reports-page` now shows "—" for Billed/Profit
   on those rows plus a one-line note, only for an invoiceable Fixed Fee project; backend unchanged.
+- **Possible follow-up, deliberately not done before the 2026-09-29 demo (user's call)**: attribute Fixed Fee revenue per
+  row by hours (row hours / BudgetHours x FixedFeeAmount - recognition is already hours-linear, so rows would sum to
+  the summary bar expenses/rounding). Touches ReportingService's 3 per-row methods + ProjectBreakdownService, and
+  would replace both "—" front-end fixes above. ~25 min incl. a sum-to-summary test.
 
 ## Done last in this session, 2026-09-11 — a UI polish sweep, honestly reported: found the app already in good shape
 
