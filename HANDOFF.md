@@ -1,8 +1,40 @@
-# TimeSheet — FDD Alignment Handoff (as of 2026-09-11)
+# TimeSheet — FDD Alignment Handoff (as of 2026-09-28)
 
 ## Context
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
+
+## Done in this session, 2026-09-28 — pre-demo check: tests, handbook audit, one real locking bug
+
+User has a demo on 2026-09-29. Dev stack restarted fresh (Azurite, `func start`, `npm start` - same commands as
+before). Chrome was **not connected** this session, so there was no live browser walk - see "Still to do" below.
+
+- **Tests**: `dotnet test TimeSheet.slnx` 70/70 (68 Infrastructure + 2 Api; Domain.Tests has none). `ng build`
+  clean. `ng test --watch=false` was **failing 2/2 and always had been** - `app.spec.ts` was the untouched CLI
+  scaffold (expected a "Hello, TimeSheet.Web" `<h1>`; jsdom has no `matchMedia` for `ThemeService`). Rewritten
+  as a real shell smoke test (router/HttpClient providers, `matchMedia` stub, asserts the signed-out "Sign in"
+  link) - 2/2 pass.
+- **API smoke**: every GET route from the `func start` listing probed unauthenticated - 57 × 401, 2 × 302 (Entra
+  login/callback), no 404/500. Startup log's only errors are the known `DailyTimesheetReminder` Graph
+  `noreply@svgit.co.uk` failure and harmless Entra-scheme "kid is missing" noise when a local JWT is tried
+  against the Entra scheme first (every function execution in the log Succeeded).
+- **Real bug fixed - Log Time grid locking**: the server refuses Edit/Delete/Duplicate once an entry is
+  `ApprovedPayroll` (`TimesheetEntriesFunctions` Update/Delete/Duplicate), but `entry-actions-cell.ts` only hid
+  the buttons once `SentToPayroll`/invoiced - an approved-but-unsent entry showed buttons that just errored.
+  Now also locks on `approvedPayroll`, with a new "Locked (approved)" label.
+- **Stale hint fixed**: Project Edit page said rates are "set per staff member on the client's Staff Costs
+  section, not per project" - predates Rate Cards; `RateResolver` has five tiers incl. role+project and
+  person+project. Reworded to point at Rate Cards (now linked).
+- **Handbook audit** (full route-by-route pass vs templates): nav labels all matched, but fixed four factual
+  errors (Download PDF on a Draft - it's Finalized/Voided only; Calendar day-click opens an in-page panel, not a
+  jump to Log Time; Reports' Client is required, not optional, and preset names; Approvals said *sending* locks
+  an entry - it's approving) plus the Resolved Rate glossary order (now the real five tiers), and filled gaps:
+  not-provisioned banner, Sign out / session-expired redirect, Log Time summary cards, the Admin "approved and
+  sent to payroll immediately" checkbox, Delete Draft / Void Invoice / Reason, View Breakdown, Edit / Rates,
+  Fixed Project Cost, Staff Cost History + Find in tenant directory, Settings threshold names, CSV header names,
+  Billable column, My Invoices/My Projects nav visibility, Admin menu location.
+- **Still to do before/at the demo**: a live click-through (Chrome not connected) - especially the new
+  "Locked (approved)" label on an approved-but-unsent entry, and the reworded Project Edit hint.
 
 ## Done last in this session, 2026-09-11 — a UI polish sweep, honestly reported: found the app already in good shape
 

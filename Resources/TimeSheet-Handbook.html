@@ -434,6 +434,11 @@
         account) or a local email/password if one was set up for you. First time on a local account? Use the
         one-time temporary password an Admin gave you to sign in — there's no separate step to set your own; if
         you want a different password later, ask an Admin to reset it again.</p>
+      <p>Signed in with Microsoft but seeing <em>"Your account isn't set up in this app yet"</em>? Your Microsoft
+        account works, but no Admin has invited you to TimeSheet yet — ask one to add you from
+        <strong>Admin ▾ → Staff</strong>. <strong>Sign out</strong> (far right of the header) always returns you to
+        the login page, and if your session expires mid-task you're taken there too, with a
+        <em>"Your session has expired"</em> message — just sign in again.</p>
     </div>
     <ol class="steps">
       <li><strong>Log your first entry.</strong> Go to <strong>Log Time</strong> (it's the page you land on) and
@@ -461,6 +466,9 @@
       <p>Your working grid — every entry you've logged, across every project you're assigned to, newest first.
         Search narrows by client or project name; nothing here is paginated away, so a broad grid genuinely holds
         your whole history.</p>
+      <p>Above the grid, summary cards show your <strong>Most Recent Day</strong>, <strong>Total Work
+        Hours</strong>, <strong>Out of Office</strong> and <strong>Total Hours</strong>, plus
+        <strong>Estimated Hours This Week</strong> — a quick sanity check that the week adds up before you move on.</p>
     </div>
 
     <h3>Fields when you log or edit an entry</h3>
@@ -474,6 +482,7 @@
           <tr><td>In Work Hours / Out of Hours</td><td class="desc">Logged separately — Out of Hours is what feeds the monthly out-of-hours payroll run.</td></tr>
           <tr><td>Bill In</td><td class="desc">Time &amp; Materials projects only. <span class="b b-neutral">Current</span> (default) or <span class="b b-neutral">Next</span> billing period — defers this entry to the following invoice run instead of the current one.</td></tr>
           <tr><td>Description</td><td class="desc">Free text — this is what shows up on Approvals, Invoicing, and Reports, so make it mean something to whoever reads it next.</td></tr>
+          <tr><td>Mark as approved and sent to payroll immediately</td><td class="desc">Admins only, new entries only. Skips the <a href="#approvals">Approvals</a> queue entirely — the entry is saved already approved and sent, so it's locked from the start.</td></tr>
         </tbody>
       </table>
     </div>
@@ -498,7 +507,9 @@
         that entry's project, the badge is also a link — clicking it jumps straight to that entry on the
         <a href="#flags">Entry Flags</a> page. <strong>Edit / Duplicate / Delete</strong> disappear once an entry
         is approved for payroll, sent to payroll, or invoiced — at that point it's
-        <span class="b b-neutral">Locked</span>, and the label tells you which.</p>
+        <span class="b b-neutral">Locked</span>, and the label tells you which: <em>Locked (approved)</em>,
+        <em>Locked (sent to payroll)</em> or <em>Locked (invoiced)</em>. Spotted a mistake on a locked entry? Raise
+        it with your PM or an Admin rather than logging a correcting entry.</p>
       <p>Opening an already-saved entry for editing also shows an <strong>Attachments</strong> card at the
         bottom — upload receipts, screenshots, or any other supporting file, download or delete anything already
         there. Only available once the entry exists (a brand-new, not-yet-logged entry has nowhere to attach a
@@ -515,10 +526,11 @@
       <span class="pill pill-everyone"><span class="pill-dot"></span>Everyone</span>
     </div>
     <div class="prose">
-      <p>The same entries as Log Time, laid out as a month grid — one colour per client, hours per day, a running
-        month total top right. Filter to a single client to see just their pattern. Useful for spotting a day you
-        forgot to log rather than for editing (click a day's project block to jump back to Log Time for the
-        detail).</p>
+      <p><strong>Your Calendar</strong> shows the same entries as Log Time, laid out as a month grid — one colour
+        per client, hours per day, a running month total top right. Filter to a single client to see just their
+        pattern. Click a day to open a panel underneath listing that day's entries (client, project, description,
+        W/H, O/H); click it again to close it. Useful for spotting a day you forgot to log — editing itself still
+        happens on Log Time.</p>
     </div>
   </section>
 
@@ -547,8 +559,8 @@
         include that whole dimension. <strong>Last 7 Days</strong> and <strong>Last Calendar Month</strong> fill
         the date range for you; a regular user's export is scoped to their own entries automatically, so the
         Client / Project / User filters mainly matter for a PM or Admin pulling a wider slice.</p>
-      <p>Below the entry rows, a blank line then a short summary section lists <strong>Budget Hours</strong> and
-        <strong>Hours Remaining</strong> once per project actually included in the export — the project's own
+      <p>Below the entry rows, a blank line then a short summary section lists <strong>Project Budget
+        Hours</strong> and <strong>Project Hours Remaining</strong> once per project actually included in the export — the project's own
         all-time figures, same as the badge described under <a href="#my-projects">My Projects</a>. Blank for a
         project with no Budget Hours set.</p>
     </div>
@@ -565,7 +577,8 @@
         line. <strong>+ Expense</strong> (from there, or from Log Time) logs a new one against one of your
         assigned projects with an amount, currency, and description — separate from hours. A
         <strong>Rechargeable to Client</strong> checkbox (ticked by default) controls whether it should be passed
-        on to the client or absorbed as an internal cost, editable at any time from the entry's own Edit page.
+        on to the client or absorbed as an internal cost, editable at any time from the entry's own Edit page
+        (it shows as the <strong>Billable</strong> column on the Expenses list).
         Not assigned to anything yet? The page tells you exactly who to ask and where
         (<span class="mono">Clients → a client → Projects → a project → Assignments</span>).</p>
       <p>Once an expense is logged, <strong>Save &amp; Attach</strong> (instead of <strong>Log</strong>) takes you
@@ -574,7 +587,7 @@
     </div>
     <div class="note admin-note">
       <span class="note-label">Admins only</span>
-      A second tab, <strong>Contract</strong>, logs a Contract Value instead — used only against non-invoiceable
+      A second tab, <strong>Contract (Admin only)</strong>, logs a Contract Value instead — used only against non-invoiceable
       projects, and not tied to your own project assignments the way an expense is.
     </div>
   </section>
@@ -586,18 +599,20 @@
       <span class="pill pill-pm"><span class="pill-dot"></span>Project Manager</span>
     </div>
     <div class="prose">
-      <p>Two stages, on two tabs. A PM sees entries scoped to the project(s) they manage; an Admin sees everything.</p>
+      <p>The <strong>Payroll Approvals</strong> page works in two stages, on two tabs. A PM sees entries scoped to
+        the project(s) they manage; an Admin sees everything.</p>
     </div>
     <div class="grid-2">
       <div class="cardlet">
         <h4>Approval Queue</h4>
-        <p>Every entry not yet approved for payroll. Tick the ones you're approving, choose or type a
-          <strong>Posting Batch</strong> name to group them, then <strong>Approve Selected</strong>.</p>
+        <p>Every entry not yet approved for payroll. Tick the ones you're approving, pick a
+          <strong>Posting Batch (existing)</strong> or type a <strong>New Batch Name</strong> to group them, then
+          <strong>Approve Selected</strong>. Approving is what locks each entry against further edits.</p>
       </div>
       <div class="cardlet">
         <h4>Ready for Payroll</h4>
-        <p>Approved entries waiting to be sent on. Tick, then <strong>Send Selected to Payroll</strong> — this is
-          the step that finally locks each entry against further edits.</p>
+        <p>Approved entries waiting to be sent on. Tick, then <strong>Send Selected to Payroll</strong> to hand
+          them over to payroll.</p>
       </div>
     </div>
     <div class="note tip">
@@ -656,7 +671,9 @@
     <div class="prose">
       <p>A read-only view of invoices that touch a project you manage — showing only your own project's lines from
         each one, never the whole client's invoice. If nothing's been invoiced against your project yet, the page
-        says so plainly rather than showing an empty table.</p>
+        says so plainly rather than showing an empty table. The link appears for every non-Admin, but only a
+        project's nominated manager will ever see anything on it — for everyone else it simply reads
+        "No invoices yet".</p>
     </div>
   </section>
 
@@ -668,7 +685,7 @@
     </div>
     <div class="prose">
       <p>Only appears in the nav if you're the nominated manager for at least one project (or an Admin is
-        impersonating someone who is). Lists every project you manage, each with an <strong>On Track</strong>
+        acting on someone's behalf — it then shows that person's managed projects, if any). Lists every project you manage, each with an <strong>On Track</strong>
         badge — up to two pills, <strong>Hours X%</strong> and <strong>Cost X%</strong>, showing actual logged
         hours against that project's Budget Hours and actual cost against its Fixed Fee Amount. Green under 75%,
         amber to 100%, red over. A project with neither figure set shows a plain "No budget set" badge instead of
@@ -718,17 +735,19 @@
         existing open Draft for the same client is blocked outright; finish or delete that Draft first.</li>
       <li><strong>Review the Draft</strong> — adjust a single line's discount %, or use
         <strong>Discount whole project</strong> to apply one % across every line in that project's group at once,
-        then give it an invoice number.</li>
+        then type its invoice number into the <strong>Invoice number</strong> box.</li>
       <li><strong>Finalize.</strong> The point of no return for what it covers: every Time &amp; Materials entry
         and billable expense on it becomes locked — no longer editable, duplicable or deletable — and its
         project's Fixed Fee (if any) won't be added to a future invoice again.</li>
-      <li><strong>Download PDF</strong> any time — Draft, Finalized, or Voided.</li>
+      <li><strong>Download PDF</strong> — available once an invoice is Finalized (and still available after it's
+        Voided). A Draft has no PDF yet; review it on screen.</li>
     </ol>
     <div class="note admin-note">
       <span class="note-label">Made a mistake?</span>
-      A <strong>Draft</strong> can simply be <strong>deleted</strong> — nothing on it was ever locked, so nothing
-      needs unwinding. A <strong>Finalized</strong> invoice is instead <strong>Voided</strong>, with an optional
-      typed reason: its record, real invoice number, and PDF all stay permanently (a correction trail, not an
+      A <strong>Draft</strong> can simply be removed with <strong>Delete Draft</strong> — nothing on it was ever
+      locked, so nothing needs unwinding. A <strong>Finalized</strong> invoice is instead voided with
+      <strong>Void Invoice</strong>, with an optional typed <strong>Reason</strong>; both ask you to confirm first.
+      A voided invoice shows who voided it, when, and why. Its record, real invoice number, and PDF all stay permanently (a correction trail, not an
       erasure) — that number can never be reused — and every entry, expense, and Fixed Fee it had locked becomes
       invoiceable again on the next Draft.
     </div>
@@ -748,16 +767,18 @@
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <div class="prose">
-      <p>Pick a report, optionally narrow to one client, choose a range, <strong>Run</strong>. Twelve report
-        types, on four axes:</p>
+      <p>Pick a report, pick its <strong>Client</strong> (always required) and, for a project-scoped report, its
+        <strong>Project</strong> too, then choose a range — <strong>Last 7 Days</strong>, <strong>Last
+        Month</strong>, <strong>Last Year</strong> or <strong>Custom</strong> — and <strong>Run</strong>. Twelve
+        report types, on four axes:</p>
     </div>
     <div class="table-scroll">
       <table class="field-table">
         <thead><tr><th>Measure</th><th>By Client</th><th>By Project</th><th>By Role</th><th>By Team</th></tr></thead>
         <tbody>
           <tr><td>Time</td><td class="desc">Time on Client</td><td class="desc">Time on Project</td><td class="desc">Time on Project (by Role)</td><td class="desc">Time on Project (by Team)</td></tr>
-          <tr><td>Cost to Business</td><td class="desc">Cost on Client</td><td class="desc">Cost on Project</td><td class="desc">Cost on Project (by Role)</td><td class="desc">Cost on Project (by Team)</td></tr>
-          <tr><td>Profit to Business</td><td class="desc">Profit on Client</td><td class="desc">Profit on Project</td><td class="desc">Profit on Project (by Role)</td><td class="desc">Profit on Project (by Team)</td></tr>
+          <tr><td>Cost to Business</td><td class="desc">Cost to Business on Client</td><td class="desc">Cost to Business on Project</td><td class="desc">Cost to Business on Project (by Role)</td><td class="desc">Cost to Business on Project (by Team)</td></tr>
+          <tr><td>Profit to Business</td><td class="desc">Profit to Business on Client</td><td class="desc">Profit to Business on Project</td><td class="desc">Profit to Business on Project (by Role)</td><td class="desc">Profit to Business on Project (by Team)</td></tr>
         </tbody>
       </table>
     </div>
@@ -781,7 +802,7 @@
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <div class="prose">
-      <p>Eight screens under the <strong>Admin ▾</strong> menu, top right — the one-time setup work rather than
+      <p>Eight screens under the <strong>Admin ▾</strong> menu, the last item in the main nav bar — the one-time setup work rather than
         day-to-day workflow, which is why they're tucked away from the main nav.</p>
     </div>
     <div class="registry">
@@ -791,7 +812,7 @@
       </div>
       <div class="registry-row">
         <div class="name">Projects</div>
-        <div class="desc">Per client. Payment model (Time &amp; Materials / Fixed Cost), budget hours, project manager, Can Invoice flag, staff Assignments, Entry Types, and a Documents card for uploading supporting files (contracts, statements of work, anything worth keeping alongside the project). A separate <strong>Cost Exempt</strong> flag marks a project as pure internal hour-tracking (e.g. Training) — time logged against it carries no cost to the business, and staff can log hours there without needing a cost rate configured at all. The project list itself carries the same <strong>On Track</strong> badge and <strong>Breakdown</strong> link described under <a href="#my-projects">My Projects</a>, for every project, not just ones you manage. Opening a project's own Edit page adds two more panels below the form: <strong>Budget &amp; Cost Status</strong> (the same hours/cost-vs-budget figures as the badge, as two progress bars) and <strong>Estimated Cost / Profit</strong> — a forward-looking estimate, split both <strong>by role</strong> and <strong>by user</strong>, of what the project's Budget Hours will cost and earn once fully consumed, based on each assignee's allocated share of it.</div>
+        <div class="desc">Per client; open one from the list with <strong>Edit / Rates</strong>. Payment model (Time &amp; Materials / Fixed Project Cost — shown as "Fixed Cost" on the list), budget hours, project manager, Can Invoice flag, staff Assignments, Entry Types, and a Documents card for uploading supporting files (contracts, statements of work, anything worth keeping alongside the project). A separate <strong>Cost Exempt</strong> flag marks a project as pure internal hour-tracking (e.g. Training) — time logged against it carries no cost to the business, and staff can log hours there without needing a cost rate configured at all. The project list itself carries the same <strong>On Track</strong> badge and <strong>Breakdown</strong> link described under <a href="#my-projects">My Projects</a>, for every project, not just ones you manage. Opening a project's own Edit page adds two more panels below the form: <strong>Budget &amp; Cost Status</strong> (the same hours/cost-vs-budget figures as the badge, as progress bars — the cost bar only when a Fixed Fee Amount is set — with a <strong>View Breakdown</strong> link) and <strong>Estimated Cost / Profit</strong> — a forward-looking estimate, split both <strong>by role</strong> and <strong>by user</strong>, of what the project's Budget Hours will cost and earn once fully consumed, based on each assignee's allocated share of it.</div>
       </div>
       <div class="registry-row">
         <div class="name">Rate Cards</div>
@@ -803,7 +824,7 @@
       </div>
       <div class="registry-row">
         <div class="name">Staff</div>
-        <div class="desc">Invite, deactivate, promote to Admin, force a password reset, edit payroll number, and — per person — every project assignment with its resolved rate and where that rate came from. A Team can be set alongside Job Role — filterable and reportable the same way, but purely a grouping with no billing significance of its own.</div>
+        <div class="desc">Invite (including <strong>Find in tenant directory</strong> to look someone up in SVG IT's Microsoft directory), deactivate, promote to Admin, force a password reset, edit payroll number, and — per person — their <strong>Cost History</strong> (<strong>Hourly Cost</strong> and <strong>Out of Hours Cost</strong>, effective-dated; <strong>Add Cost</strong> starts a new one) plus every project assignment with its resolved rate and where that rate came from. A Team can be set alongside Job Role — filterable and reportable the same way, but purely a grouping with no billing significance of its own.</div>
       </div>
       <div class="registry-row">
         <div class="name">Teams</div>
@@ -811,7 +832,7 @@
       </div>
       <div class="registry-row">
         <div class="name">Settings</div>
-        <div class="desc">Base reporting currency, default invoice month-end day, and the two firm-wide project budget-consumption thresholds that trigger a notification.</div>
+        <div class="desc">Base reporting currency, default invoice month-end day, and the two firm-wide project budget-consumption thresholds that trigger a notification — <strong>Warning Threshold (%)</strong> and <strong>Alert Threshold (%)</strong>.</div>
       </div>
       <div class="registry-row">
         <div class="name">Audit Log</div>
@@ -844,7 +865,7 @@
       <dt>On Track badge</dt>
       <dd>A project's actual hours/cost measured against its Budget Hours/Fixed Fee Amount — green under 75%, amber to 100%, red over, or "No budget set" if neither figure is configured. Purely visual; unrelated to the Settings-configurable thresholds that trigger a budget notification. See <a href="#my-projects">My Projects</a>.</dd>
       <dt>Resolved Rate</dt>
-      <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a person-specific override, then a project-specific rate, then a client-specific rate, then the role's plain default. A later rate change never retroactively touches an entry already logged.</dd>
+      <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a rate for that person on that project, then for that person at that client, then for their role on that project, then for their role at that client, then the role's plain default. A later rate change never retroactively touches an entry already logged.</dd>
     </dl>
   </section>
 
