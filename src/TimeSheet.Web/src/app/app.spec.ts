@@ -31,11 +31,13 @@ describe('App', () => {
     expect(app).toBeTruthy();
   });
 
-  it('should render the signed-out shell with a Sign in link', async () => {
+  it('should render the signed-out shell with a Sign in link and no app nav links', async () => {
     const fixture = TestBed.createComponent(App);
     fixture.detectChanges();
     await fixture.whenStable();
     const compiled = fixture.nativeElement as HTMLElement;
     expect(compiled.textContent).toContain('Sign in');
+    const navLinks = Array.from(compiled.querySelectorAll('nav a.nav-link')).map((a) => a.textContent?.trim());
+    expect(navLinks).toEqual([]);
   });
 });

@@ -7,57 +7,59 @@
           <span class="h-4 w-px bg-border"></span>
           TimeSheet
         </a>
-        <a routerLink="/timesheet" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">Log Time</a>
-        <a routerLink="/timesheet/calendar" routerLinkActive="nav-link-active" class="nav-link">Calendar</a>
-        <a routerLink="/timesheet/my-overview" routerLinkActive="nav-link-active" class="nav-link">Your Overview</a>
-        <a routerLink="/expenses" routerLinkActive="nav-link-active" class="nav-link">Expenses</a>
-        <a routerLink="/export" routerLinkActive="nav-link-active" class="nav-link">Export</a>
-
-        @if (currentUser.isAdmin() || currentUser.isProjectManager()) {
-          <a routerLink="/admin/approvals" routerLinkActive="nav-link-active" class="nav-link">Approvals</a>
-          <a routerLink="/admin/entry-flags" routerLinkActive="nav-link-active" class="nav-link">Entry Flags</a>
-        }
-        @if (!currentUser.isAdmin()) {
-          <a routerLink="/my-invoices" routerLinkActive="nav-link-active" class="nav-link">My Invoices</a>
-        }
-        @if ((currentUser.isProjectManager() && !currentUser.isAdmin()) || impersonation.actingAs()) {
-          <a routerLink="/my-projects" routerLinkActive="nav-link-active" class="nav-link">My Projects</a>
-        }
-        @if (currentUser.isAdmin()) {
-          <a routerLink="/admin/payroll-periods" routerLinkActive="nav-link-active" class="nav-link">Payroll Periods</a>
-          <a routerLink="/admin/invoicing" routerLinkActive="nav-link-active" class="nav-link">Invoicing</a>
-          <a routerLink="/admin/reports" routerLinkActive="nav-link-active" class="nav-link">Reports</a>
-
-          <div class="relative" data-dropdown="admin">
-            <button
-              class="nav-link flex items-center gap-1"
-              [class.nav-link-active]="isAdminSectionActive()"
-              (click)="showAdminMenu.set(!showAdminMenu())"
-              aria-haspopup="true"
-              [attr.aria-expanded]="showAdminMenu()"
-              aria-label="Admin configuration menu"
-            >
-              Admin
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-              </svg>
-            </button>
-
-            @if (showAdminMenu()) {
-              <div class="card absolute left-0 z-10 mt-2 w-56 p-2">
-                <div class="flex flex-col gap-0.5">
-                  <a routerLink="/admin/audit-log" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Audit Log</a>
-                  <a routerLink="/admin/clients" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Clients</a>
-                  <a routerLink="/admin/projects" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Projects</a>
-                  <a routerLink="/admin/rate-cards" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Rate Cards</a>
-                  <a routerLink="/admin/roles" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Roles</a>
-                  <a routerLink="/admin/settings" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Settings</a>
-                  <a routerLink="/admin/users" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Staff</a>
-                  <a routerLink="/admin/teams" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Teams</a>
+        @if (currentUser.isSignedIn()) {
+          <a routerLink="/timesheet" routerLinkActive="nav-link-active" [routerLinkActiveOptions]="{ exact: false }" class="nav-link">Log Time</a>
+          <a routerLink="/timesheet/calendar" routerLinkActive="nav-link-active" class="nav-link">Calendar</a>
+          <a routerLink="/timesheet/my-overview" routerLinkActive="nav-link-active" class="nav-link">Your Overview</a>
+          <a routerLink="/expenses" routerLinkActive="nav-link-active" class="nav-link">Expenses</a>
+          <a routerLink="/export" routerLinkActive="nav-link-active" class="nav-link">Export</a>
+  
+          @if (currentUser.isAdmin() || currentUser.isProjectManager()) {
+            <a routerLink="/admin/approvals" routerLinkActive="nav-link-active" class="nav-link">Approvals</a>
+            <a routerLink="/admin/entry-flags" routerLinkActive="nav-link-active" class="nav-link">Entry Flags</a>
+          }
+          @if (!currentUser.isAdmin()) {
+            <a routerLink="/my-invoices" routerLinkActive="nav-link-active" class="nav-link">My Invoices</a>
+          }
+          @if ((currentUser.isProjectManager() && !currentUser.isAdmin()) || impersonation.actingAs()) {
+            <a routerLink="/my-projects" routerLinkActive="nav-link-active" class="nav-link">My Projects</a>
+          }
+          @if (currentUser.isAdmin()) {
+            <a routerLink="/admin/payroll-periods" routerLinkActive="nav-link-active" class="nav-link">Payroll Periods</a>
+            <a routerLink="/admin/invoicing" routerLinkActive="nav-link-active" class="nav-link">Invoicing</a>
+            <a routerLink="/admin/reports" routerLinkActive="nav-link-active" class="nav-link">Reports</a>
+  
+            <div class="relative" data-dropdown="admin">
+              <button
+                class="nav-link flex items-center gap-1"
+                [class.nav-link-active]="isAdminSectionActive()"
+                (click)="showAdminMenu.set(!showAdminMenu())"
+                aria-haspopup="true"
+                [attr.aria-expanded]="showAdminMenu()"
+                aria-label="Admin configuration menu"
+              >
+                Admin
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="h-3.5 w-3.5" aria-hidden="true">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                </svg>
+              </button>
+  
+              @if (showAdminMenu()) {
+                <div class="card absolute left-0 z-10 mt-2 w-56 p-2">
+                  <div class="flex flex-col gap-0.5">
+                    <a routerLink="/admin/audit-log" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Audit Log</a>
+                    <a routerLink="/admin/clients" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Clients</a>
+                    <a routerLink="/admin/projects" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Projects</a>
+                    <a routerLink="/admin/rate-cards" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Rate Cards</a>
+                    <a routerLink="/admin/roles" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Roles</a>
+                    <a routerLink="/admin/settings" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Settings</a>
+                    <a routerLink="/admin/users" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Staff</a>
+                    <a routerLink="/admin/teams" routerLinkActive="nav-link-active" class="nav-link" (click)="showAdminMenu.set(false)">Teams</a>
+                  </div>
                 </div>
-              </div>
-            }
-          </div>
+              }
+            </div>
+          }
         }
       </nav>
 
