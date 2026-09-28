@@ -38,6 +38,17 @@ export class ReportsPage {
   protected readonly report = signal<ReportEnvelope | null>(null);
   protected readonly error = signal<string | null>(null);
 
+  // Fixed Fee revenue is recognized once for the whole project (ReportingService puts it in the summary's
+  // Billed) and never split per user/role/team, so each breakdown row arrives as Billed 0 / Profit -Cost - which
+  // reads as a loss. Captured when Run is clicked, so changing the dropdowns afterwards can't relabel an
+  // already-displayed report.
+  protected readonly fixedFeeRowsBlanked = signal(false);
+  private static readonly FIXED_FEE_BLANKED_COLUMNS = new Set(['billed', 'profit']);
+
+  protected isBlankedCell(col: string): boolean {
+    return this.fixedFeeRowsBlanked() && ReportsPage.FIXED_FEE_BLANKED_COLUMNS.has(col);
+  }
+
   protected readonly breakdownColumns = computed(() => {
     const first = this.report()?.breakdown?.[0];
     return first ? Object.keys(first) : [];
@@ -74,10 +85,17 @@ export class ReportsPage {
     }
 
     this.error.set(null);
+    const project = this.projects().find((p) => p.id === this.selectedProjectId());
+    const blankRows = this.reportType().startsWith('profit-on-project')
+      && project?.paymentModel === 'FixedProjectCost'
+      && project.canInvoice === true;
     this.reportsService
       .get(this.reportType(), scope, { preset: this.rangePreset(), startDate: this.startDate(), endDate: this.endDate() })
       .subscribe({
-        next: (r) => this.report.set(r),
+        next: (r) => {
+          this.fixedFeeRowsBlanked.set(blankRows);
+          this.report.set(r);
+        },
         error: (err) => this.error.set(err?.error?.error ?? 'Could not run the report.'),
       });
   }

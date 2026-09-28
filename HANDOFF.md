@@ -46,8 +46,9 @@ before). Chrome was **not connected** this session, so there was no live browser
   populated DB (the bootstrap endpoint just 403s). Fixing it properly needs an anonymous "is bootstrap
   available" endpoint whitelisted in `CurrentUserMiddleware`; that edit was **blocked by this session's safety
   classifier** (auth-middleware change). First-time setup on an empty DB now goes to `/bootstrap-local` directly by URL.
-- **Known demo caveat, not changed**: Profit reports' per-user/role/team rows show Billed 0 / negative Profit on
-  Fixed Fee projects by design (revenue is recognized once, in the summary) - the summary totals are correct.
+- **Fixed later the same session**: Profit reports' per-user/role/team rows showed Billed 0 / negative Profit on
+  Fixed Fee projects (revenue is recognized once, in the summary). `reports-page` now shows "—" for Billed/Profit
+  on those rows plus a one-line note, only for an invoiceable Fixed Fee project; backend unchanged.
 
 ## Done last in this session, 2026-09-11 — a UI polish sweep, honestly reported: found the app already in good shape
 

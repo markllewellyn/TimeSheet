@@ -83,6 +83,13 @@
       </div>
     </div>
 
+    @if (fixedFeeRowsBlanked()) {
+      <p class="text-sm text-muted-foreground">
+        Fixed Fee project - revenue is recognized for the whole project (see Billed in the summary above), not per
+        row, so Billed and Profit are left blank below.
+      </p>
+    }
+
     <div class="card overflow-hidden px-4">
       <table class="table-clean">
         <thead>
@@ -96,7 +103,7 @@
           @for (row of r.breakdown; track $index) {
             <tr>
               @for (col of breakdownColumns(); track col) {
-                <td>{{ row[col] }}</td>
+                <td>{{ isBlankedCell(col) ? '—' : row[col] }}</td>
               }
             </tr>
           }
