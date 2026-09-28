@@ -35,8 +35,7 @@
       </div>
     </div>
 
-    <p class="mt-6 text-center text-xs text-muted-foreground">
-      First time setting this up? <a routerLink="/bootstrap-local" class="btn-link">Create the first Admin account</a>
-    </p>
+    <!-- No "create the first Admin" link here: it only works on an empty database, and this page can't tell
+         (there's no anonymous bootstrap-status endpoint). First-time setup goes to /bootstrap-local directly. -->
   </div>
 </div>

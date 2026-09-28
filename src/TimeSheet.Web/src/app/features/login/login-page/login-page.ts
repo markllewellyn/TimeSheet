@@ -1,6 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { environment } from '../../../../environments/environment';
 import { CurrentUserService } from '../../../core/auth/current-user.service';
 import { LocalAuthService } from '../../../core/auth/local-auth.service';
@@ -22,7 +22,7 @@ const ERROR_MESSAGES: Record<string, string> = {
 @Component({
   selector: 'app-login-page',
   standalone: true,
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule],
   templateUrl: './login-page.html',
 })
 export class LoginPage {

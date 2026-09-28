@@ -42,10 +42,10 @@ before). Chrome was **not connected** this session, so there was no live browser
   asserts no nav links when signed out. (2) Project Detail Breakdown's By Staff table showed Revenue 0.00 and a
   negative Profit per person on a Fixed Fee project (reads as a loss) - now "—" whenever
   `recognizedRevenueToDate` is set, matching what the handbook already claimed.
-- **Not done - needs a decision**: the login page always offers "Create the first Admin account" even on a
+- **Login-page "Create the first Admin account" link removed** (user chose this over a backend fix): it always showed, even on a
   populated DB (the bootstrap endpoint just 403s). Fixing it properly needs an anonymous "is bootstrap
   available" endpoint whitelisted in `CurrentUserMiddleware`; that edit was **blocked by this session's safety
-  classifier** (auth-middleware change), so it was left for the user rather than worked around.
+  classifier** (auth-middleware change). First-time setup on an empty DB now goes to `/bootstrap-local` directly by URL.
 - **Known demo caveat, not changed**: Profit reports' per-user/role/team rows show Billed 0 / negative Profit on
   Fixed Fee projects by design (revenue is recognized once, in the summary) - the summary totals are correct.
 
