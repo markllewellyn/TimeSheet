@@ -33,8 +33,21 @@ before). Chrome was **not connected** this session, so there was no live browser
   sent to payroll immediately" checkbox, Delete Draft / Void Invoice / Reason, View Breakdown, Edit / Rates,
   Fixed Project Cost, Staff Cost History + Find in tenant directory, Settings threshold names, CSV header names,
   Billable column, My Invoices/My Projects nav visibility, Admin menu location.
-- **Still to do before/at the demo**: a live click-through (Chrome not connected) - especially the new
-  "Locked (approved)" label on an approved-but-unsent entry, and the reworded Project Edit hint.
+- **Live click-through done later the same session** (Chrome connected, signed in as Admin by the user): all
+  23 main routes load with no console errors or error banners; "Locked (approved)" confirmed on entry 24 (and
+  "Locked (sent to payroll)" still on entry 22); the Project Edit hint renders with its Rate Cards link; a real
+  Profit-by-Team report run for ERP Migration Phase 2 returned correct figures.
+- **Two more fixes from that walk**: (1) the header nav links (Log Time, Calendar, ...) showed while signed out -
+  now behind `currentUser.isSignedIn()`, the same check the right-hand header side already used; `app.spec.ts`
+  asserts no nav links when signed out. (2) Project Detail Breakdown's By Staff table showed Revenue 0.00 and a
+  negative Profit per person on a Fixed Fee project (reads as a loss) - now "—" whenever
+  `recognizedRevenueToDate` is set, matching what the handbook already claimed.
+- **Not done - needs a decision**: the login page always offers "Create the first Admin account" even on a
+  populated DB (the bootstrap endpoint just 403s). Fixing it properly needs an anonymous "is bootstrap
+  available" endpoint whitelisted in `CurrentUserMiddleware`; that edit was **blocked by this session's safety
+  classifier** (auth-middleware change), so it was left for the user rather than worked around.
+- **Known demo caveat, not changed**: Profit reports' per-user/role/team rows show Billed 0 / negative Profit on
+  Fixed Fee projects by design (revenue is recognized once, in the summary) - the summary totals are correct.
 
 ## Done last in this session, 2026-09-11 — a UI polish sweep, honestly reported: found the app already in good shape
 
