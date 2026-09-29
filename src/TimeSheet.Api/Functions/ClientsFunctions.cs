@@ -158,6 +158,25 @@ public class ClientsFunctions(
         return new NoContentResult();
     }
 
+    /// <summary>The undo for Clients_Deactivate - without it a deactivated client could never be brought back
+    /// (Clients_Update doesn't touch IsActive), and an inactive client drops out of the Reports client list.</summary>
+    [Function("Clients_Reactivate")]
+    public async Task<IActionResult> Reactivate(
+        [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "clients/{id:int}/reactivate")] HttpRequest req, int id, CancellationToken ct)
+    {
+        if (currentUser.RequireAdmin() is { } forbidden) return forbidden;
+
+        var client = await clients.GetByIdAsync(id, ct);
+        if (client is null) return new NotFoundResult();
+
+        client.IsActive = true;
+        client.ModifiedUtc = DateTimeOffset.UtcNow;
+        client.ModifiedByUserId = currentUser.RequireUser().UserId;
+        clients.Update(client);
+        await uow.SaveChangesAsync(ct);
+        return new NoContentResult();
+    }
+
     /// <summary>Client.Name/AccountCode are backed by legacy fixed-width columns (40/50 chars - see
     /// ClientConfiguration) that would otherwise surface as a raw DB truncation error; CurrencyId, if supplied,
     /// must reference a real Currency row rather than silently creating a dangling FK.</summary>

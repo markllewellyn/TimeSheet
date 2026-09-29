@@ -45,6 +45,8 @@
                 <a [routerLink]="['/admin/clients', c.id, 'projects']" class="btn-link mr-3">Projects</a>
                 @if (c.isActive) {
                   <button class="btn-link text-[var(--destructive)]" (click)="deactivate(c)">Deactivate</button>
+                } @else {
+                  <button class="btn-link" (click)="reactivate(c)">Reactivate</button>
                 }
               </td>
             </tr>

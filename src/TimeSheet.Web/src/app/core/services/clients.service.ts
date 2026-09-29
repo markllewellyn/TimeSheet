@@ -48,4 +48,8 @@ export class ClientsService {
   deactivate(id: number): Observable<void> {
     return this.http.post<void>(`${this.baseUrl}/${id}/deactivate`, {});
   }
+
+  reactivate(id: number): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/${id}/reactivate`, {});
+  }
 }

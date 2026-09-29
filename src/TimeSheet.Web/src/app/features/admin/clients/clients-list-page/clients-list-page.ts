@@ -36,4 +36,10 @@ export class ClientsListPage {
     if (!confirmed) return;
     this.clientsService.deactivate(client.id).subscribe(() => this.refresh());
   }
+
+  protected async reactivate(client: Client): Promise<void> {
+    const confirmed = await this.confirmService.confirm(`Reactivate ${client.name}?`, { confirmLabel: 'Reactivate' });
+    if (!confirmed) return;
+    this.clientsService.reactivate(client.id).subscribe(() => this.refresh());
+  }
 }

@@ -4,6 +4,30 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done in this session, 2026-09-29 (demo day, before the demo) — Reactivate a client
+
+Found live by the user: a client (Priya's POS Rollout project's client) was missing from the Reports client picker.
+Cause: the client was inactive - Reports lists active clients only - and there was **no way to reactivate** a
+client at all (`Clients_Deactivate` existed; `Clients_Update` never touches `IsActive`; the list page showed no
+button for inactive rows).
+
+- New `Clients_Reactivate` (`POST clients/{id}/reactivate`, Admin-only, mirrors `Clients_Deactivate` exactly -
+  neither writes an AuditLog row). **Reactivate** button (with confirm) on inactive rows in Admin → Clients.
+- New `tests/TimeSheet.Api.Tests/ClientsFunctionsTests.cs` (3 tests: admin reactivates + client reappears in
+  the active list; non-admin refused; unknown id 404). `dotnet test` 73/73, `ng build` clean, API host restarted
+  and `Clients_Reactivate` confirmed registered (401 unauthenticated). Handbook's Clients row updated.
+- Not live-clicked by me (Chrome not connected) - the user is reactivating the real client themselves.
+
+**Post-demo backlog raised today, not started (user's call):**
+- **Fixed Fee per-row revenue attribution** (the follow-up below) - planned, deliberately held until after the demo.
+- **Reports can't report on an inactive client** - `reports-page.ts` calls `clientsService.list()` (active only).
+  Possible fix: a "Show inactive clients" toggle.
+- **Time can still be logged against an inactive client** if the person's project assignment is active. Decide
+  whether deactivating a client should block that.
+- **Fixed Fee recognized revenue isn't capped** at `FixedFeeAmount` once hours pass `BudgetHours`
+  (`RevenueRecognitionService`).
+- **Expenses have no approval step** (not in the FDD either) - a new feature if wanted.
+
 ## Done in this session, 2026-09-28 — pre-demo check: tests, handbook audit, one real locking bug
 
 User has a demo on 2026-09-29. Dev stack restarted fresh (Azurite, `func start`, `npm start` - same commands as
