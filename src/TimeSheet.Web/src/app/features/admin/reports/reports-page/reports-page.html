@@ -29,7 +29,7 @@
       <select class="input" [ngModel]="selectedClientId()" (ngModelChange)="onClientChange($event)">
         <option [ngValue]="null" disabled>Select a client</option>
         @for (c of clients(); track c.id) {
-          <option [ngValue]="c.id">{{ c.name }}</option>
+          <option [ngValue]="c.id">{{ c.name }}{{ c.isActive ? '' : ' (inactive)' }}</option>
         }
       </select>
     </label>
@@ -40,7 +40,7 @@
         <select class="input" [ngModel]="selectedProjectId()" (ngModelChange)="selectedProjectId.set($event)">
           <option [ngValue]="null" disabled>Select a project</option>
           @for (p of projects(); track p.id) {
-            <option [ngValue]="p.id">{{ p.name }}</option>
+            <option [ngValue]="p.id">{{ p.name }}{{ p.isActive ? '' : ' (inactive)' }}</option>
           }
         </select>
       </label>
@@ -66,6 +66,11 @@
         <input type="date" class="input" [ngModel]="endDate()" (ngModelChange)="endDate.set($event)" />
       </label>
     }
+
+    <label class="flex items-center gap-1.5 pb-2 text-sm">
+      <input type="checkbox" [checked]="showInactive()" (change)="toggleShowInactive()" />
+      Show inactive clients
+    </label>
 
     <button class="btn-primary" (click)="run()">Run</button>
   </div>

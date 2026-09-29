@@ -90,7 +90,7 @@ Periods has June and July rows, not just August:
 
 **Post-demo backlog raised today, not started (user's call):**
 - ~~**Fixed Fee per-row revenue attribution**~~ - **done after the demo, same day** (see the entry at the top).
-- **Reports can't report on an inactive client** - `reports-page.ts` calls `clientsService.list()` (active only).
+- ~~**Reports can't report on an inactive client**~~ **done after the demo, same day**: a "Show inactive clients" tick box on Reports (UI-only; adds inactive clients and their inactive projects, labelled "(inactive)") - `reports-page.ts` calls `clientsService.list()` (active only).
   Possible fix: a "Show inactive clients" toggle.
 - **Time can still be logged against an inactive client** if the person's project assignment is active. Decide
   whether deactivating a client should block that.

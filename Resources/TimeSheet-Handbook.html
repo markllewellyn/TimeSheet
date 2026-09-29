@@ -775,8 +775,10 @@
     <div class="prose">
       <p>Pick a report, pick its <strong>Client</strong> (always required) and, for a project-scoped report, its
         <strong>Project</strong> too, then choose a range — <strong>Last 7 Days</strong>, <strong>Last
-        Month</strong>, <strong>Last Year</strong> or <strong>Custom</strong> — and <strong>Run</strong>. Twelve
-        report types, on four axes:</p>
+        Month</strong>, <strong>Last Year</strong> or <strong>Custom</strong> — and <strong>Run</strong>. Only
+        active clients and projects are listed until you tick <strong>Show inactive clients</strong>, which adds
+        deactivated clients and their inactive projects (marked "(inactive)") so you can still report on past
+        work. Twelve report types, on four axes:</p>
     </div>
     <div class="table-scroll">
       <table class="field-table">
@@ -818,7 +820,7 @@
     <div class="registry">
       <div class="registry-row">
         <div class="name">Clients</div>
-        <div class="desc">Client records, reporting currency, billing period (One-off / Monthly), rate overrides for a specific person at that client. <strong>Deactivate</strong> / <strong>Reactivate</strong> from the list — an inactive client is left out of the Reports client picker, so reactivate it to report on it.</div>
+        <div class="desc">Client records, reporting currency, billing period (One-off / Monthly), rate overrides for a specific person at that client. <strong>Deactivate</strong> / <strong>Reactivate</strong> from the list — an inactive client is hidden from the Reports client picker unless <strong>Show inactive clients</strong> is ticked there.</div>
       </div>
       <div class="registry-row">
         <div class="name">Projects</div>

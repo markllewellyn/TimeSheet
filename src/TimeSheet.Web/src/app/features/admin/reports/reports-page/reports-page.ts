@@ -54,14 +54,43 @@ export class ReportsPage {
     return key.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
   }
 
+  // Off by default so the picker stays short; on, it lets you report on past work for a deactivated client (and
+  // its inactive projects - a finished client's projects have usually been closed too).
+  protected readonly showInactive = signal(false);
+
   constructor() {
-    this.clientsService.list().subscribe((clients) => this.clients.set(clients));
+    this.loadClients();
+  }
+
+  protected toggleShowInactive(): void {
+    this.showInactive.update((v) => !v);
+    const selected = this.clients().find((c) => c.id === this.selectedClientId());
+    if (!this.showInactive() && selected && !selected.isActive) {
+      this.selectedClientId.set(null);
+      this.selectedProjectId.set(null);
+      this.projects.set([]);
+    } else if (this.selectedClientId() !== null) {
+      this.loadProjects(this.selectedClientId()!);
+    }
+    this.loadClients();
   }
 
   protected onClientChange(clientId: number): void {
     this.selectedClientId.set(clientId);
     this.selectedProjectId.set(null);
-    this.projectsAdmin.listByClient(clientId, false).subscribe((projects) => this.projects.set(projects));
+    this.loadProjects(clientId);
+  }
+
+  private loadClients(): void {
+    this.clientsService.list(this.showInactive()).subscribe((clients) => this.clients.set(clients));
+  }
+
+  private loadProjects(clientId: number): void {
+    this.projectsAdmin.listByClient(clientId, this.showInactive()).subscribe((projects) => {
+      this.projects.set(projects);
+      // Unticking can drop the chosen project from the list - don't leave a hidden project selected.
+      if (!projects.some((p) => p.id === this.selectedProjectId())) this.selectedProjectId.set(null);
+    });
   }
 
   protected run(): void {
