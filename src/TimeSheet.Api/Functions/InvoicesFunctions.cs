@@ -12,12 +12,15 @@ namespace TimeSheet.Api.Functions;
 /// <summary>Generating/finalizing/browsing-by-client is Admin-only - a billing action. The one exception is
 /// Invoices_ListForProjectManager, a read-only view scoped to a project manager's own project(s) - see
 /// AuthorizationExtensions.RequireAdminOrProjectManager and the FDD's "project managers can view the staged
-/// invoice for their projects".</summary>
+/// invoice for their projects".
+/// Every mutating action writes an AuditLog row. IAuditLogService.LogAsync only stages the row, so each one is
+/// followed by its own uow.SaveChangesAsync - without it (as before 2026-09-29) the row was silently dropped.</summary>
 public class InvoicesFunctions(
     IInvoiceRepository invoiceRepository,
     IProjectRepository projectRepository,
     IInvoicingService invoicing,
     IAuditLogService auditLog,
+    IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
     [Function("Invoices_ListForProjectManager")]
@@ -65,6 +68,8 @@ public class InvoicesFunctions(
         try
         {
             var invoice = await invoicing.GenerateDraftInvoiceAsync(clientId, body.PeriodStart, body.PeriodEnd, body.ManualExchangeRate, ct);
+            await LogAndSaveAsync("Invoice.DraftGenerated", invoice.Id,
+                $"{body.PeriodStart:yyyy-MM-dd} to {body.PeriodEnd:yyyy-MM-dd}, client {clientId}, total {invoice.TotalAmount:0.00} {invoice.ReportingCurrency}", ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -86,6 +91,8 @@ public class InvoicesFunctions(
         try
         {
             var invoice = await invoicing.FinalizeInvoiceAsync(id, body.InvoiceNumber, currentUser.RequireUser().UserId, ct);
+            await LogAndSaveAsync("Invoice.Finalized", id,
+                $"invoice number {invoice.InvoiceNumber}, total {invoice.TotalAmount:0.00} {invoice.ReportingCurrency}", ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -104,9 +111,15 @@ public class InvoicesFunctions(
         var body = await req.ReadFromJsonAsync<ApplyLineItemDiscountRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        // Captured before the change so the audit row can show old -> new (the service overwrites it in place).
+        var before = await invoiceRepository.GetByIdAsync(id, ct);
+        var previous = before?.LineItems.FirstOrDefault(l => l.Id == lineItemId)?.DiscountPercent;
+
         try
         {
             var invoice = await invoicing.ApplyLineItemDiscountAsync(id, lineItemId, body.DiscountPercent, ct);
+            await LogAndSaveAsync("Invoice.LineDiscountChanged", id,
+                $"line {lineItemId}: {FormatDiscount(previous)} -> {FormatDiscount(body.DiscountPercent)}, new total {invoice.TotalAmount:0.00}", ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -128,9 +141,15 @@ public class InvoicesFunctions(
         var body = await req.ReadFromJsonAsync<ApplyLineItemDiscountRequest>(ct)
             ?? throw new BadHttpRequestException("Missing request body.");
 
+        var before = await invoiceRepository.GetByIdAsync(id, ct);
+        var previous = before?.LineItems.Where(l => l.ProjectId == projectId).Select(l => l.DiscountPercent).Distinct().ToList() ?? [];
+        var previousText = previous.Count == 1 ? FormatDiscount(previous[0]) : "mixed";
+
         try
         {
             var invoice = await invoicing.ApplyProjectDiscountAsync(id, projectId, body.DiscountPercent, ct);
+            await LogAndSaveAsync("Invoice.ProjectDiscountChanged", id,
+                $"project {projectId}: {previousText} -> {FormatDiscount(body.DiscountPercent)}, new total {invoice.TotalAmount:0.00}", ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -153,8 +172,8 @@ public class InvoicesFunctions(
         try
         {
             await invoicing.DeleteDraftAsync(id, ct);
-            await auditLog.LogAsync(currentUser.RequireUser(), "Invoice.DraftDeleted", "Invoice", id,
-                $"{invoice.PeriodStart:yyyy-MM-dd} to {invoice.PeriodEnd:yyyy-MM-dd}, client {invoice.ClientId}", null, ct);
+            await LogAndSaveAsync("Invoice.DraftDeleted", id,
+                $"{invoice.PeriodStart:yyyy-MM-dd} to {invoice.PeriodEnd:yyyy-MM-dd}, client {invoice.ClientId}", ct);
             return new NoContentResult();
         }
         catch (InvalidOperationException ex)
@@ -177,7 +196,7 @@ public class InvoicesFunctions(
         try
         {
             var invoice = await invoicing.VoidInvoiceAsync(id, body.Reason, user.UserId, user.DisplayName, ct);
-            await auditLog.LogAsync(user, "Invoice.Voided", "Invoice", id, body.Reason, null, ct);
+            await LogAndSaveAsync("Invoice.Voided", id, body.Reason, ct);
             var full = await invoiceRepository.GetByIdAsync(invoice.Id, ct);
             return new OkObjectResult(ToDto(full!, full!.Client?.Name ?? ""));
         }
@@ -203,6 +222,14 @@ public class InvoicesFunctions(
             return new BadRequestObjectResult(new { error = ex.Message });
         }
     }
+
+    private async Task LogAndSaveAsync(string action, int invoiceId, string? details, CancellationToken ct)
+    {
+        await auditLog.LogAsync(currentUser.RequireUser(), action, "Invoice", invoiceId, details, impersonatedUserId: null, ct);
+        await uow.SaveChangesAsync(ct);
+    }
+
+    private static string FormatDiscount(decimal? percent) => percent is { } p ? $"{p:0.##}%" : "none";
 
     private static InvoiceDto ToDto(Invoice i, string clientName) => new(
         i.Id, i.ClientId, clientName, i.PeriodStart, i.PeriodEnd, i.ReportingCurrency, i.ExchangeRate, i.Status.ToString(),

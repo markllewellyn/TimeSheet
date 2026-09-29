@@ -18,6 +18,18 @@ button for inactive rows).
   and `Clients_Reactivate` confirmed registered (401 unauthenticated). Handbook's Clients row updated.
 - Not live-clicked by me (Chrome not connected) - the user is reactivating the real client themselves.
 
+**Invoice audit logging fixed later the same day - a real, long-standing bug.** `InvoicesFunctions` called
+`IAuditLogService.LogAsync` for Void/Delete Draft but had no `IUnitOfWork`, and `LogAsync` only stages the row -
+so none were ever saved (dev DB: 11 voided invoices, zero `Invoice.Voided` rows). Now injects `IUnitOfWork` and
+saves after every audit row, and also audits `Invoice.DraftGenerated`, `Invoice.Finalized`,
+`Invoice.LineDiscountChanged` / `Invoice.ProjectDiscountChanged` (old -> new %). New `InvoicesFunctionsTests.cs`
+(2 tests, confirmed failing with the save removed); 75/75 pass; API restarted. Past invoice actions can't be
+recovered. **Worth checking other Functions classes for the same stage-without-save trap** - the others looked
+fine (their action counts appear in the AuditLog table), but it's easy to miss.
+
+Also added a "Costs, rates and roles" subsection to the handbook's Admin chapter. Found while writing it: the
+person + project rate tier (resolver step 1) has **no UI** - only per-client person overrides can be created.
+
 **Demo dummy data added later the same day, at the user's request (direct DB write, approved; backup of the data
 taken first to `OneDrive - SVG IT\Projects\Claude\Training\TimeSheet-DataBackups\2026-09-29\`)** - so Payroll
 Periods has June and July rows, not just August:

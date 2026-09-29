@@ -840,9 +840,58 @@
       </div>
       <div class="registry-row">
         <div class="name">Audit Log</div>
-        <div class="desc">Who changed what, when, and who they were impersonating at the time — filterable by user and date range.</div>
+        <div class="desc">Who changed what, when, and who they were impersonating at the time — filterable by user and date range. Covers timesheet entries (created, edited, duplicated, deleted, approved, sent to payroll), expenses, entry flags, password resets, and invoices: draft generated, discount changed (with the old and new percentage), finalized, draft deleted and voided. Invoice actions before 29 Sep 2026 weren't recorded.</div>
       </div>
     </div>
+    <h3 id="costs-and-rates">Costs, rates and roles — how they fit together</h3>
+    <p class="lead">Two separate things are priced on every entry: what SVG IT <strong>pays</strong> the person (their
+      <strong>cost</strong>) and what the client is <strong>charged</strong> (the <strong>rate</strong>). The gap
+      between the two is the profit you see on <a href="#reports">Reports</a>.</p>
+    <div class="table-scroll">
+      <table class="field-table">
+        <thead><tr><th></th><th>Cost — what we pay</th><th>Rate — what we charge</th></tr></thead>
+        <tbody>
+          <tr><td>Where it's set</td><td class="desc"><strong>Staff</strong> → <strong>Manage</strong> →
+            <strong>Cost History</strong> (Hourly Cost and Out of Hours Cost)</td><td class="desc"><strong>Rate
+            Cards</strong> (by role), plus person-specific <strong>Rate Overrides</strong> on a client's Edit page</td></tr>
+          <tr><td>Varies by</td><td class="desc">Person only — the same on every client and project</td><td class="desc">Person or
+            role, optionally narrowed to one client or one project</td></tr>
+          <tr><td>Feeds</td><td class="desc">Cost and Profit reports, Estimated Cost, out-of-hours
+            <a href="#payroll">Payroll Periods</a></td><td class="desc">Invoicing, the Billed figure on Profit reports,
+            "To Payroll" on the grid</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead"><strong>Roles</strong> are what let rates be set once for many people: each staff member has a
+      Job Role, and a Rate Card attaches a rate to that role, so everyone in it bills the same unless someone's been
+      given an exception. To pick the rate for an entry, the app checks these five places in order and uses the
+      <strong>first</strong> one it finds — the most specific always wins:</p>
+    <div class="table-scroll">
+      <table class="field-table">
+        <thead><tr><th>Order</th><th>A rate for…</th><th>Set on</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td class="desc">This <strong>person</strong> on this <strong>project</strong></td><td class="desc">No screen yet — the app honours one if it exists, but a person-specific rate can currently only be added per client (step 2)</td></tr>
+          <tr><td>2</td><td class="desc">This <strong>person</strong> at this <strong>client</strong></td><td class="desc">Clients → Edit → <strong>Rate Overrides</strong></td></tr>
+          <tr><td>3</td><td class="desc">Their <strong>role</strong> on this <strong>project</strong></td><td class="desc"><strong>Rate Cards</strong>, narrowed to a project</td></tr>
+          <tr><td>4</td><td class="desc">Their <strong>role</strong> at this <strong>client</strong></td><td class="desc"><strong>Rate Cards</strong>, narrowed to a client</td></tr>
+          <tr><td>5</td><td class="desc">Their <strong>role</strong>, everywhere</td><td class="desc"><strong>Rate Cards</strong>, the role's default</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead">For example, if a consultant's role bills £120/h by default but they've been given a £110/h Rate
+      Override at one client, their time at that client bills at £110/h (step 2 is found first) and everywhere else
+      at £120/h (step 5). The Staff screen's <strong>Project Assignments</strong> panel shows each person's resolved
+      rate per project and which of these steps it came from.</p>
+    <div class="note tip">
+      <span class="note-label">Worth knowing</span>
+      Costs and rates are both <strong>effective-dated</strong>, and an entry is priced with whatever applied on
+      <strong>the entry's own date</strong> — then frozen, so a later change never reprices time already logged.
+      A rate can carry a <strong>Discount %</strong>, taken off before invoicing. A <strong>Cost Exempt</strong>
+      project still uses the rate but treats cost as zero. If none of the five steps has a rate (or the person has no
+      cost in force on that date), the entry is refused with a "rate not configured" message rather than guessed at —
+      set one up, making sure its Effective From is on or before the entry's date.
+    </div>
+
     <h3>Acting on someone's behalf</h3>
     <p class="lead">The swap-arrows icon, top right, lets an Admin log time <em>as</em> another active staff member —
       for backfilling something they forgot, say. It only affects new entries created while it's active (a banner
@@ -869,7 +918,7 @@
       <dt>On Track badge</dt>
       <dd>A project's actual hours/cost measured against its Budget Hours/Fixed Fee Amount — green under 75%, amber to 100%, red over, or "No budget set" if neither figure is configured. Purely visual; unrelated to the Settings-configurable thresholds that trigger a budget notification. See <a href="#my-projects">My Projects</a>.</dd>
       <dt>Resolved Rate</dt>
-      <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a rate for that person on that project, then for that person at that client, then for their role on that project, then for their role at that client, then the role's plain default. A later rate change never retroactively touches an entry already logged.</dd>
+      <dd>The £/hr or $/hr actually charged on an entry, snapshotted at the moment it's logged. Resolution checks, in order: a rate for that person on that project, then for that person at that client, then for their role on that project, then for their role at that client, then the role's plain default. A later rate change never retroactively touches an entry already logged. See <a href="#costs-and-rates">Costs, rates and roles</a>.</dd>
     </dl>
   </section>
 
