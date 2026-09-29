@@ -692,10 +692,11 @@
         a misleading 0%.</p>
       <p><strong>Breakdown</strong>, on each row, opens that project's all-time drill-down: three charts — hours
         by staff member, hours by entry type, and a monthly hours trend — each paired with the underlying table.
-        For a Fixed Fee project, per-person revenue and profit are deliberately left blank rather than a naive
-        hours × rate guess; a single "Recognized Revenue to date" figure is shown instead, prorated by how much
-        of the project's Budget Hours has actually been consumed — the same logic Reports already uses for a
-        Fixed Fee project, kept consistent rather than inventing a second way to count the same money.</p>
+        For a Fixed Fee project there's no hourly rate to multiply by, so a "Recognized Revenue to date" figure
+        is shown first — the fee, prorated by how much of the project's Budget Hours has been consumed — and each
+        person's revenue is <strong>their share of it by hours</strong> (log a third of the hours, get a third of
+        the recognized revenue). The per-person figures always add up to the Recognized Revenue figure — the same
+        split Reports uses for a Fixed Fee project.</p>
     </div>
     <div class="note tip">
       <span class="note-label">Admins see this too</span>
@@ -793,9 +794,9 @@
       client can span Fixed Fee and Time &amp; Materials projects whose revenue can't honestly be split by role
       or team.</p>
     <p class="lead">On a Fixed Fee project, the Profit reports' summary <strong>Billed</strong> is the project's
-      recognized revenue to date, but that revenue isn't split per user, role or team — so those rows show
-      <strong>—</strong> for Billed and Profit (with a note above the table) rather than a misleading loss. Cost
-      per row is still real.</p>
+      recognized revenue for the date range, and each user, role or team row's Billed is <strong>its share of that
+      by hours</strong> (a note above the table says so). The rows always add up exactly to the summary, and each
+      row's Profit is its share minus its real cost.</p>
     <p class="lead">A project-scoped Time report also shows <strong>Budget Hours</strong>/<strong>Hours
       Remaining</strong> in its summary (the project's own all-time figures, same as
       <a href="#my-projects">My Projects</a>'s badge — not just what the selected date range covers, so these can

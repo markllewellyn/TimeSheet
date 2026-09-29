@@ -183,32 +183,24 @@ public class ReportingService(
         var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectId, ct);
         var project = await projects.GetByIdAsync(projectId, ct);
 
-        var byUser = new List<ProfitByUserLine>();
-        foreach (var g in rows.GroupBy(r => (r.UserId, r.UserName)))
-        {
-            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+        var groups = rows.GroupBy(r => (r.UserId, r.UserName)).ToList();
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
 
-            decimal billedAmount;
-            if (project?.PaymentModel == PaymentModel.FixedProjectCost)
-            {
-                billedAmount = 0; // Fixed-fee revenue is recognized at the project level, not per-user - see the project-level line below.
-            }
-            else
-            {
-                var billed = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct);
-                billedAmount = billed.Amount;
-            }
+        var byUser = new List<ProfitByUserLine>();
+        for (var i = 0; i < groups.Count; i++)
+        {
+            var g = groups[i];
+            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+            var billedAmount = fixedFeeShares?[i]
+                ?? (await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct)).Amount;
 
             byUser.Add(new ProfitByUserLine(g.Key.UserId, g.Key.UserName, billedAmount, cost.Amount, billedAmount - cost.Amount, g.Sum(x => x.EntryCount)));
         }
 
         var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
-        var totalHours = rows.Sum(r => r.WorkHours + r.OutOfHoursHours);
         var totalCost = byUser.Sum(l => l.Cost) + expenseCost;
-
-        var totalBilled = project?.PaymentModel == PaymentModel.FixedProjectCost
-            ? await revenueRecognition.GetRecognizedRevenueAsync(projectId, totalHours, currency, range.End, ct)
-            : byUser.Sum(l => l.Billed);
+        // Fixed Fee rows already sum to exactly the project's recognized revenue (see AllocateFixedFeeRevenueAsync).
+        var totalBilled = byUser.Sum(l => l.Billed);
 
         var profit = totalBilled - totalCost;
         var margin = totalBilled == 0 ? 0 : Math.Round(profit / totalBilled * 100, 2);
@@ -217,9 +209,8 @@ public class ReportingService(
     }
 
     /// <summary>FDD's "role... basis" ask - see GetTimeOnProjectByRoleReportAsync/IReportingService's doc
-    /// comment. Fixed Fee revenue is recognized at the whole-project level (billedAmount 0 per role-line, same
-    /// as ProfitByUserLine's existing precedent), then added once into the summary's totalBilled below - never
-    /// double counted or silently dropped.</summary>
+    /// comment. Fixed Fee revenue is recognized for the whole project, then split across the role-lines by hours
+    /// (AllocateFixedFeeRevenueAsync) - the lines sum to exactly the summary's Billed, never double counted.</summary>
     public async Task<ReportEnvelope<ProfitSummary, ProfitByRoleLine>> GetProfitOnProjectByRoleReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
     {
         var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
@@ -228,32 +219,23 @@ public class ReportingService(
         var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectId, ct);
         var project = await projects.GetByIdAsync(projectId, ct);
 
-        var byRole = new List<ProfitByRoleLine>();
-        foreach (var g in rows.GroupBy(r => (r.RoleId, r.RoleName)))
-        {
-            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+        var groups = rows.GroupBy(r => (r.RoleId, r.RoleName)).ToList();
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
 
-            decimal billedAmount;
-            if (project?.PaymentModel == PaymentModel.FixedProjectCost)
-            {
-                billedAmount = 0;
-            }
-            else
-            {
-                var billed = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct);
-                billedAmount = billed.Amount;
-            }
+        var byRole = new List<ProfitByRoleLine>();
+        for (var i = 0; i < groups.Count; i++)
+        {
+            var g = groups[i];
+            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+            var billedAmount = fixedFeeShares?[i]
+                ?? (await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct)).Amount;
 
             byRole.Add(new ProfitByRoleLine(g.Key.RoleId, g.Key.RoleName, billedAmount, cost.Amount, billedAmount - cost.Amount, g.Sum(x => x.EntryCount)));
         }
 
         var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
-        var totalHours = rows.Sum(r => r.WorkHours + r.OutOfHoursHours);
         var totalCost = byRole.Sum(l => l.Cost) + expenseCost;
-
-        var totalBilled = project?.PaymentModel == PaymentModel.FixedProjectCost
-            ? await revenueRecognition.GetRecognizedRevenueAsync(projectId, totalHours, currency, range.End, ct)
-            : byRole.Sum(l => l.Billed);
+        var totalBilled = byRole.Sum(l => l.Billed);
 
         var profit = totalBilled - totalCost;
         var margin = totalBilled == 0 ? 0 : Math.Round(profit / totalBilled * 100, 2);
@@ -262,9 +244,7 @@ public class ReportingService(
     }
 
     /// <summary>FDD's "team... basis" ask - see GetTimeOnProjectByTeamReportAsync/IReportingService's doc
-    /// comment. Fixed Fee revenue is recognized at the whole-project level (billedAmount 0 per team-line, same
-    /// as ProfitByRoleLine's existing precedent), then added once into the summary's totalBilled below - never
-    /// double counted or silently dropped.</summary>
+    /// comment. Fixed Fee revenue is split across the team-lines by hours, same as the by-role report above.</summary>
     public async Task<ReportEnvelope<ProfitSummary, ProfitByTeamLine>> GetProfitOnProjectByTeamReportAsync(int projectId, ReportDateRange range, CancellationToken ct)
     {
         var rows = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), range.Start, range.End, ct);
@@ -273,32 +253,23 @@ public class ReportingService(
         var projectCurrency = await ResolveNativeProjectCurrencyAsync(projectId, ct);
         var project = await projects.GetByIdAsync(projectId, ct);
 
-        var byTeam = new List<ProfitByTeamLine>();
-        foreach (var g in rows.GroupBy(r => (r.TeamId, r.TeamName)))
-        {
-            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+        var groups = rows.GroupBy(r => (r.TeamId, r.TeamName)).ToList();
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
 
-            decimal billedAmount;
-            if (project?.PaymentModel == PaymentModel.FixedProjectCost)
-            {
-                billedAmount = 0;
-            }
-            else
-            {
-                var billed = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct);
-                billedAmount = billed.Amount;
-            }
+        var byTeam = new List<ProfitByTeamLine>();
+        for (var i = 0; i < groups.Count; i++)
+        {
+            var g = groups[i];
+            var cost = await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.CostAmountNative), projectCurrency), currency, range.End, ct);
+            var billedAmount = fixedFeeShares?[i]
+                ?? (await currencyConversion.ConvertAsync(new Money(g.Sum(x => x.BilledAmountNative), projectCurrency), currency, range.End, ct)).Amount;
 
             byTeam.Add(new ProfitByTeamLine(g.Key.TeamId, g.Key.TeamName, billedAmount, cost.Amount, billedAmount - cost.Amount, g.Sum(x => x.EntryCount)));
         }
 
         var expenseCost = await SumConvertedAsync(expenseRows.Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
-        var totalHours = rows.Sum(r => r.WorkHours + r.OutOfHoursHours);
         var totalCost = byTeam.Sum(l => l.Cost) + expenseCost;
-
-        var totalBilled = project?.PaymentModel == PaymentModel.FixedProjectCost
-            ? await revenueRecognition.GetRecognizedRevenueAsync(projectId, totalHours, currency, range.End, ct)
-            : byTeam.Sum(l => l.Billed);
+        var totalBilled = byTeam.Sum(l => l.Billed);
 
         var profit = totalBilled - totalCost;
         var margin = totalBilled == 0 ? 0 : Math.Round(profit / totalBilled * 100, 2);
@@ -345,6 +316,17 @@ public class ReportingService(
         return new ReportEnvelope<ProfitSummary, ProfitByProjectLine>(
             range, currency, new ProfitSummary(summaryBilled, summaryCost, summaryProfit, summaryMargin, rows.Sum(r => r.EntryCount)),
             byProject.OrderByDescending(l => l.Profit).ToList());
+    }
+
+    /// <summary>Fixed Fee only (null otherwise, so the caller uses each row's own T&amp;M BilledAmountNative): the
+    /// project's recognized revenue for the whole range, split across the rows by hours via RevenueAllocation.ByHours
+    /// - so each row shows its real share rather than 0 (which made every row read as a loss), and the rows sum to
+    /// exactly the summary's Billed. A non-invoiceable Fixed Fee project recognizes 0, so every share is 0.</summary>
+    private async Task<decimal[]?> AllocateFixedFeeRevenueAsync(Project? project, IReadOnlyList<decimal> rowHours, string currency, DateOnly asOf, CancellationToken ct)
+    {
+        if (project?.PaymentModel != PaymentModel.FixedProjectCost) return null;
+        var recognized = await revenueRecognition.GetRecognizedRevenueAsync(project.Id, rowHours.Sum(), currency, asOf, ct);
+        return RevenueAllocation.ByHours(recognized, rowHours);
     }
 
     private static TimeSummary SummarizeTime(IReadOnlyList<TimeEntryAggregateRow> rows, ProjectStatus? status = null) => new(

@@ -14,18 +14,30 @@ public class ProjectBreakdownService(
         var canInvoice = project.CanInvoice == true;
         var isFixedFee = project.PaymentModel == PaymentModel.FixedProjectCost;
 
-        var byStaff = rows
-            .GroupBy(e => (e.UserId, UserName: e.User?.DisplayName ?? "Unknown"))
-            .Select(g =>
+        decimal? recognizedRevenue = null;
+        if (isFixedFee && canInvoice)
+        {
+            var totalHours = rows.Sum(e => e.WorkHours + e.OutOfHoursHours);
+            var nativeCurrency = await ResolveNativeCurrencyAsync(project, ct);
+            recognizedRevenue = await revenueRecognition.GetRecognizedRevenueAsync(
+                project.Id, totalHours, nativeCurrency, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
+        }
+
+        var staffGroups = rows.GroupBy(e => (e.UserId, UserName: e.User?.DisplayName ?? "Unknown")).ToList();
+        // Fixed Fee: each person gets their hours-share of the project's recognized revenue (same split as
+        // ReportingService's per-row Profit reports), so the column sums to RecognizedRevenueToDate exactly - not a
+        // misleading hours*rate figure, and not 0 (which read as a loss per person).
+        var fixedFeeShares = recognizedRevenue is { } recognized
+            ? RevenueAllocation.ByHours(recognized, staffGroups.Select(g => g.Sum(e => e.WorkHours + e.OutOfHoursHours)).ToList())
+            : null;
+
+        var byStaff = staffGroups
+            .Select((g, i) =>
             {
                 var hours = g.Sum(e => e.WorkHours + e.OutOfHoursHours);
                 var cost = g.Sum(e => e.WorkHours * (e.ResolvedHourlyCost ?? 0) + e.OutOfHoursHours * (e.ResolvedOutOfHoursCost ?? 0));
-                // Fixed Fee: revenue is recognized at the project level only (see RecognizedRevenueToDate below) -
-                // matches ReportingService.GetProfitOnProjectReportAsync's own identical rule exactly, rather than
-                // a misleading hours*rate figure per person that wouldn't sum to the real recognized revenue.
-                var revenue = canInvoice && !isFixedFee
-                    ? g.Sum(e => (e.WorkHours + e.OutOfHoursHours) * (e.ResolvedCustomerRate ?? 0))
-                    : 0m;
+                var revenue = fixedFeeShares?[i]
+                    ?? (canInvoice && !isFixedFee ? g.Sum(e => (e.WorkHours + e.OutOfHoursHours) * (e.ResolvedCustomerRate ?? 0)) : 0m);
                 return new StaffBreakdownLine(g.Key.UserId, g.Key.UserName, hours, cost, revenue, revenue - cost);
             })
             .OrderByDescending(l => l.Hours)
@@ -43,15 +55,6 @@ public class ProjectBreakdownService(
             .Select(g => new MonthBreakdownLine(g.Key.Year, g.Key.Month, g.Sum(e => e.WorkHours + e.OutOfHoursHours)))
             .OrderBy(l => l.Year).ThenBy(l => l.Month)
             .ToList();
-
-        decimal? recognizedRevenue = null;
-        if (isFixedFee && canInvoice)
-        {
-            var totalHours = rows.Sum(e => e.WorkHours + e.OutOfHoursHours);
-            var nativeCurrency = await ResolveNativeCurrencyAsync(project, ct);
-            recognizedRevenue = await revenueRecognition.GetRecognizedRevenueAsync(
-                project.Id, totalHours, nativeCurrency, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
-        }
 
         return new ProjectBreakdown(project.Id, byStaff, byEntryType, byMonth, recognizedRevenue);
     }

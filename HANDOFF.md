@@ -4,6 +4,28 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done in this session, 2026-09-29 (after the demo) — Fixed Fee revenue split per row by hours
+
+The follow-up held back for the demo. Fixed Fee per-user/role/team Profit report rows and the Project Breakdown's
+By Staff table used to get revenue 0 (profit = -cost, reading as a loss), papered over with "—" in the UI.
+
+- New `RevenueAllocation.ByHours` (Infrastructure/Services): splits a total by hours, 2dp, rounding remainder to
+  the row with most hours, so rows always sum to exactly the total. `ReportingService`'s three per-row Profit
+  methods now share `AllocateFixedFeeRevenueAsync` (recognized revenue for the range, split across the rows), and
+  `totalBilled` is simply the rows' sum for both payment models. `ProjectBreakdownService` does the same for
+  staff lines against `RecognizedRevenueToDate`. By-client report and the T&M path unchanged; non-invoiceable
+  Fixed Fee still recognizes 0.
+- UI: both "—" workarounds removed (`reports-page`, `project-detail-page`); each keeps a one-line note that Fixed
+  Fee rows are a share by hours. Handbook's My Projects (Breakdown) and Reports passages rewritten.
+- New `FixedFeeRevenueSplitTests.cs` (5 tests; the two service tests confirmed failing against the old code).
+  80/80 backend, 2/2 UI, `ng build` clean, API restarted.
+- **Checked against real dev data** with a read-only scratch run of the real services: ERP Migration Phase 2
+  (EUR) - summary 17,198.33 = user/role/team row sums = Breakdown staff sum (Sarah 84h 11,900.00, Mark 37.4h
+  5,298.33); POS Rollout (USD) - rows = summary (7,800.00 to 8 Sep), Breakdown 8,550.00 (57h), both $150/h =
+  45,000 / 300h. Not clicked through in the browser (Chrome not connected).
+- Side note from that run: a POS Rollout Profit report whose range includes the GBP expense (9 Sep) needs a
+  GBP->USD rate - the real app fetches and caches one online; just be aware it would error offline.
+
 ## Done in this session, 2026-09-29 (demo day, before the demo) — Reactivate a client
 
 Found live by the user: a client (Priya's POS Rollout project's client) was missing from the Reports client picker.
@@ -49,7 +71,7 @@ Periods has June and July rows, not just August:
   `EffectiveFrom = 2026-06-01` StaffCost/RateCard rows - or restore the backup.
 
 **Post-demo backlog raised today, not started (user's call):**
-- **Fixed Fee per-row revenue attribution** (the follow-up below) - planned, deliberately held until after the demo.
+- ~~**Fixed Fee per-row revenue attribution**~~ - **done after the demo, same day** (see the entry at the top).
 - **Reports can't report on an inactive client** - `reports-page.ts` calls `clientsService.list()` (active only).
   Possible fix: a "Show inactive clients" toggle.
 - **Time can still be logged against an inactive client** if the person's project assignment is active. Decide
@@ -111,7 +133,7 @@ before). Chrome was **not connected** this session, so there was no live browser
 - **Fixed later the same session**: Profit reports' per-user/role/team rows showed Billed 0 / negative Profit on
   Fixed Fee projects (revenue is recognized once, in the summary). `reports-page` now shows "—" for Billed/Profit
   on those rows plus a one-line note, only for an invoiceable Fixed Fee project; backend unchanged.
-- **Possible follow-up, deliberately not done before the 2026-09-29 demo (user's call)**: attribute Fixed Fee revenue per
+- ~~**Possible follow-up, deliberately not done before the 2026-09-29 demo (user's call)**~~ **Done 2026-09-29 after the demo** (see the top entry): attribute Fixed Fee revenue per
   row by hours (row hours / BudgetHours x FixedFeeAmount - recognition is already hours-linear, so rows would sum to
   the summary bar expenses/rounding). Touches ReportingService's 3 per-row methods + ProjectBreakdownService, and
   would replace both "—" front-end fixes above. ~25 min incl. a sum-to-summary test.

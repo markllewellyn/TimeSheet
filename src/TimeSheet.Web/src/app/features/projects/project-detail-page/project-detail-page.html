@@ -20,7 +20,7 @@
       @if (b.recognizedRevenueToDate !== null) {
         <p class="mb-3 text-sm text-muted-foreground">
           Recognized Revenue to date: <strong class="text-foreground">{{ b.recognizedRevenueToDate | number: '1.2-2' }}</strong>
-          (Fixed Fee - not attributed per person below)
+          (Fixed Fee - split per person below by hours)
         </p>
       }
       @if (b.byStaff.length === 0) {
@@ -43,15 +43,8 @@
                 <td class="font-medium text-foreground">{{ line.userName }}</td>
                 <td class="text-muted-foreground">{{ line.hours | number: '1.1-1' }}</td>
                 <td class="text-muted-foreground">{{ line.cost | number: '1.2-2' }}</td>
-                <!-- Fixed Fee: revenue isn't attributed per person, so the API's 0 revenue / -cost profit would read
-                     as a loss - show a dash instead, pointing at the Recognized Revenue figure above. -->
-                @if (b.recognizedRevenueToDate !== null) {
-                  <td class="text-muted-foreground" title="Fixed Fee - see Recognized Revenue above">—</td>
-                  <td class="text-muted-foreground" title="Fixed Fee - see Recognized Revenue above">—</td>
-                } @else {
-                  <td class="text-muted-foreground">{{ line.revenue | number: '1.2-2' }}</td>
-                  <td class="text-muted-foreground">{{ line.profit | number: '1.2-2' }}</td>
-                }
+                <td class="text-muted-foreground">{{ line.revenue | number: '1.2-2' }}</td>
+                <td class="text-muted-foreground">{{ line.profit | number: '1.2-2' }}</td>
               </tr>
             }
           </tbody>

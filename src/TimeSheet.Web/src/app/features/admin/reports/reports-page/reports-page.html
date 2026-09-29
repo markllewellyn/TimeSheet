@@ -83,10 +83,10 @@
       </div>
     </div>
 
-    @if (fixedFeeRowsBlanked()) {
+    @if (fixedFeeSplitNote()) {
       <p class="text-sm text-muted-foreground">
-        Fixed Fee project - revenue is recognized for the whole project (see Billed in the summary above), not per
-        row, so Billed and Profit are left blank below.
+        Fixed Fee project - each row's Billed is its share of the project's recognized revenue, split by hours, so
+        the rows add up to Billed in the summary above.
       </p>
     }
 
@@ -103,7 +103,7 @@
           @for (row of r.breakdown; track $index) {
             <tr>
               @for (col of breakdownColumns(); track col) {
-                <td>{{ isBlankedCell(col) ? '—' : row[col] }}</td>
+                <td>{{ row[col] }}</td>
               }
             </tr>
           }
