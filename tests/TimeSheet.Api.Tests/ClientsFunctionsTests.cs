@@ -8,6 +8,7 @@ using TimeSheet.Domain.Entities;
 using TimeSheet.Domain.Services;
 using TimeSheet.Infrastructure.Data;
 using TimeSheet.Infrastructure.Repositories;
+using TimeSheet.Infrastructure.Services;
 using Xunit;
 
 namespace TimeSheet.Api.Tests;
@@ -44,7 +45,7 @@ public class ClientsFunctionsTests
     }
 
     private static ClientsFunctions CreateFunctions(TimesheetDbContext db, User user, UserRole role) => new(
-        new ClientRepository(db), new CurrencyRepository(db), db,
+        new ClientRepository(db), new CurrencyRepository(db), new AuditLogService(new AuditLogRepository(db), new UserRepository(db)), db,
         new StubCurrentUserAccessor(new CurrentUserContext(user.Id, user.EntraObjectId!, user.Email, user.DisplayName, role)),
         NullLogger<ClientsFunctions>.Instance);
 
@@ -62,6 +63,9 @@ public class ClientsFunctionsTests
         var reloaded = await db.Clients.SingleAsync(c => c.Id == client.Id);
         Assert.True(reloaded.IsActive);
         Assert.Equal(user.Id, reloaded.ModifiedByUserId);
+        var audit = await db.AuditLogs.SingleAsync(a => a.Action == "Client.Reactivated");
+        Assert.Equal(client.Id, audit.EntityId);
+        Assert.Equal("Bright", audit.Details);
 
         // The Reports page's client dropdown uses the default (active-only) list.
         var list = Assert.IsType<OkObjectResult>(await functions.List(new DefaultHttpContext().Request, CancellationToken.None));

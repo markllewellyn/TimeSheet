@@ -11,11 +11,13 @@ namespace TimeSheet.Api.Functions;
 
 /// <summary>
 /// A person's effective-dated internal hourly cost (see StaffCost.cs) - Admin-only throughout, since these
-/// reveal internal margin. A "change" is always a new dated row (POST) - there is no update endpoint.
+/// reveal internal margin. A "change" is always a new dated row (POST) - there is no update endpoint - so
+/// Create writes a StaffCost.Created audit row (FDD: audit trail on rates).
 /// </summary>
 public class StaffCostsFunctions(
     IStaffCostRepository staffCosts,
     IUserRepository users,
+    IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -68,6 +70,11 @@ public class StaffCostsFunctions(
             CreatedByUserId = currentUser.RequireUser().UserId,
         };
         await staffCosts.AddAsync(cost, ct);
+        await uow.SaveChangesAsync(ct);
+
+        await auditLog.LogAsync(currentUser.RequireUser(), "StaffCost.Created", "StaffCost", cost.Id,
+            $"{staff.DisplayName}: hourly {cost.HourlyCost:0.00}, out of hours {cost.OutOfHoursCost:0.00}, effective {cost.EffectiveFrom:yyyy-MM-dd}",
+            impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
 
         return new CreatedResult($"/api/staff-costs/{cost.Id}", ToDto(cost, staff.DisplayName));

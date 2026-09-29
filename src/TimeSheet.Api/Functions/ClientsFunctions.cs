@@ -14,7 +14,8 @@ namespace TimeSheet.Api.Functions;
 /// <summary>Clients are business/billing entities (addresses, account managers, reporting currency) - all
 /// endpoints are Admin-only per the plan's authorization invariants.</summary>
 public class ClientsFunctions(
-    IClientRepository clients, ICurrencyRepository currencies, IUnitOfWork uow, ICurrentUserAccessor currentUser, ILogger<ClientsFunctions> logger)
+    IClientRepository clients, ICurrencyRepository currencies, IAuditLogService auditLog, IUnitOfWork uow, ICurrentUserAccessor currentUser,
+    ILogger<ClientsFunctions> logger)
 {
     [Function("Clients_List")]
     public async Task<IActionResult> List(
@@ -154,6 +155,7 @@ public class ClientsFunctions(
         client.ModifiedUtc = DateTimeOffset.UtcNow;
         client.ModifiedByUserId = currentUser.RequireUser().UserId;
         clients.Update(client);
+        await auditLog.LogAsync(currentUser.RequireUser(), "Client.Deactivated", "Client", client.Id, client.Name, impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
     }
@@ -173,6 +175,7 @@ public class ClientsFunctions(
         client.ModifiedUtc = DateTimeOffset.UtcNow;
         client.ModifiedByUserId = currentUser.RequireUser().UserId;
         clients.Update(client);
+        await auditLog.LogAsync(currentUser.RequireUser(), "Client.Reactivated", "Client", client.Id, client.Name, impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
         return new NoContentResult();
     }

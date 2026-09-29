@@ -4,6 +4,24 @@
 
 The FDD (`Resources/SVGIT_FDD_Timesheets_1 1 1 2.docx`) is the source of truth for how this app should behave. We've been working through a gap analysis between the FDD and the actual app, fixing the highest-impact items first.
 
+## Done in this session, 2026-09-29 (after the demo) — audit trail on rates and costs
+
+Closes the FDD architecture diagram's "row-level audit trail on rates, entries and invoices" (entries and
+invoices were already covered). Rates and costs are create-only (a change is a new dated row), so one audit
+point each:
+- `RateCards_Create` -> `RateCard.Created`, e.g. "Person James O'Brien, client Northwind: 110.00/h, 10% discount,
+  effective 2026-06-01" / "Role Consultant, all clients: 120.00/h, effective 2026-09-04". Covers the client
+  page's Rate Overrides too (same endpoint).
+- `StaffCosts_Create` -> `StaffCost.Created` ("James O'Brien: hourly 42.50, out of hours 165.00, effective ...").
+- `Clients_Deactivate` / `Clients_Reactivate` -> `Client.Deactivated` / `Client.Reactivated`.
+- Both creates use the two-step save (entity first for its Id, then the audit row) and **save the audit row** -
+  not the stage-only trap `InvoicesFunctions` had.
+- New `RateAndCostAuditTests.cs` (4 tests; the 3 save tests confirmed failing with the second save removed);
+  `ClientsFunctionsTests` now also asserts the Reactivated row. 84/84 backend; API restarted. Handbook's Audit
+  Log entry updated. Not clicked through (Chrome not connected).
+- Still not audited, deliberately out of this scope: Client Create/Update (addresses, billing period etc.),
+  Roles/Teams, project edits, project assignments. Worth a pass if a fuller audit trail is wanted.
+
 ## Done in this session, 2026-09-29 (after the demo) — Fixed Fee revenue split per row by hours
 
 The follow-up held back for the demo. Fixed Fee per-user/role/team Profit report rows and the Project Breakdown's
@@ -80,7 +98,7 @@ Periods has June and July rows, not just August:
   (`RevenueRecognitionService`).
 - **Expenses have no approval step** - confirmed 2026-09-29 against the full FDD (text, reviewer comments and both
   diagrams): none is required - the only approval the FDD asks for is out-of-hours work. A new requirement if wanted.
-- **Audit rate and cost changes** - the FDD's architecture diagram asks for a "row-level audit trail on rates,
+- ~~**Audit rate and cost changes**~~ **done after the demo, same day** (see the top entry) - the FDD's architecture diagram asks for a "row-level audit trail on rates,
   entries and invoices". Entries are audited and invoices are now too, but creating Rate Cards
   (`RateCardsFunctions`, which also backs client Rate Overrides) and Staff Cost History rows (`StaffCostsFunctions`) writes no AuditLog row. Add one per
   create (who, scope, rate/cost, effective date), saving via `IUnitOfWork` - see today's `InvoicesFunctions` fix for

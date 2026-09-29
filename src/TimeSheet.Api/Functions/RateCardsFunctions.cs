@@ -10,13 +10,16 @@ using TimeSheet.Domain.Services;
 namespace TimeSheet.Api.Functions;
 
 /// <summary>Effective-dated, role-or-person-scoped billing rates - see RateCard.cs. Admin-only, since these
-/// reveal internal margin/pricing. A "change" is always a new dated row - there is no update endpoint.</summary>
+/// reveal internal margin/pricing. A "change" is always a new dated row - there is no update endpoint - so
+/// Create is the one place a rate changes, and it writes a RateCard.Created audit row (FDD architecture:
+/// "row-level audit trail on rates, entries and invoices"). Also backs the client page's Rate Overrides.</summary>
 public class RateCardsFunctions(
     IRateCardRepository rateCards,
     IRoleRepository roles,
     IUserRepository users,
     IClientRepository clients,
     IProjectRepository projects,
+    IAuditLogService auditLog,
     IUnitOfWork uow,
     ICurrentUserAccessor currentUser)
 {
@@ -111,6 +114,14 @@ public class RateCardsFunctions(
             CreatedByUserId = currentUser.RequireUser().UserId,
         };
         await rateCards.AddAsync(rateCard, ct);
+        await uow.SaveChangesAsync(ct);
+
+        // Two-step save, same as TimesheetEntriesFunctions: the audit row needs the rate card's generated Id.
+        var who = role is not null ? $"Role {role.Name}" : $"Person {staff!.DisplayName}";
+        var where = project is not null ? $"project {project.Name}" : client is not null ? $"client {client.Name}" : "all clients";
+        var discountText = rateCard.DiscountPercent is { } d ? $", {d:0.##}% discount" : "";
+        await auditLog.LogAsync(currentUser.RequireUser(), "RateCard.Created", "RateCard", rateCard.Id,
+            $"{who}, {where}: {rateCard.Rate:0.00}/h{discountText}, effective {rateCard.EffectiveFrom:yyyy-MM-dd}", impersonatedUserId: null, ct);
         await uow.SaveChangesAsync(ct);
 
         return new CreatedResult($"/api/rate-cards/{rateCard.Id}", ToDtoWith(rateCard, role, staff, client, project));
