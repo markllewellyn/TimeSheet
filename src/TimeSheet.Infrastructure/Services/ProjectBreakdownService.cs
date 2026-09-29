@@ -20,7 +20,7 @@ public class ProjectBreakdownService(
             var totalHours = rows.Sum(e => e.WorkHours + e.OutOfHoursHours);
             var nativeCurrency = await ResolveNativeCurrencyAsync(project, ct);
             recognizedRevenue = await revenueRecognition.GetRecognizedRevenueAsync(
-                project.Id, totalHours, nativeCurrency, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
+                project.Id, hoursBeforePeriod: 0, totalHours, nativeCurrency, DateOnly.FromDateTime(DateTimeOffset.UtcNow.Date), ct);
         }
 
         var staffGroups = rows.GroupBy(e => (e.UserId, UserName: e.User?.DisplayName ?? "Unknown")).ToList();

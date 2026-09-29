@@ -184,7 +184,7 @@ public class ReportingService(
         var project = await projects.GetByIdAsync(projectId, ct);
 
         var groups = rows.GroupBy(r => (r.UserId, r.UserName)).ToList();
-        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), range, currency, ct);
 
         var byUser = new List<ProfitByUserLine>();
         for (var i = 0; i < groups.Count; i++)
@@ -220,7 +220,7 @@ public class ReportingService(
         var project = await projects.GetByIdAsync(projectId, ct);
 
         var groups = rows.GroupBy(r => (r.RoleId, r.RoleName)).ToList();
-        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), range, currency, ct);
 
         var byRole = new List<ProfitByRoleLine>();
         for (var i = 0; i < groups.Count; i++)
@@ -254,7 +254,7 @@ public class ReportingService(
         var project = await projects.GetByIdAsync(projectId, ct);
 
         var groups = rows.GroupBy(r => (r.TeamId, r.TeamName)).ToList();
-        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), currency, range.End, ct);
+        var fixedFeeShares = await AllocateFixedFeeRevenueAsync(project, groups.Select(g => g.Sum(x => x.WorkHours + x.OutOfHoursHours)).ToList(), range, currency, ct);
 
         var byTeam = new List<ProfitByTeamLine>();
         for (var i = 0; i < groups.Count; i++)
@@ -299,7 +299,8 @@ public class ReportingService(
                 expenseRows.Where(e => e.ProjectId == projectGroup.Key.ProjectId).Select(e => (e.Amount, e.Currency, e.Date)), currency, ct);
 
             var billed = project?.PaymentModel == PaymentModel.FixedProjectCost
-                ? await revenueRecognition.GetRecognizedRevenueAsync(projectGroup.Key.ProjectId, projectHours, currency, range.End, ct)
+                ? await revenueRecognition.GetRecognizedRevenueAsync(projectGroup.Key.ProjectId,
+                    await GetHoursBeforeAsync(projectGroup.Key.ProjectId, range.Start, ct), projectHours, currency, range.End, ct)
                 : (await currencyConversion.ConvertAsync(new Money(billedNative, projectCurrency), currency, range.End, ct)).Amount;
 
             var totalCost = cost.Amount + expenseCost;
@@ -322,11 +323,22 @@ public class ReportingService(
     /// project's recognized revenue for the whole range, split across the rows by hours via RevenueAllocation.ByHours
     /// - so each row shows its real share rather than 0 (which made every row read as a loss), and the rows sum to
     /// exactly the summary's Billed. A non-invoiceable Fixed Fee project recognizes 0, so every share is 0.</summary>
-    private async Task<decimal[]?> AllocateFixedFeeRevenueAsync(Project? project, IReadOnlyList<decimal> rowHours, string currency, DateOnly asOf, CancellationToken ct)
+    private async Task<decimal[]?> AllocateFixedFeeRevenueAsync(Project? project, IReadOnlyList<decimal> rowHours, ReportDateRange range, string currency, CancellationToken ct)
     {
         if (project?.PaymentModel != PaymentModel.FixedProjectCost) return null;
-        var recognized = await revenueRecognition.GetRecognizedRevenueAsync(project.Id, rowHours.Sum(), currency, asOf, ct);
+        var hoursBefore = await GetHoursBeforeAsync(project.Id, range.Start, ct);
+        var recognized = await revenueRecognition.GetRecognizedRevenueAsync(project.Id, hoursBefore, rowHours.Sum(), currency, range.End, ct);
         return RevenueAllocation.ByHours(recognized, rowHours);
+    }
+
+    /// <summary>Hours logged on the project before a report's range starts - the Fixed Fee cap is cumulative
+    /// (see IRevenueRecognitionService), so a range needs to know how much of the budget was already used.
+    /// Same aggregate query as the report itself, so it counts exactly the same entries.</summary>
+    private async Task<decimal> GetHoursBeforeAsync(int projectId, DateOnly rangeStart, CancellationToken ct)
+    {
+        if (rangeStart <= DateOnly.MinValue) return 0;
+        var earlier = await reportingRepository.GetTimeEntryAggregatesAsync(new ReportScope(null, projectId), DateOnly.MinValue, rangeStart.AddDays(-1), ct);
+        return earlier.Sum(r => r.WorkHours + r.OutOfHoursHours);
     }
 
     private static TimeSummary SummarizeTime(IReadOnlyList<TimeEntryAggregateRow> rows, ProjectStatus? status = null) => new(

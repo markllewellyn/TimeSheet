@@ -693,7 +693,8 @@
       <p><strong>Breakdown</strong>, on each row, opens that project's all-time drill-down: three charts — hours
         by staff member, hours by entry type, and a monthly hours trend — each paired with the underlying table.
         For a Fixed Fee project there's no hourly rate to multiply by, so a "Recognized Revenue to date" figure
-        is shown first — the fee, prorated by how much of the project's Budget Hours has been consumed — and each
+        is shown first — the fee, prorated by how much of the project's Budget Hours has been consumed, and never
+        more than the fee itself, however far over budget the project goes — and each
         person's revenue is <strong>their share of it by hours</strong> (log a third of the hours, get a third of
         the recognized revenue). The per-person figures always add up to the Recognized Revenue figure — the same
         split Reports uses for a Fixed Fee project.</p>
@@ -799,6 +800,10 @@
       recognized revenue for the date range, and each user, role or team row's Billed is <strong>its share of that
       by hours</strong> (a note above the table says so). The rows always add up exactly to the summary, and each
       row's Profit is its share minus its real cost.</p>
+    <p class="lead">Fixed Fee revenue is <strong>capped at the fee</strong>. Only hours up to the project's Budget
+      Hours earn revenue, counted from the start of the project, so a date range gets whatever part of the budget
+      it used. Once the budget is used up, further hours still show their cost but earn nothing, so profit falls,
+      and every period's revenue added together never comes to more than the fixed fee.</p>
     <p class="lead">A project-scoped Time report also shows <strong>Budget Hours</strong>/<strong>Hours
       Remaining</strong> in its summary (the project's own all-time figures, same as
       <a href="#my-projects">My Projects</a>'s badge — not just what the selected date range covers, so these can

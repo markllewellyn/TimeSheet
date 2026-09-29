@@ -93,5 +93,9 @@ public interface IReportingService
 /// </summary>
 public interface IRevenueRecognitionService
 {
-    Task<decimal> GetRecognizedRevenueAsync(int projectId, decimal hoursInPeriod, string targetCurrency, DateOnly asOf, CancellationToken ct);
+    /// <summary>Revenue recognized for <paramref name="hoursInPeriod"/>, capped so a project never recognizes more
+    /// than its FixedFeeAmount in total: only hours up to BudgetHours count, measured cumulatively from the
+    /// project's start - so <paramref name="hoursBeforePeriod"/> (hours logged before the period) is needed to know
+    /// how much budget was already used. Pass 0 for an all-time figure.</summary>
+    Task<decimal> GetRecognizedRevenueAsync(int projectId, decimal hoursBeforePeriod, decimal hoursInPeriod, string targetCurrency, DateOnly asOf, CancellationToken ct);
 }

@@ -94,7 +94,7 @@ Periods has June and July rows, not just August:
   Possible fix: a "Show inactive clients" toggle.
 - **Time can still be logged against an inactive client** if the person's project assignment is active. Decide
   whether deactivating a client should block that.
-- **Fixed Fee recognized revenue isn't capped** at `FixedFeeAmount` once hours pass `BudgetHours`
+- ~~**Fixed Fee recognized revenue isn't capped**~~ **done after the demo, same day** - capped cumulatively at the fee (`IRevenueRecognitionService` now takes `hoursBeforePeriod`; `ReportingService.GetHoursBeforeAsync` supplies it for a range, Breakdown passes 0). New `FixedFeeRevenueCapTests.cs` (5, confirmed failing uncapped); 89/89. No change to current dev data - ERP (121.4 of 600h) and POS (57 of 300h) are both under budget. Was: at `FixedFeeAmount` once hours pass `BudgetHours`
   (`RevenueRecognitionService`).
 - **Expenses have no approval step** - confirmed 2026-09-29 against the full FDD (text, reviewer comments and both
   diagrams): none is required - the only approval the FDD asks for is out-of-hours work. A new requirement if wanted.
