@@ -56,7 +56,15 @@ Periods has June and July rows, not just August:
   whether deactivating a client should block that.
 - **Fixed Fee recognized revenue isn't capped** at `FixedFeeAmount` once hours pass `BudgetHours`
   (`RevenueRecognitionService`).
-- **Expenses have no approval step** (not in the FDD either) - a new feature if wanted.
+- **Expenses have no approval step** - confirmed 2026-09-29 against the full FDD (text, reviewer comments and both
+  diagrams): none is required - the only approval the FDD asks for is out-of-hours work. A new requirement if wanted.
+- **Audit rate and cost changes** - the FDD's architecture diagram asks for a "row-level audit trail on rates,
+  entries and invoices". Entries are audited and invoices are now too, but creating Rate Cards
+  (`RateCardsFunctions`, which also backs client Rate Overrides) and Staff Cost History rows (`StaffCostsFunctions`) writes no AuditLog row. Add one per
+  create (who, scope, rate/cost, effective date), saving via `IUnitOfWork` - see today's `InvoicesFunctions` fix for
+  the stage-without-save trap. Client Deactivate/Reactivate aren't audited either; worth doing at the same time.
+- **No screen for a person + project rate** (resolver step 1) - the API supports it, the UI only creates
+  per-client person overrides. Add if per-project exceptions for individuals are wanted.
 
 ## Done in this session, 2026-09-28 — pre-demo check: tests, handbook audit, one real locking bug
 
