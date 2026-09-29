@@ -34,7 +34,7 @@ export class PayrollPeriodsPage {
       },
       error: (err) => {
         this.loading.set(false);
-        this.error.set(err?.error?.error ?? 'Could not load payroll periods.');
+        this.error.set(err?.error?.error ?? 'Could not load out-of-hours payroll.');
       },
     });
   }
@@ -44,7 +44,7 @@ export class PayrollPeriodsPage {
     this.selectedPeriod.set(null);
     this.payrollPeriodsService.getById(period.id).subscribe({
       next: (detail) => this.selectedPeriod.set(detail),
-      error: (err) => this.error.set(err?.error?.error ?? 'Could not load that payroll period.'),
+      error: (err) => this.error.set(err?.error?.error ?? 'Could not load that out-of-hours payroll month.'),
     });
   }
 

@@ -413,7 +413,7 @@
     <a href="#flags">Entry Flags</a>
     <a href="#my-invoices">My Invoices</a>
     <a href="#my-projects">My Projects</a>
-    <a href="#payroll">Payroll Periods</a>
+    <a href="#payroll">Out-of-Hours Payroll</a>
     <a href="#invoicing">Invoicing</a>
     <a href="#reports">Reports</a>
     <a href="#admin">Admin</a>
@@ -708,15 +708,20 @@
   <section class="chapter" id="payroll">
     <div class="chapter-head">
       <span class="chapter-num">§10</span>
-      <h2>Payroll Periods</h2>
+      <h2>Out-of-Hours Payroll</h2>
       <span class="pill pill-admin"><span class="pill-dot"></span>Admin</span>
     </div>
     <div class="prose">
-      <p>A read-only monthly summary — out-of-hours pay aggregated per staff member, generated automatically on
-        the 1st of each month from whatever's been approved-but-not-yet-sent-to-payroll. Approving and sending
-        entries itself still happens on <a href="#approvals">Approvals</a>; this page just shows what the
-        aggregation produced. <strong>Run Now</strong> triggers that same job on demand, without waiting for the
-        1st.</p>
+      <p>One row per month, showing the total out-of-hours pay due — click a month to see the breakdown by
+        staff member. Each person's pay is their approved out-of-hours hours × their <strong>Out of Hours
+        Cost</strong> on the date of each entry (see <a href="#costs-and-rates">Costs, rates and roles</a>).
+        Months are generated automatically on the 1st, from out-of-hours entries that have been approved but not
+        yet sent to payroll; <strong>Run Now</strong> builds last month straight away instead of waiting. This is a
+        read-only summary — approving and sending entries to payroll still happens on
+        <a href="#approvals">Approvals</a>.</p>
+      <p>Running a month again rebuilds it from scratch rather than adding to it, so if that month's entries have
+        since been sent to payroll, they drop out and the total goes down. Treat it as a snapshot of what's
+        waiting to be paid, taken <em>before</em> you send.</p>
     </div>
   </section>
 
@@ -857,7 +862,7 @@
           <tr><td>Varies by</td><td class="desc">Person only — the same on every client and project</td><td class="desc">Person or
             role, optionally narrowed to one client or one project</td></tr>
           <tr><td>Feeds</td><td class="desc">Cost and Profit reports, Estimated Cost, out-of-hours
-            <a href="#payroll">Payroll Periods</a></td><td class="desc">Invoicing, the Billed figure on Profit reports,
+            <a href="#payroll">Out-of-Hours Payroll</a></td><td class="desc">Invoicing, the Billed figure on Profit reports,
             "To Payroll" on the grid</td></tr>
         </tbody>
       </table>

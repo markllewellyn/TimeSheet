@@ -27,6 +27,11 @@ saves after every audit row, and also audits `Invoice.DraftGenerated`, `Invoice.
 recovered. **Worth checking other Functions classes for the same stage-without-save trap** - the others looked
 fine (their action counts appear in the AuditLog table), but it's easy to miss.
 
+**"Payroll Periods" renamed to "Out-of-Hours Payroll"** on screen (nav link, page title, empty/error messages)
+and in the handbook, at the user's request - the old name read as all payroll. Display text only: the
+`/admin/payroll-periods` route, API, `PayrollPeriod` entity and code names are unchanged (the FDD's own data model
+still calls it PayrollPeriod).
+
 Also added a "Costs, rates and roles" subsection to the handbook's Admin chapter. Found while writing it: the
 person + project rate tier (resolver step 1) has **no UI** - only per-client person overrides can be created.
 

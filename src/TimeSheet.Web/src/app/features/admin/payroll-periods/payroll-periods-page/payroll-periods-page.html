@@ -1,11 +1,12 @@
 <div class="flex flex-col gap-4">
   <div class="page-header">
     <div>
-      <h1 class="page-title">Payroll Periods</h1>
+      <h1 class="page-title">Out-of-Hours Payroll</h1>
       <p class="page-subtitle">
-        Out-of-hours pay aggregated per staff member for each month, generated automatically by the monthly
-        payroll aggregation job. This is a read-only summary - approving and sending entries to payroll still
-        happens on the Approvals screen.
+        One row per month, showing the total out-of-hours pay due - click a month to see the breakdown by staff
+        member. Each person's pay is their approved out-of-hours hours × their Out of Hours Cost on the date of
+        each entry. Months are generated automatically on the 1st (or with Run Now). This is a read-only summary -
+        approving and sending entries to payroll still happens on the Approvals screen.
       </p>
     </div>
     <button
@@ -54,7 +55,7 @@
             </tr>
           } @empty {
             <tr>
-              <td colspan="5" class="text-center text-sm text-muted-foreground">No payroll periods have been generated yet.</td>
+              <td colspan="5" class="text-center text-sm text-muted-foreground">No out-of-hours payroll months have been generated yet.</td>
             </tr>
           }
         </tbody>
