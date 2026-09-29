@@ -85,7 +85,7 @@ Periods has June and July rows, not just August:
   rows and their Northwind person+client RateCards - all dev data previously started 2026-08-10.
 - PayrollPeriod rows for June (7h, 1,245.00) and July (8.5h, 1,537.50) built with the real
   `PayrollAggregationService` from a scratch tool (Run Now can only build the previous month).
-- To remove: delete entries with that posting batch, the two June/July PayrollPeriods, and the four
+- **Keeping it** (user's decision, 2026-09-29, after the demo). If that ever changes, to remove: delete entries with that posting batch, the two June/July PayrollPeriods, and the four
   `EffectiveFrom = 2026-06-01` StaffCost/RateCard rows - or restore the backup.
 
 **Post-demo backlog raised today, not started (user's call):**
