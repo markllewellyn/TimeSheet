@@ -18,6 +18,19 @@ button for inactive rows).
   and `Clients_Reactivate` confirmed registered (401 unauthenticated). Handbook's Clients row updated.
 - Not live-clicked by me (Chrome not connected) - the user is reactivating the real client themselves.
 
+**Demo dummy data added later the same day, at the user's request (direct DB write, approved; backup of the data
+taken first to `OneDrive - SVG IT\Projects\Claude\Training\TimeSheet-DataBackups\2026-09-29\`)** - so Payroll
+Periods has June and July rows, not just August:
+- 6 out-of-hours entries, posting batch **`DEMO-DUMMY-JUN-JUL`**, description "Out-of-hours support call (dummy
+  data)", approved (by Mark) but **not** sent: James O'Brien on WMS Support Retainer (Jun 10: 3h, Jun 20: 2h,
+  Jul 8: 4h, Jul 18: 1.5h), Mark on Warehouse Ops Optimisation (Jun 13: 2h, Jul 22: 3h).
+- Pricing them needed backdated copies (same rates, `EffectiveFrom` 2026-06-01) of James's and Mark's StaffCost
+  rows and their Northwind person+client RateCards - all dev data previously started 2026-08-10.
+- PayrollPeriod rows for June (7h, 1,245.00) and July (8.5h, 1,537.50) built with the real
+  `PayrollAggregationService` from a scratch tool (Run Now can only build the previous month).
+- To remove: delete entries with that posting batch, the two June/July PayrollPeriods, and the four
+  `EffectiveFrom = 2026-06-01` StaffCost/RateCard rows - or restore the backup.
+
 **Post-demo backlog raised today, not started (user's call):**
 - **Fixed Fee per-row revenue attribution** (the follow-up below) - planned, deliberately held until after the demo.
 - **Reports can't report on an inactive client** - `reports-page.ts` calls `clientsService.list()` (active only).
