@@ -81,7 +81,9 @@ export class AddEntryPage {
     const onBehalfOf = this.impersonation.actingAs();
     this.projectsService.listAssignedToMe(onBehalfOf?.id).subscribe({
       next: (projects) => {
-        this.projects.set(projects);
+        // New time can't be logged against an inactive client (refused server-side) - hide those projects when
+        // adding. Editing keeps them, so an existing entry's own project is still there.
+        this.projects.set(this.isEditMode ? projects : projects.filter((p) => p.clientIsActive !== false));
         this.projectsLoaded.set(true);
         if (this.editId) this.loadExisting(Number(this.editId));
       },

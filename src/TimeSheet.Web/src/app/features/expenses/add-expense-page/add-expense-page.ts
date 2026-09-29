@@ -113,7 +113,9 @@ export class AddExpensePage {
     if (kind === 'Expense') {
       this.projectsService.listAssignedToMe(this.impersonation.actingAs()?.id).subscribe({
         next: (projects) => {
-          this.projects.set(projects);
+          // A new expense can't go against an inactive client (refused server-side) - hide those projects when
+          // adding. Editing keeps them, so an existing expense's own project is still there.
+          this.projects.set(this.isEditMode ? projects : projects.filter((p) => p.clientIsActive !== false));
           this.projectsLoaded.set(true);
           onLoaded?.();
         },

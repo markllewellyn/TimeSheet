@@ -44,6 +44,8 @@ export interface Project {
   budgetHours: number | null;
   fixedFeeAmount: number | null;
   isActive: boolean;
+  // The owning client's IsActive (null if not loaded) - Add Entry/Add Expense hide an inactive client's projects.
+  clientIsActive?: boolean | null;
   projectManagerUserId: number | null;
   projectManagerName: string | null;
   // FDD: "The project list shows a count of how many staff are assigned to each project." Active assignments only.

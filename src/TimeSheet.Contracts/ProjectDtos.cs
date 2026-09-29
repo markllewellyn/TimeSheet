@@ -9,7 +9,10 @@ public record ProjectDto(
     // Projects_ListByClient, Projects_ListManagedByMe) - null on every other ProjectDto response (Get/Create/
     // Update/ListAssignedToMe), which a regular assigned staff member can also reach and must not see project
     // financials through. See ProjectsFunctions.ToDto's optional status parameter.
-    decimal? ActualHours = null, decimal? HoursUsedPercent = null, decimal? ActualCost = null, decimal? CostUsedPercent = null);
+    decimal? ActualHours = null, decimal? HoursUsedPercent = null, decimal? ActualCost = null, decimal? CostUsedPercent = null,
+    // The owning client's own IsActive - lets the Add Entry/Add Expense pickers hide an inactive client's projects
+    // (new entries against one are refused server-side, see InactiveClientGuard). Null when Client wasn't loaded.
+    bool? ClientIsActive = null);
 
 public record CreateProjectRequest(
     int ClientId, string Name, string Code, string? Description,

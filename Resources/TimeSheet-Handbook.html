@@ -476,7 +476,7 @@
       <table class="field-table">
         <thead><tr><th>Field</th><th>Notes</th></tr></thead>
         <tbody>
-          <tr><td>Client / Project</td><td class="desc">Only projects you're assigned to appear. Picking a client filters the project list.</td></tr>
+          <tr><td>Client / Project</td><td class="desc">Only projects you're assigned to appear, and only for active clients — new time can't be logged against a deactivated client. Picking a client filters the project list.</td></tr>
           <tr><td>Entry Type</td><td class="desc">Only shows once a project has at least one type configured (Admin sets these up per project). Left as "(none)" otherwise.</td></tr>
           <tr><td>Date</td><td class="desc">Defaults to today.</td></tr>
           <tr><td>In Work Hours / Out of Hours</td><td class="desc">Logged separately — Out of Hours is what feeds the monthly out-of-hours payroll run.</td></tr>
@@ -825,7 +825,7 @@
     <div class="registry">
       <div class="registry-row">
         <div class="name">Clients</div>
-        <div class="desc">Client records, reporting currency, billing period (One-off / Monthly), rate overrides for a specific person at that client. <strong>Deactivate</strong> / <strong>Reactivate</strong> from the list — an inactive client is hidden from the Reports client picker unless <strong>Show inactive clients</strong> is ticked there.</div>
+        <div class="desc">Client records, reporting currency, billing period (One-off / Monthly), rate overrides for a specific person at that client. <strong>Deactivate</strong> / <strong>Reactivate</strong> from the list. Deactivating stops <strong>new</strong> time and expense entries against that client (existing ones can still be edited, approved and invoiced), and an inactive client is hidden from the Reports client picker unless <strong>Show inactive clients</strong> is ticked there.</div>
       </div>
       <div class="registry-row">
         <div class="name">Projects</div>

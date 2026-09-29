@@ -278,5 +278,5 @@ public class ProjectsFunctions(
         p.PaymentModel.ToString(), p.ProjectType.ToString(), p.CanInvoice, p.IsCostExempt, p.CurrencyOverride, p.StartDate, p.EndDate,
         p.BudgetHours, p.FixedFeeAmount, p.IsActive,
         p.ProjectManagerUserId, projectManagerName ?? p.ProjectManager?.DisplayName, assignedStaffCount,
-        status?.ActualHours, status?.HoursUsedPercent, status?.ActualCost, status?.CostUsedPercent);
+        status?.ActualHours, status?.HoursUsedPercent, status?.ActualCost, status?.CostUsedPercent, p.Client?.IsActive);
 }

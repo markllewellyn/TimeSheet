@@ -103,6 +103,11 @@ public class ExpenseEntriesFunctions(
             if (validation is not null) return validation;
         }
 
+        // Both kinds - an expense and an Admin's Contract value are both new entries (see InactiveClientGuard).
+        // Both branches above have already 404'd a missing project.
+        var entryProject = await projects.GetByIdAsync(body.ProjectId, ct);
+        if (entryProject is not null && InactiveClientGuard.RejectIfClientInactive(entryProject) is { } inactiveClient) return inactiveClient;
+
         var entry = new ExpenseEntry
         {
             UserId = effectiveUserId,

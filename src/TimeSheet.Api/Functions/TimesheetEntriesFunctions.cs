@@ -103,6 +103,7 @@ public class TimesheetEntriesFunctions(
 
         var (validationError, project) = await ValidateAssignmentAsync(effectiveUserId, body.ProjectId, body.Date, ct);
         if (validationError is not null) return validationError;
+        if (InactiveClientGuard.RejectIfClientInactive(project!) is { } inactiveClient) return inactiveClient;
 
         var valuesError = await ValidateEntryValuesAsync(project!.ClientId, effectiveUserId, body.Date, body.WorkHours, body.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
@@ -285,6 +286,7 @@ public class TimesheetEntriesFunctions(
 
         var (validationError, project) = await ValidateAssignmentAsync(source.UserId, source.ProjectId, targetDate, ct);
         if (validationError is not null) return validationError;
+        if (InactiveClientGuard.RejectIfClientInactive(project!) is { } inactiveClient) return inactiveClient;
 
         var valuesError = await ValidateEntryValuesAsync(project!.ClientId, source.UserId, targetDate, source.WorkHours, source.OutOfHoursHours, excludeEntryId: null, ct);
         if (valuesError is not null) return valuesError;
