@@ -2638,8 +2638,9 @@ Installed globally via `npm install -g azurite`, given a persistent data directo
 `C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\` (same convention as the dev SQLite DB
 and Attachments folder), and started with:
 ```
-azurite --silent --location "C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite" --debug "C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite\debug.log"
+azurite --silent --location "C:\Users\MarkLlewellyn\AppData\Local\TimeSheetDev\azurite"
 ```
+(Updated 2026-09-29: `--debug "...\debug.log"` dropped from this command - debug mode made Azurite take ~85s to start and grew a ~400 MB log. Add it back only when debugging Azurite itself.)
 **Azurite must be running before `func start`** for any timer-triggered Function to actually fire
 (scheduled or via `POST /admin/functions/{name}`) — otherwise you'll see 202-with-no-effect or the
 listener-startup error above. With it running, both new timers were manually triggered and
@@ -2748,9 +2749,10 @@ session's earlier entry above respectively. They are not part of the new numbere
 - **Stopping Azurite kills the API host** (found 2026-09-29 while deleting Azurite's 422 MB `debug.log`): the
   Functions host keeps its timer leases in `AzureWebJobsStorage` (Azurite), so ~20s after Azurite goes away it
   logs "No connection could be made ... 127.0.0.1:10000 ... Host is shutting down" and exits. **Always restart
-  `func start` after restarting Azurite.** Also: Azurite's ~85s startup is **not** caused by `debug.log` size (it
-  was just as slow with the log deleted) - cause unknown. The `--debug` flag in the start command regrows the log
-  (~400 MB over a month); drop it from the command if the log isn't wanted.
+  `func start` after restarting Azurite.** Also: Azurite's ~85s startup was caused by **debug mode itself**, not
+  the log's size - it was just as slow with the log deleted, then started in **1s** once `--debug` was dropped
+  (done 2026-09-29, at the user's request; the documented start command above is updated, and the old
+  `debug.log` deleted).
 
 - ~~navigating directly to `/login` while already signed in shows both the signed-in header (nav links, "Sign
   out") *and* the login form at the same time~~ - **fixed 2026-09-10, a later session**: see that session's own
