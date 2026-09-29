@@ -2746,6 +2746,12 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **Git remote set up 2026-09-29**: `origin` = https://github.com/markllewellyn/TimeSheet.git (private, created
+  empty by the user). Full history pushed from `master`, which tracks `origin/master`. History was checked for
+  secrets first - `local.settings.json` has never been committed (gitignored; only the `.example` with
+  placeholders is tracked), and no real key formats appear anywhere. No `gh`/`az` CLI here; Git Credential
+  Manager handles the GitHub sign-in.
+
 - **Stopping Azurite kills the API host** (found 2026-09-29 while deleting Azurite's 422 MB `debug.log`): the
   Functions host keeps its timer leases in `AzureWebJobsStorage` (Azurite), so ~20s after Azurite goes away it
   logs "No connection could be made ... 127.0.0.1:10000 ... Host is shutting down" and exits. **Always restart
