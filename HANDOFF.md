@@ -2745,6 +2745,13 @@ session's earlier entry above respectively. They are not part of the new numbere
 
 ## Known loose ends / flags already raised, not yet actioned
 
+- **Stopping Azurite kills the API host** (found 2026-09-29 while deleting Azurite's 422 MB `debug.log`): the
+  Functions host keeps its timer leases in `AzureWebJobsStorage` (Azurite), so ~20s after Azurite goes away it
+  logs "No connection could be made ... 127.0.0.1:10000 ... Host is shutting down" and exits. **Always restart
+  `func start` after restarting Azurite.** Also: Azurite's ~85s startup is **not** caused by `debug.log` size (it
+  was just as slow with the log deleted) - cause unknown. The `--debug` flag in the start command regrows the log
+  (~400 MB over a month); drop it from the command if the log isn't wanted.
+
 - ~~navigating directly to `/login` while already signed in shows both the signed-in header (nav links, "Sign
   out") *and* the login form at the same time~~ - **fixed 2026-09-10, a later session**: see that session's own
   "Done" entry above for the new `guestGuard`.
